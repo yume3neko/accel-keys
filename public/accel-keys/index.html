@@ -530,7 +530,7 @@
         <div class="normal-ui">
           <section class="hsbox">
             <label for="hs">HIGH SPEED</label
-            ><input id="hs" type="range" min="0.5" max="2" step="0.25" /><output
+            ><input id="hs" type="range" min="0.5" max="2" step="0.1" /><output
               class="hsvalue"
               ><span id="hsText"></span><small id="hsBonus"></small
             ></output>
@@ -581,12 +581,20 @@
           raf = 0,
           judgeTimer = 0,
           activeLane = -1,
-          highSpeed = Math.max(
-            0.5,
-            Number(localStorage.getItem("accel-keys-hs") || 1),
+          highSpeed = Math.min(
+            2,
+            Math.max(
+              0.5,
+              Math.round(
+                Number(localStorage.getItem("accel-keys-hs") || 1) * 10,
+              ) / 10,
+            ),
           ),
           previewAt = 0;
-        const hsScore = () => 1 + (highSpeed - 1) * 0.08,
+        const hsScore = () =>
+            highSpeed < 1
+              ? 0.6 + (highSpeed - 0.5) * 0.25
+              : 1 + (highSpeed - 1) * 0.08,
           myBest = Number(localStorage.getItem("accel-keys-best") || 0);
         q("#myBest").textContent = myBest.toLocaleString();
         q("#hs").value = String(highSpeed);

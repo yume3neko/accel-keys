@@ -1,5 +1,417 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>ACCEL KEYS ADMIN</title><style>
-:root{color-scheme:dark;--lime:#b9ff38;--red:#ff4d62;--bg:#070a0c;--card:#101619;--line:#2b353a;--muted:#869197}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0,#142017,var(--bg) 34%);color:#f2f5f3;font-family:Arial,"Noto Sans JP",sans-serif;min-height:100vh}button,input{font:inherit}.wrap{width:min(1100px,calc(100% - 28px));margin:auto;padding:24px 0 60px}header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:20px}.brand{font-size:18px;font-weight:900;letter-spacing:.14em}.brand b{color:var(--lime)}a{color:var(--muted);font-size:13px}.login{max-width:430px;margin:15vh auto;background:var(--card);border:1px solid var(--line);padding:26px;border-radius:10px}.login h1{font-size:25px;margin:0 0 8px}.login p{color:var(--muted);font-size:14px;line-height:1.6}.row{display:flex;gap:8px}input{min-width:0;flex:1;background:#090d0f;border:1px solid var(--line);border-radius:6px;color:#fff;padding:12px}button{border:0;border-radius:6px;background:var(--lime);color:#071006;padding:11px 16px;font-weight:900;cursor:pointer}.error{color:#ff8795;font-size:13px;min-height:18px}.panel{display:none}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}.summary div{background:var(--card);border:1px solid var(--line);padding:16px;border-radius:8px}.summary span{display:block;font-size:11px;letter-spacing:.15em;color:var(--muted)}.summary b{display:block;font-size:28px;margin-top:5px}.tools{display:flex;justify-content:space-between;align-items:center;margin:12px 0}.tools h1{font-size:20px}.danger{background:transparent;color:var(--red);border:1px solid var(--red)}.refresh{background:#263036;color:#fff;margin-right:7px}.table{overflow:auto;border:1px solid var(--line);border-radius:8px;background:#0b1012}table{width:100%;border-collapse:collapse;min-width:790px}th,td{text-align:left;padding:12px 13px;border-bottom:1px solid #222b2f;font-size:13px}th{color:var(--muted);font-size:11px;letter-spacing:.08em}td.score{color:var(--lime);font-weight:900}.del{padding:6px 10px;background:#35151b;color:#ff8e9c}.empty{text-align:center;color:var(--muted);padding:50px}.status{color:var(--muted);font-size:13px;min-height:20px}.logout{background:transparent;color:var(--muted);border:1px solid var(--line);padding:7px 11px}@media(max-width:600px){.wrap{padding-top:15px}.summary{grid-template-columns:1fr 1fr}.summary div:last-child{grid-column:1/-1}.tools{align-items:flex-end}.tools h1{font-size:17px}.tools button{font-size:12px;padding:9px}.login{margin-top:10vh}}
-</style></head><body><div class="wrap"><header><div class="brand"><b>A</b> ACCEL KEYS / ADMIN</div><a href="/">ゲームへ戻る</a></header><section class="login" id="login"><h1>管理者認証</h1><p>Cloudflare Pagesに設定した管理者キーを入力してください。キーはこの端末のタブを閉じるまで保持されます。</p><form class="row" id="loginForm"><input id="token" type="password" autocomplete="current-password" placeholder="管理者キー" required><button>ログイン</button></form><p class="error" id="loginError"></p></section><main class="panel" id="panel"><section class="summary"><div><span>登録件数</span><b id="total">0</b></div><div><span>プレイヤー数</span><b id="players">0</b></div><div><span>世界記録</span><b id="worldBest">0</b></div></section><div class="tools"><h1>登録履歴</h1><div><button class="refresh" id="refresh">更新</button><button class="danger" id="clear">ランキングを全削除</button></div></div><p class="status" id="status"></p><div class="table"><table><thead><tr><th>ID</th><th>登録日時（UTC）</th><th>プレイヤー</th><th>スコア</th><th>モード</th><th>最高速度</th><th>最高コンボ</th><th></th></tr></thead><tbody id="rows"></tbody></table><div class="empty" id="empty" hidden>登録記録はありません。</div></div><p><button class="logout" id="logout">ログアウト</button></p></main></div><script>
-(()=>{const q=s=>document.querySelector(s),api='/api/admin/scores';let token=sessionStorage.getItem('accel-admin-token')||'';const headers=()=>({'authorization':'Bearer '+token,'content-type':'application/json'}),esc=s=>{const d=document.createElement('div');d.textContent=s;return d.innerHTML};async function load(){q('#status').textContent='読み込み中…';try{const r=await fetch(api,{headers:headers()}),d=await r.json();if(r.status===401)throw Error('管理者キーが正しくありません。');if(!r.ok)throw Error(d.error);q('#login').style.display='none';q('#panel').style.display='block';q('#total').textContent=Number(d.summary.total).toLocaleString();q('#players').textContent=Number(d.summary.players).toLocaleString();q('#worldBest').textContent=Number(d.summary.worldBest).toLocaleString();q('#rows').innerHTML=d.scores.map(x=>`<tr><td>${x.id}</td><td>${esc(x.createdAt)}</td><td>${esc(x.name)}</td><td class="score">${Number(x.score).toLocaleString()}</td><td>${x.mode==='hits'?'打数':'時間'}</td><td>×${Number(x.maxSpeed).toFixed(2)}</td><td>${x.bestCombo}</td><td><button class="del" data-id="${x.id}" data-name="${esc(x.name)}">削除</button></td></tr>`).join('');q('#empty').hidden=d.scores.length>0;q('#status').textContent=`最新500件を表示しています（更新：${new Date().toLocaleTimeString()}）`;document.querySelectorAll('.del').forEach(b=>b.onclick=()=>remove(Number(b.dataset.id),b.dataset.name))}catch(e){q('#status').textContent='';q('#loginError').textContent=e.message;q('#login').style.display='block';q('#panel').style.display='none';sessionStorage.removeItem('accel-admin-token')}}async function remove(id,name){if(!confirm(`${name} の記録を削除しますか？`))return;const r=await fetch(api,{method:'DELETE',headers:headers(),body:JSON.stringify({id})}),d=await r.json();if(!r.ok)return alert(d.error);load()}q('#loginForm').onsubmit=e=>{e.preventDefault();token=q('#token').value;sessionStorage.setItem('accel-admin-token',token);q('#loginError').textContent='';load()};q('#refresh').onclick=load;q('#clear').onclick=async()=>{if(!confirm('ランキングを全件削除します。この操作は取り消せません。'))return;if(!confirm('本当にすべて削除しますか？'))return;const r=await fetch(api,{method:'DELETE',headers:headers(),body:JSON.stringify({all:true})}),d=await r.json();if(!r.ok)return alert(d.error);alert(`${d.deleted}件を削除しました。`);load()};q('#logout').onclick=()=>{sessionStorage.removeItem('accel-admin-token');location.reload()};if(token)load()})();
-</script></body></html>
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>ACCEL KEYS ADMIN</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --lime: #b9ff38;
+        --red: #ff4d62;
+        --bg: #070a0c;
+        --card: #101619;
+        --line: #2b353a;
+        --muted: #869197;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: radial-gradient(circle at 50% 0, #142017, var(--bg) 34%);
+        color: #f2f5f3;
+        font-family: Arial, "Noto Sans JP", sans-serif;
+        min-height: 100vh;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      .wrap {
+        width: min(1100px, calc(100% - 28px));
+        margin: auto;
+        padding: 24px 0 60px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 18px;
+        margin-bottom: 20px;
+      }
+      .brand {
+        font-size: 18px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+      }
+      .brand b {
+        color: var(--lime);
+      }
+      a {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .login {
+        max-width: 430px;
+        margin: 15vh auto;
+        background: var(--card);
+        border: 1px solid var(--line);
+        padding: 26px;
+        border-radius: 10px;
+      }
+      .login h1 {
+        font-size: 25px;
+        margin: 0 0 8px;
+      }
+      .login p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      input {
+        min-width: 0;
+        flex: 1;
+        background: #090d0f;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: #fff;
+        padding: 12px;
+      }
+      button {
+        border: 0;
+        border-radius: 6px;
+        background: var(--lime);
+        color: #071006;
+        padding: 11px 16px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+      .error {
+        color: #ff8795;
+        font-size: 13px;
+        min-height: 18px;
+      }
+      .panel {
+        display: none;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .summary div {
+        background: var(--card);
+        border: 1px solid var(--line);
+        padding: 16px;
+        border-radius: 8px;
+      }
+      .summary span {
+        display: block;
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        color: var(--muted);
+      }
+      .summary b {
+        display: block;
+        font-size: 28px;
+        margin-top: 5px;
+      }
+      .tools {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 12px 0;
+      }
+      .tools h1 {
+        font-size: 20px;
+      }
+      .danger {
+        background: transparent;
+        color: var(--red);
+        border: 1px solid var(--red);
+      }
+      .refresh {
+        background: #263036;
+        color: #fff;
+        margin-right: 7px;
+      }
+      .table {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0b1012;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 790px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 12px 13px;
+        border-bottom: 1px solid #222b2f;
+        font-size: 13px;
+      }
+      th {
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+      }
+      td.score {
+        color: var(--lime);
+        font-weight: 900;
+      }
+      .del {
+        padding: 6px 10px;
+        background: #35151b;
+        color: #ff8e9c;
+      }
+      .edit {
+        padding: 6px 10px;
+        margin-right: 6px;
+        background: #24330f;
+        color: var(--lime);
+      }
+      .empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 50px;
+      }
+      .status {
+        color: var(--muted);
+        font-size: 13px;
+        min-height: 20px;
+      }
+      .logout {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        padding: 7px 11px;
+      }
+      @media (max-width: 600px) {
+        .wrap {
+          padding-top: 15px;
+        }
+        .summary {
+          grid-template-columns: 1fr 1fr;
+        }
+        .summary div:last-child {
+          grid-column: 1/-1;
+        }
+        .tools {
+          align-items: flex-end;
+        }
+        .tools h1 {
+          font-size: 17px;
+        }
+        .tools button {
+          font-size: 12px;
+          padding: 9px;
+        }
+        .login {
+          margin-top: 10vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="brand"><b>A</b> ACCEL KEYS / ADMIN</div>
+        <a href="/">ゲームへ戻る</a>
+      </header>
+      <section class="login" id="login">
+        <h1>管理者認証</h1>
+        <p>
+          Cloudflare
+          Pagesに設定した管理者キーを入力してください。キーはこの端末のタブを閉じるまで保持されます。
+        </p>
+        <form class="row" id="loginForm">
+          <input
+            id="token"
+            type="password"
+            autocomplete="current-password"
+            placeholder="管理者キー"
+            required
+          /><button>ログイン</button>
+        </form>
+        <p class="error" id="loginError"></p>
+      </section>
+      <main class="panel" id="panel">
+        <section class="summary">
+          <div><span>登録件数</span><b id="total">0</b></div>
+          <div><span>プレイヤー数</span><b id="players">0</b></div>
+          <div><span>世界記録</span><b id="worldBest">0</b></div>
+        </section>
+        <div class="tools">
+          <h1>登録履歴</h1>
+          <div>
+            <button class="refresh" id="refresh">更新</button
+            ><button class="danger" id="clear">ランキングを全削除</button>
+          </div>
+        </div>
+        <p class="status" id="status"></p>
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>登録日時（UTC）</th>
+                <th>プレイヤー</th>
+                <th>スコア</th>
+                <th>モード</th>
+                <th>最高速度</th>
+                <th>最高コンボ</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="empty" id="empty" hidden>登録記録はありません。</div>
+        </div>
+        <p><button class="logout" id="logout">ログアウト</button></p>
+      </main>
+    </div>
+    <script>
+      (() => {
+        const q = (s) => document.querySelector(s),
+          api = "/api/admin/scores";
+        let token = sessionStorage.getItem("accel-admin-token") || "",
+          currentScores = [];
+        const headers = () => ({
+            authorization: "Bearer " + token,
+            "content-type": "application/json",
+          }),
+          esc = (s) => {
+            const d = document.createElement("div");
+            d.textContent = s;
+            return d.innerHTML;
+          };
+        async function load() {
+          q("#status").textContent = "読み込み中…";
+          try {
+            const r = await fetch(api, { headers: headers() }),
+              d = await r.json();
+            if (r.status === 401) throw Error("管理者キーが正しくありません。");
+            if (!r.ok) throw Error(d.error);
+            q("#login").style.display = "none";
+            q("#panel").style.display = "block";
+            q("#total").textContent = Number(d.summary.total).toLocaleString();
+            q("#players").textContent = Number(
+              d.summary.players,
+            ).toLocaleString();
+            q("#worldBest").textContent = Number(
+              d.summary.worldBest,
+            ).toLocaleString();
+            currentScores = d.scores;
+            q("#rows").innerHTML = d.scores
+              .map(
+                (x) =>
+                  `<tr><td>${x.id}</td><td>${esc(x.createdAt)}</td><td>${esc(x.name)}</td><td class="score">${Number(x.score).toLocaleString()}</td><td>${x.mode === "hits" ? "打数" : "時間"}</td><td>×${Number(x.maxSpeed).toFixed(2)}</td><td>${x.bestCombo}</td><td><button class="edit" data-id="${x.id}">編集</button><button class="del" data-id="${x.id}" data-name="${esc(x.name)}">削除</button></td></tr>`,
+              )
+              .join("");
+            q("#empty").hidden = d.scores.length > 0;
+            q("#status").textContent =
+              `最新500件を表示しています（更新：${new Date().toLocaleTimeString()}）`;
+            document
+              .querySelectorAll(".edit")
+              .forEach((b) => (b.onclick = () => edit(Number(b.dataset.id))));
+            document
+              .querySelectorAll(".del")
+              .forEach(
+                (b) =>
+                  (b.onclick = () =>
+                    remove(Number(b.dataset.id), b.dataset.name)),
+              );
+          } catch (e) {
+            q("#status").textContent = "";
+            q("#loginError").textContent = e.message;
+            q("#login").style.display = "block";
+            q("#panel").style.display = "none";
+            sessionStorage.removeItem("accel-admin-token");
+          }
+        }
+        async function edit(id) {
+          const record = currentScores.find((x) => Number(x.id) === id);
+          if (!record) return alert("記録が見つかりません。");
+          const name = prompt("プレイヤー名", record.name);
+          if (name === null) return;
+          const score = prompt("スコア", record.score);
+          if (score === null) return;
+          const mode = prompt("モード（time または hits）", record.mode);
+          if (mode === null) return;
+          const maxSpeed = prompt("最高速度", record.maxSpeed);
+          if (maxSpeed === null) return;
+          const bestCombo = prompt("最高コンボ", record.bestCombo);
+          if (bestCombo === null) return;
+          if (!confirm("この内容で記録を更新しますか？")) return;
+          const r = await fetch(api, {
+              method: "PATCH",
+              headers: headers(),
+              body: JSON.stringify({
+                id,
+                name,
+                score: Number(score),
+                mode,
+                maxSpeed: Number(maxSpeed),
+                bestCombo: Number(bestCombo),
+              }),
+            }),
+            d = await r.json();
+          if (!r.ok) return alert(d.error);
+          alert("記録を更新しました。");
+          load();
+        }
+        async function remove(id, name) {
+          if (!confirm(`${name} の記録を削除しますか？`)) return;
+          const r = await fetch(api, {
+              method: "DELETE",
+              headers: headers(),
+              body: JSON.stringify({ id }),
+            }),
+            d = await r.json();
+          if (!r.ok) return alert(d.error);
+          load();
+        }
+        q("#loginForm").onsubmit = (e) => {
+          e.preventDefault();
+          token = q("#token").value;
+          sessionStorage.setItem("accel-admin-token", token);
+          q("#loginError").textContent = "";
+          load();
+        };
+        q("#refresh").onclick = load;
+        q("#clear").onclick = async () => {
+          if (
+            !confirm("ランキングを全件削除します。この操作は取り消せません。")
+          )
+            return;
+          if (!confirm("本当にすべて削除しますか？")) return;
+          const r = await fetch(api, {
+              method: "DELETE",
+              headers: headers(),
+              body: JSON.stringify({ all: true }),
+            }),
+            d = await r.json();
+          if (!r.ok) return alert(d.error);
+          alert(`${d.deleted}件を削除しました。`);
+          load();
+        };
+        q("#logout").onclick = () => {
+          sessionStorage.removeItem("accel-admin-token");
+          location.reload();
+        };
+        if (token) load();
+      })();
+    </script>
+  </body>
+</html>

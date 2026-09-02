@@ -1,0 +1,8 @@
+name = "accel-keys"
+compatibility_date = "2026-08-01"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "accel-keys-scores"
+database_id = "939304b7-dae3-4af1-b23f-9d0475917154"

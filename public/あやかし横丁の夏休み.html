@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プロジェクトセカイ あやかし横丁の夏休み アセットビューワ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            color: #e94560;
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.3);
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+
+        .mode-switch {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .mode-btn {
+            padding: 8px 20px;
+            border: 2px solid #e94560;
+            background: transparent;
+            color: #fff;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn:hover {
+            background: rgba(233, 69, 96, 0.2);
+        }
+
+        .mode-btn.active {
+            background: #e94560;
+            color: #fff;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: #ffd700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title::before {
+            content: "✦";
+            color: #e94560;
+        }
+
+        .char-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+        }
+
+        .char-btn {
+            padding: 10px 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .char-btn:hover {
+            background: rgba(233, 69, 96, 0.3);
+            border-color: #e94560;
+            transform: translateY(-2px);
+        }
+
+        .char-btn.selected {
+            background: #e94560;
+            border-color: #e94560;
+        }
+
+        .pattern-btns {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .pattern-btn {
+            padding: 8px 25px;
+            border: 2px solid #ffd700;
+            background: transparent;
+            color: #ffd700;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .pattern-btn:hover {
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        .pattern-btn.selected {
+            background: #ffd700;
+            color: #1a1a2e;
+        }
+
+        .ending-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .ending-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .ending-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .ending-list::-webkit-scrollbar-thumb {
+            background: #e94560;
+            border-radius: 3px;
+        }
+
+        .ending-btn {
+            padding: 10px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ending-btn:hover {
+            background: rgba(233, 69, 96, 0.3);
+            border-color: #e94560;
+        }
+
+        .ending-btn.selected {
+            background: #e94560;
+            border-color: #e94560;
+        }
+
+        .ending-btn.revealed {
+            background: rgba(255, 215, 0, 0.15);
+            border-color: #ffd700;
+        }
+
+        .ending-id {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .ending-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .ending-title {
+            flex: 1;
+        }
+
+        .ending-title.hidden-title {
+            color: #888;
+            font-style: italic;
+        }
+
+        .ending-char {
+            font-size: 0.75rem;
+            color: #ffd700;
+        }
+
+        .image-display {
+            text-align: center;
+            padding: 20px;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-display img {
+            max-width: 100%;
+            max-height: 450px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .image-info {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .placeholder {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-msg {
+            color: #e94560;
+            font-size: 0.9rem;
+        }
+
+        .route-indicator {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(233, 69, 96, 0.15);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+            padding: 6px 15px;
+            border-radius: 8px 8px 0 0;
+            font-size: 0.8rem;
+            color: #ffd700;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .route-indicator span {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .scenario-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .scenario-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: #000;
+            border-radius: 0;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+        }
+
+        .scenario-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            opacity: 0.85;
+        }
+
+        .scenario-char-container {
+            position: relative;
+            height: 95%;
+            z-index: 2;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .scenario-char-img {
+            height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+            transition: filter 0.3s ease, opacity 0.2s;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+        }
+
+        /* 非アクティブ時に立ち絵を暗くするスタイル */
+        .scenario-char-img.dimmed {
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5)) brightness(0.45);
+        }
+
+        .dialogue-box {
+            position: relative;
+            z-index: 3;
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid rgba(233, 69, 96, 0.6);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 15px 20px;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+
+        .speaker-name {
+            font-size: 1rem;
+            color: #ffd700;
+            font-weight: bold;
+            margin-bottom: 6px;
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+        }
+
+        .dialogue-text {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #fff;
+            white-space: pre-wrap;
+            flex: 1;
+        }
+
+        .next-indicator {
+            text-align: right;
+            font-size: 0.75rem;
+            color: #e94560;
+            animation: blink 1s infinite;
+            margin-top: 5px;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .choice-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 15px;
+            overflow-y: auto;
+            max-height: 100%;
+        }
+
+        .choice-btn {
+            background: linear-gradient(135deg, #e94560 0%, #0f3460 100%);
+            color: #fff;
+            border: 2px solid #ffd700;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            width: 100%;
+            max-width: 450px;
+            text-align: left;
+            position: relative;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .choice-btn:hover {
+            transform: scale(1.02);
+            background: linear-gradient(135deg, #ff6b81 0%, #16213e 100%);
+        }
+
+        .choice-btn.true-route {
+            background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+            color: #1a1a2e;
+            font-weight: bold;
+            border-color: #fff;
+            animation: pulse-gold 2s infinite;
+        }
+
+        .choice-btn.completed-route {
+            background: linear-gradient(135deg, #2a2a40 0%, #1b3b2b 100%);
+            border-color: #2ed573;
+            box-shadow: 0 0 12px rgba(46, 213, 115, 0.4);
+        }
+        .choice-btn.completed-route:hover {
+            background: linear-gradient(135deg, #3a3a50 0%, #254d38 100%);
+        }
+
+        .choice-sub-text {
+            flex: 1;
+        }
+
+        .choice-remaining {
+            font-size: 0.7rem;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 2px 6px;
+            border-radius: 10px;
+            color: #ffd700;
+            margin-left: 8px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .choice-remaining.is-completed {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+            font-weight: bold;
+        }
+
+        .choice-btn.true-route .choice-remaining {
+            background: rgba(26, 26, 46, 0.3);
+            color: #1a1a2e;
+        }
+
+        @keyframes pulse-gold {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.6); }
+            50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.9); }
+        }
+
+        .scenario-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .control-btn {
+            padding: 6px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .control-btn:hover {
+            background: rgba(233, 69, 96, 0.3);
+        }
+
+        .confirm-area {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .confirm-subtext {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+
+        .confirm-btn-area {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .confirm-action-btn {
+            padding: 10px 30px;
+            border: 2px solid #e94560;
+            background: transparent;
+            color: #e94560;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .confirm-action-btn:hover {
+            background: rgba(233, 69, 96, 0.2);
+        }
+
+        .confirm-action-btn.primary {
+            background: #e94560;
+            color: #fff;
+        }
+
+        .hint-display {
+            font-size: 0.85rem;
+            color: #ffd700;
+            margin-top: 10px;
+            padding: 10px 15px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            margin-bottom: 15px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .hint-display:hover {
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        .answer-reveal-box {
+            font-size: 0.85rem;
+            color: #2ed573;
+            margin-top: 8px;
+            padding: 10px 15px;
+            background: rgba(46, 213, 115, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(46, 213, 115, 0.3);
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ending-name-display {
+            font-size: 1.2rem;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        .ending-name-display .true-mark {
+            color: #ffd700;
+        }
+
+
+        .audio-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin: -5px 0 20px;
+            padding: 10px 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(0,0,0,0.18);
+            border-radius: 12px;
+            flex-wrap: wrap;
+            font-size: 0.8rem;
+        }
+        .audio-controls button {
+            padding: 6px 14px;
+            border: 1px solid #ffd700;
+            background: rgba(255,215,0,0.08);
+            color: #ffd700;
+            border-radius: 18px;
+            cursor: pointer;
+        }
+        .audio-controls label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #ddd;
+        }
+        .audio-controls input[type="range"] { width: 90px; }
+        .audio-status { color: #aaa; min-width: 135px; text-align: center; }
+        .local-note {
+            font-size: 0.72rem;
+            color: #8fd3ff;
+            text-align: center;
+            margin-top: -12px;
+            margin-bottom: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .char-grid {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            }
+            .ending-list {
+                grid-template-columns: 1fr;
+            }
+            h1 {
+                font-size: 1.2rem;
+            }
+            .scenario-container {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎐 あやかし横丁の夏休み</h1>
+
+        <div class="mode-switch">
+            <button class="mode-btn" data-mode="scenario" onclick="switchMode('scenario')">📖 シナリオ再生</button>
+            <button class="mode-btn active" data-mode="character" onclick="switchMode('character')">🖼️ キャラクター画像</button>
+            <button class="mode-btn" data-mode="ending" onclick="switchMode('ending')">🏆 エンディング画像</button>
+        </div>
+
+        <div class="audio-controls">
+            <button id="sound-toggle" onclick="toggleSound()">🔊 音声 ON</button>
+            <label>BGM <input id="bgm-volume" type="range" min="0" max="1" step="0.05" value="0.35" oninput="setBgmVolume(this.value)"></label>
+            <label>SE <input id="se-volume" type="range" min="0" max="1" step="0.05" value="0.65" oninput="setSeVolume(this.value)"></label>
+            <span class="audio-status" id="audio-status">初回操作後に音声開始</span>
+        </div>
+
+        <!-- シナリオ再生パネル -->
+        <div id="scenario-panel" class="panel hidden">
+            <div class="panel-title">シナリオプレイヤー</div>
+            <div class="scenario-wrapper">
+                <div class="route-indicator">
+                    <div>現在のルート: <span id="current-route-name">オープニング</span></div>
+                    <div>現在の位置: <span id="current-position-info">1 / 40</span></div>
+                </div>
+                <div class="scenario-container" id="scenario-screen">
+                    <img id="sc-bg" class="scenario-bg" src="" alt="背景" onerror="this.src=''">
+                    <div class="scenario-char-container" id="sc-char-container">
+                        <img id="sc-char" class="scenario-char-img" src="" style="display: none;" alt="">
+                    </div>
+                    <div class="choice-container hidden" id="choice-container">
+                    </div>
+                </div>
+                <div class="dialogue-box" onclick="nextDialogue()">
+                    <div>
+                        <div class="speaker-name" id="sc-speaker"></div>
+                        <div class="dialogue-text" id="sc-text"></div>
+                    </div>
+                    <div class="next-indicator">▼ タップして次へ</div>
+                </div>
+            </div>
+            <div class="scenario-controls">
+                <button class="control-btn" onclick="restartScenario()">最初から再生</button>
+                <button class="control-btn" onclick="cycleAutoPlay()" id="auto-btn">オート: オフ</button>
+            </div>
+        </div>
+
+        <!-- キャラクター選択パネル -->
+        <div id="character-panel" class="panel">
+            <div class="panel-title">キャラクターを選択</div>
+            <div class="char-grid" id="char-grid"></div>
+
+            <div class="pattern-btns" id="pattern-btns" style="display:none;">
+                <button class="pattern-btn" data-type="pattern" data-value="1" onclick="selectPattern('1')">表情 1</button>
+                <button class="pattern-btn" data-type="pattern" data-value="2" onclick="selectPattern('2')">表情 2</button>
+                <button class="pattern-btn" data-type="pattern" data-value="icon" onclick="selectPattern('icon')">アイコン</button>
+            </div>
+        </div>
+
+        <!-- エンディング選択パネル -->
+        <div id="ending-panel" class="panel hidden">
+            <div class="panel-title">エンディングを選択</div>
+            <div class="ending-list" id="ending-list"></div>
+        </div>
+
+        <!-- 画像表示エリア（画像モード用） -->
+        <div class="panel image-display" id="image-display-panel">
+            <div class="image-display" id="image-display">
+                <div class="placeholder">キャラクターを選択してください</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = "./"; // ローカル素材のみ参照
+
+        let scenarioData = null;
+        let revealedEndings = [];
+
+        const characters = [
+            {"en": "miku", "ja": "ミク"}, {"en": "rin", "ja": "リン"}, {"en": "ren", "ja": "レン"},
+            {"en": "luka", "ja": "ルカ"}, {"en": "meiko", "ja": "メイコ"}, {"en": "kaito", "ja": "カイト"},
+            {"en": "ichika", "ja": "イチカ"}, {"en": "saki", "ja": "サキ"}, {"en": "honami", "ja": "ホナミ"},
+            {"en": "shiho", "ja": "シホ"}, {"en": "minori", "ja": "ミノリ"}, {"en": "haruka", "ja": "ハルカ"},
+            {"en": "airi", "ja": "アイリ"}, {"en": "shizuku", "ja": "シズク"}, {"en": "kohane", "ja": "コハネ"},
+            {"en": "an", "ja": "アン"}, {"en": "akito", "ja": "アキト"}, {"en": "toya", "ja": "トウヤ"},
+            {"en": "tsukasa", "ja": "ツカサ"}, {"en": "emu", "ja": "エム"}, {"en": "nene", "ja": "ネネ"},
+            {"en": "rui", "ja": "ルイ"}, {"en": "kanade", "ja": "カナデ"}, {"en": "mafuyu", "ja": "マフユ"},
+            {"en": "ena", "ja": "エナ"}, {"en": "mizuki", "ja": "ミズキ"}
+        ];
+
+        const charIconMap = {
+            "ミク": "miku", "リン": "rin", "レン": "ren", "ルカ": "luka", "メイコ": "meiko", "カイト": "kaito",
+            "イチカ": "ichika", "サキ": "saki", "ホナミ": "honami", "シホ": "shiho", "ミノリ": "minori", "ハルカ": "haruka",
+            "アイリ": "airi", "シズク": "shizuku", "コハネ": "kohane", "アン": "an", "アキト": "akito", "トウヤ": "toya",
+            "ツカサ": "tsukasa", "エム": "emu", "ネネ": "nene", "ルイ": "rui", "カナデ": "kanade", "マフユ": "mafuyu",
+            "エナ": "ena", "ミズキ": "mizuki", "全員": "all"
+        };
+
+        const endings = [{"endingId": 1, "jaName": "ミク", "enName": "miku", "title": "姫君の密やかな冒険", "hint": "ヒント：オークション開催中に祭具を偽物とすり替えると…", "routeAnswer": "【ルート答え】オープニング ➔ 屋台オークション(ルート3) ➔ 正面から潜入(ルート3_1) ➔ 本物を偽物とすり替える", "targetRoute": "route3_1_2", "isTrueEnding": false, "ogpFile": "q1pkc26nro"}, {"endingId": 2, "jaName": "リン", "enName": "rin", "title": "甘いおすそ分け", "hint": "ヒント：巨大提灯の好物を作ってみると…", "routeAnswer": "【ルート答え】オープニング ➔ 巨大提灯を探す(ルート2) ➔ 好物でおびき寄せる(ルート2_2) ➔ 特大わたあめを作って待つ", "targetRoute": "route2_2_1", "isTrueEnding": false, "ogpFile": "kawyite2pu"}, {"endingId": 3, "jaName": "レン", "enName": "ren", "title": "盆踊りパーティー♪", "hint": "ヒント：会場を盛り上げると…", "routeAnswer": "【ルート答え】オープニング ➔ 巨大提灯を探す(ルート2) ➔ 好物でおびき寄せる(ルート2_2) ➔ お祭り会場を音楽で盛り上げる", "targetRoute": "route2_2_2", "isTrueEnding": false, "ogpFile": "pfqmpf8pi6"}, {"endingId": 4, "jaName": "ルカ", "enName": "luka", "title": "コルセットを締めて", "hint": "ヒント：妖力反応を追って犯人と交渉すると…", "routeAnswer": "【ルート答え】オープニング ➔ 流しそうめん暴走(ルート4) ➔ 妖力の反応を調べる(ルート4_3) ➔ しっかり交渉してみる", "targetRoute": "route4_3_2", "isTrueEnding": false, "ogpFile": "33qqpx68gd"}, {"endingId": 5, "jaName": "メイコ", "enName": "meiko", "title": "蛇女の粋な説得", "hint": "ヒント：フードフェスに出ている妖怪を説得すると…", "routeAnswer": "【ルート答え】オープニング ➔ 食材消失事件(ルート1) ➔ 台車の跡を追う(ルート1_2) ➔ 主催者を説得する", "targetRoute": "route1_2_3", "isTrueEnding": false, "ogpFile": "6h6nvc3hbr"}, {"endingId": 6, "jaName": "カイト", "enName": "kaito", "title": "誰とでもお友達", "hint": "ヒント：食材を取り戻すために山妖怪と仲良くなると…", "routeAnswer": "【ルート答え】オープニング ➔ 食材消失事件(ルート1) ➔ 巨大な足跡を追う(ルート1_1) ➔ 宴会に混ざって交渉する", "targetRoute": "route1_1_3", "isTrueEnding": false, "ogpFile": "faktclpor6"}, {"endingId": 7, "jaName": "イチカ", "enName": "ichika", "title": "きゅうりの恐怖", "hint": "ヒント：妖力反応を追って犯人を捕まえると…", "routeAnswer": "【ルート答え】オープニング ➔ 流しそうめん暴走(ルート4) ➔ 妖力の反応を調べる(ルート4_3) ➔ 悪さをする妖怪なら捕まえる", "targetRoute": "route4_3_1", "isTrueEnding": false, "ogpFile": "3ti4nagnko"}, {"endingId": 8, "jaName": "サキ", "enName": "saki", "title": "待ち伏せ大作戦", "hint": "ヒント：オークションに出品される祭具の輸送中を狙うと…", "routeAnswer": "【ルート答え】オープニング ➔ 祭具オークション(ルート3) ➔ 運搬ルート調査(ルート3_3) ➔ 輸送中の隙を狙う", "targetRoute": "route3_3_2", "isTrueEnding": false, "ogpFile": "ll63q5mqfn"}, {"endingId": 9, "jaName": "ホナミ", "enName": "honami", "title": "お掃除と健康祈願", "hint": "ヒント：流しそうめん装置の水流の原因を探ってみると…", "routeAnswer": "【ルート答え】オープニング ➔ 流しそうめん暴走(ルート4) ➔ 上流へ向かい水を止める(ルート4_1) ➔ 川を遡ってお掃除する", "targetRoute": "route4_1_2", "isTrueEnding": false, "ogpFile": "5eo8j2858h"}, {"endingId": 10, "jaName": "シホ", "enName": "shiho", "title": "チーズのために！", "hint": "ヒント：オークションに出品される祭具の受け渡し現場を押さえると…", "routeAnswer": "【ルート答え】オープニング ➔ 祭具オークション(ルート3) ➔ 運搬ルート調査(ルート3_3) ➔ 受け渡し現場を押さえる", "targetRoute": "route3_3_1", "isTrueEnding": false, "ogpFile": "by716ictuq"}, {"endingId": 11, "jaName": "ミノリ", "enName": "minori", "title": "鎌さばきと千切り", "hint": "ヒント：フードフェスでおとり屋台を出すと…", "routeAnswer": "【ルート答え】オープニング ➔ 食材消失事件(ルート1) ➔ 台車の跡を追う(ルート1_2) ➔ おとりの屋台を出す", "targetRoute": "route1_2_1", "isTrueEnding": false, "ogpFile": "2xa704w1rg"}, {"endingId": 12, "jaName": "ハルカ", "enName": "haruka", "title": "閻魔様の演技", "hint": "ヒント：フードフェスで偽の情報を流すと…", "routeAnswer": "【ルート答え】オープニング ➔ 食材消失事件(ルート1) ➔ 台車の跡を追う(ルート1_2) ➔ 幻の屋台飯の情報を流す", "targetRoute": "route1_2_2", "isTrueEnding": false, "ogpFile": "gybv741t4t"}, {"endingId": 13, "jaName": "アイリ", "enName": "airi", "title": "熱狂のあとの探しもの", "hint": "ヒント：オークション会場で大暴れすると…", "routeAnswer": "【ルート答え】オープニング ➔ 祭具オークション(ルート3) ➔ 正面から潜入(ルート3_1) ➔ オークションをめちゃくちゃにする", "targetRoute": "route3_1_3", "isTrueEnding": false, "ogpFile": "lgdl8bc11u"}, {"endingId": 14, "jaName": "シズク", "enName": "shizuku", "title": "うっかり金棒", "hint": "ヒント：オークションのステージ裏で何かをすると…", "routeAnswer": "【ルート答え】オープニング ➔ 祭具オークション(ルート3) ➔ 裏口から忍び込み(ルート3_2) ➔ ステージ裏ですり替える", "targetRoute": "route3_2_2", "isTrueEnding": false, "ogpFile": "f30j5awesj"}, {"endingId": 15, "jaName": "コハネ", "enName": "kohane", "title": "三番目の個室へ", "hint": "ヒント：流れてくるそうめんを回収すると…", "routeAnswer": "【ルート答え】オープニング ➔ 流しそうめん暴走(ルート4) ➔ 上流へ向かい水を止める(ルート4_1) ➔ 流れてくるそうめんを回収する", "targetRoute": "route4_1_3", "isTrueEnding": false, "ogpFile": "33xuc82rbg"}, {"endingId": 16, "jaName": "アン", "enName": "an", "title": "挟み撃ち大捕物", "hint": "ヒント：流しそうめん装置を改造した犯人を探すと…", "routeAnswer": "【ルート答え】オープニング ➔ 流しそうめん暴走(ルート4) ➔ 犯人や改造痕跡の調査(ルート4_2) ➔ 犯人を追いかける", "targetRoute": "route4_2_2", "isTrueEnding": false, "ogpFile": "sy1u0418ne"}, {"endingId": 17, "jaName": "アキト", "enName": "akito", "title": "パンケーキの恨み", "hint": "ヒント：山妖怪から食材を奪い返すと…", "routeAnswer": "【ルート答え】オープニング ➔ 食材消失事件(ルート1) ➔ 巨大な足跡を追う(ルート1_1) ➔ こっそりと食材を奪い返す", "targetRoute": "route1_1_2", "isTrueEnding": false, "ogpFile": "keton0sxgc"}, {"endingId": 18, "jaName": "トウヤ", "enName": "toya", "title": "絶品無水カレー", "hint": "ヒント：食材を取り戻すために山妖怪に何かを挑むと…", "routeAnswer": "【ルート答え】オープニング ➔ 食材消失事件(ルート1) ➔ 巨大な足跡を追う(ルート1_1) ➔ 正々堂々と料理勝負を挑む", "targetRoute": "route1_1_1", "isTrueEnding": false, "ogpFile": "yrv45li2a5"}, {"endingId": 19, "jaName": "ツカサ", "enName": "tsukasa", "title": "大空へ逃げる偽司会", "hint": "ヒント：オークションに潜入して何かになりきると…", "routeAnswer": "【ルート答え】オープニング ➔ 祭具オークション(ルート3) ➔ 裏口から忍び込み(ルート3_2) ➔ 司会のフリをして潜入する", "targetRoute": "route3_2_1", "isTrueEnding": false, "ogpFile": "ts88dtw143"}, {"endingId": 20, "jaName": "エム", "enName": "emu", "title": "提灯に乗って", "hint": "ヒント：巨大提灯を正面から捕まえると…", "routeAnswer": "【ルート答え】オープニング ➔ 巨大提灯を探す(ルート2) ➔ 屋上に上って追いかける(ルート2_1) ➔ 正面から捕まえに行く", "targetRoute": "route2_1_1", "isTrueEnding": false, "ogpFile": "7l6jbty64m"}, {"endingId": 21, "jaName": "ネネ", "enName": "nene", "title": "待ち伏せ作戦成功！", "hint": "ヒント：巨大提灯の行き先を予測すると…", "routeAnswer": "【ルート答え】オープニング ➔ 巨大提灯を探す(ルート2) ➔ 火の粉の痕跡を追う(ルート2_3) ➔ 待ち伏せして捕まえる", "targetRoute": "route2_3_1", "isTrueEnding": false, "ogpFile": "owbf2b8lab"}, {"endingId": 22, "jaName": "ルイ", "enName": "rui", "title": "華麗なる競り落とし劇", "hint": "ヒント：オークションで祭具を競り落とすと…", "routeAnswer": "【ルート答え】オープニング ➔ 祭具オークション(ルート3) ➔ 正面から潜入(ルート3_1) ➔ 富豪になりきって競り落とす", "targetRoute": "route3_1_1", "isTrueEnding": false, "ogpFile": "rgftunt2dn"}, {"endingId": 23, "jaName": "カナデ", "enName": "kanade", "title": "一緒に盆踊り♪", "hint": "ヒント：巨大提灯を祭り囃子で誘導すると…", "routeAnswer": "【ルート答え】オープニング ➔ 巨大提灯を探す(ルート2) ➔ 屋上に上って追いかける(ルート2_1) ➔ 祭り囃子で誘導する", "targetRoute": "route2_1_2", "isTrueEnding": false, "ogpFile": "hvhymorj1j"}, {"endingId": 24, "jaName": "マフユ", "enName": "mafuyu", "title": "うっかり消火", "hint": "ヒント：巨大提灯の落とした火の粉を調べると…", "routeAnswer": "【ルート答え】オープニング ➔ 巨大提灯を探す(ルート2) ➔ 火の粉の痕跡を追う(ルート2_3) ➔ 火の粉を回収して調べる", "targetRoute": "route2_3_2", "isTrueEnding": false, "ogpFile": "nmcyirllc8"}, {"endingId": 25, "jaName": "エナ", "enName": "ena", "title": "怖がられたい幽霊", "hint": "ヒント：流しそうめん装置の水の流れを止めると…", "routeAnswer": "【ルート答え】オープニング ➔ 流しそうめん暴走(ルート4) ➔ 上流へ向かい水を止める(ルート4_1) ➔ 丸太で水の流れを止める", "targetRoute": "route4_1_1", "isTrueEnding": false, "ogpFile": "rhc28v4mrr"}, {"endingId": 26, "jaName": "ミズキ", "enName": "mizuki", "title": "魅惑の人間モデル", "hint": "ヒント：流しそうめん装置を修理すると…", "routeAnswer": "【ルート答え】オープニング ➔ 流しそうめん暴走(ルート4) ➔ 犯人や改造痕跡の調査(ルート4_2) ➔ 装置の修理を手伝う", "targetRoute": "route4_2_1", "isTrueEnding": false, "ogpFile": "ynccit1w6f"}, {"endingId": 27, "jaName": "全員", "enName": "all", "title": "夏祭り大成功！", "hint": "ヒント：すべてのあやかし達の困りごとを解決すると…", "routeAnswer": "【ルート答え】全エンドコンプリート後にオープニングからルート5へ", "targetRoute": "route5", "isTrueEnding": true, "ogpFile": "qf8t1p1nbo"}];
+
+        const routeEndingMap = {
+            'route1_1_1': [18],
+            'route1_1_2': [17],
+            'route1_1_3': [6],
+            'route1_2_1': [11],
+            'route1_2_2': [12],
+            'route1_2_3': [5],
+            'route2_1_1': [20],
+            'route2_1_2': [23],
+            'route2_2_1': [2],
+            'route2_2_2': [3],
+            'route2_3_1': [21],
+            'route2_3_2': [24],
+            'route3_1_1': [22],
+            'route3_1_2': [1],
+            'route3_1_3': [13],
+            'route3_2_1': [19],
+            'route3_2_2': [14],
+            'route3_3_1': [10],
+            'route3_3_2': [8],
+            'route4_1_1': [25],
+            'route4_1_2': [9],
+            'route4_1_3': [15],
+            'route4_2_1': [26],
+            'route4_2_2': [16],
+            'route4_3_1': [7],
+            'route4_3_2': [4],
+            'route5': [27]
+        };
+
+        function getEndingIdsForRoute(routeKey) {
+            if (routeEndingMap[routeKey]) {
+                return routeEndingMap[routeKey];
+            }
+            let ids = [];
+            for (let key in routeEndingMap) {
+                if (key.startsWith(routeKey)) {
+                    ids = ids.concat(routeEndingMap[key]);
+                }
+            }
+            return [...new Set(ids)];
+        }
+
+        function getRemainingCount(routeKey) {
+            const relatedIds = getEndingIdsForRoute(routeKey);
+            if (relatedIds.length === 0) return null;
+            const unrevealed = relatedIds.filter(id => !revealedEndings.includes(id)).length;
+            return { unrevealed, total: relatedIds.length };
+        }
+
+        let currentRoute = 'opening';
+        let currentIndex = 0;
+        let currentBg = '';
+        let currentSpeakerImg = '';
+        let currentDisplayedCharEn = ''; 
+        
+        let autoPlayMode = 0;
+        let autoPlayTimer = null;
+        let pendingEndingId = null;
+
+        const routeNames = {
+            'opening': 'オープニング',
+            'route1': 'ルート1：屋台の食材消失事件',
+            'route1_1': 'ルート1-1：巨大な足跡を追う',
+            'route1_1_1': 'ルート1-1-1：料理勝負 (END18)',
+            'route1_1_2': 'ルート1-1-2：こっそり奪還 (END17)',
+            'route1_1_3': 'ルート1-1-3：宴会で交渉 (END6)',
+            'route1_2': 'ルート1-2：台車の跡を追う',
+            'route1_2_1': 'ルート1-2-1：おとり屋台 (END11)',
+            'route1_2_2': 'ルート1-2-2：偽情報作戦 (END12)',
+            'route1_2_3': 'ルート1-2-3：主催者を説得 (END5)',
+            'route2': 'ルート2：逃げ出した巨大提灯',
+            'route2_1': 'ルート2-1：屋上を追いかける',
+            'route2_1_1': 'ルート2-1-1：正面から捕獲 (END20)',
+            'route2_1_2': 'ルート2-1-2：祭り囃子で誘導 (END23)',
+            'route2_2': 'ルート2-2：好物でおびき寄せる',
+            'route2_2_1': 'ルート2-2-1：特大わたあめ (END2)',
+            'route2_2_2': 'ルート2-2-2：音楽で盛り上げる (END3)',
+            'route2_3': 'ルート2-3：火の粉の痕跡を追う',
+            'route2_3_1': 'ルート2-3-1：待ち伏せ捕獲 (END21)',
+            'route2_3_2': 'ルート2-3-2：火の粉を調査 (END24)',
+            'route3': 'ルート3：あやかしオークション',
+            'route3_1': 'ルート3-1：客として正面潜入',
+            'route3_1_1': 'ルート3-1-1：競り落とし劇 (END22)',
+            'route3_1_2': 'ルート3-1-2：偽物とすり替え (END1)',
+            'route3_1_3': 'ルート3-1-3：会場で大暴れ (END13)',
+            'route3_2': 'ルート3-2：裏口から忍び込み',
+            'route3_2_1': 'ルート3-2-1：偽司会で逃走 (END19)',
+            'route3_2_2': 'ルート3-2-2：ステージ裏すり替え (END14)',
+            'route3_3': 'ルート3-3：運搬ルート調査',
+            'route3_3_1': 'ルート3-3-1：受け渡し現場 (END10)',
+            'route3_3_2': 'ルート3-3-2：輸送中の隙を狙う (END8)',
+            'route4': 'ルート4：流しそうめん装置の暴走',
+            'route4_1': 'ルート4-1：上流へ向かい水を止める',
+            'route4_1_1': 'ルート4-1-1：丸太でせき止め (END25)',
+            'route4_1_2': 'ルート4-1-2：川を遡ってお掃除 (END9)',
+            'route4_1_3': 'ルート4-1-3：そうめん回収 (END15)',
+            'route4_2': 'ルート4-2：犯人や改造痕跡の調査',
+            'route4_2_1': 'ルート4-2-1：装置の修理 (END26)',
+            'route4_2_2': 'ルート4-2-2：犯人を追う (END16)',
+            'route4_3': 'ルート4-3：妖力反応の調査',
+            'route4_3_1': 'ルート4-3-1：妖怪を捕まえる (END7)',
+            'route4_3_2': 'ルート4-3-2：しっかり交渉 (END4)',
+            'route5': 'ルート5：夏祭り大成功！'
+        };
+
+        function convertRouteKey(key) {
+            if (!key) return key;
+            return key
+                .replace(/routeA/g, 'route1')
+                .replace(/routeB/g, 'route2')
+                .replace(/routeC/g, 'route3')
+                .replace(/routeD/g, 'route4')
+                .replace(/routeE/g, 'route5');
+        }
+
+        const EMBEDDED_SCENARIO_DATA = {"キャラクターとアイコンの対応表":{"自分":null,"あなた":null,"？？？":"assets/webp/common/icon/icon_ichika.webp","イチカ":"assets/webp/common/icon/icon_ichika.webp","アキト":"assets/webp/common/icon/icon_akito.webp","アン":"assets/webp/common/icon/icon_an.webp","アイリ":"assets/webp/common/icon/icon_airi.webp","エナ":"assets/webp/common/icon/icon_ena.webp","エム":"assets/webp/common/icon/icon_emu.webp","カイト":"assets/webp/common/icon/icon_kaito.webp","カナデ":"assets/webp/common/icon/icon_kanade.webp","コハネ":"assets/webp/common/icon/icon_kohane.webp","サキ":"assets/webp/common/icon/icon_saki.webp","シズク":"assets/webp/common/icon/icon_shizuku.webp","シホ":"assets/webp/common/icon/icon_shiho.webp","ツカサ":"assets/webp/common/icon/icon_tsukasa.webp","トウヤ":"assets/webp/common/icon/icon_toya.webp","ネネ":"assets/webp/common/icon/icon_nene.webp","ハルカ":"assets/webp/common/icon/icon_haruka.webp","ホナミ":"assets/webp/common/icon/icon_honami.webp","マフユ":"assets/webp/common/icon/icon_mafuyu.webp","ミク":"assets/webp/common/icon/icon_miku.webp","ミズキ":"assets/webp/common/icon/icon_mizuki.webp","ミノリ":"assets/webp/common/icon/icon_minori.webp","メイコ":"assets/webp/common/icon/icon_meiko.webp","リン":"assets/webp/common/icon/icon_rin.webp","ルイ":"assets/webp/common/icon/icon_rui.webp","ルカ":"assets/webp/common/icon/icon_luka.webp","レン":"assets/webp/common/icon/icon_ren.webp","全員":"assets/webp/common/icon/icon_all.webp","秘密":"assets/webp/common/icon/icon_secret.webp"},"シナリオ":{"opening":[{"キャラ名":"自分","セリフ":"（あれ……ここは、どこ……？）","背景画像":"assets/webp/content/bg/bg_content_01.webp","BGM":"bgmDefault"},{"キャラ名":"自分","セリフ":"（えっ……！提灯が浮いてるし、人も飛んでる……！）"},{"キャラ名":"自分","セリフ":"（いつもと違うところにいるみたい。\n早く帰らないと）"},{"キャラ名":"自分","セリフ":"（——でも、少し見覚えがあるような……？）"},{"キャラ名":"？？？","セリフ":"こんなところで迷子？\nあっちで夏祭りの——","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"？？？","セリフ":"あなた、見たことない姿だね。\n何の妖怪？それとも幽霊？"},{"キャラ名":"自分","セリフ":"（妖怪？幽霊？両方とも違うんだけど……）"},{"キャラ名":"？？？","セリフ":"どっちでもないなら……\nもしかして、人間！？"},{"キャラ名":"？？？","セリフ":"大変……！\nそっか、この横丁に迷い込んじゃったんだ……"},{"キャラ名":"？？？","セリフ":"ここは“あやかし横丁”。\nいろんな妖怪や、\n幽霊が一緒に暮らす横丁だよ"},{"キャラ名":"自分","セリフ":"（妖怪……幽霊……？こんなところがあったんだ。すごい……！）"},{"キャラ名":"イチカ","セリフ":"私の名前はイチカ、よろしくね"},{"キャラ名":"イチカ","セリフ":"そうだ、喉は渇いてない？"},{"キャラ名":"イチカ","セリフ":"はい、きゅうり！\nやっぱり水分補給にはこれが一番だよね！"},{"キャラ名":"イチカ","セリフ":"あなたも食べなよ！\n遠慮しないで、\nまだまだいっぱいあるから！"},{"キャラ名":"自分","セリフ":"（えっ！？どうしてきゅうり……！？）"},{"キャラ名":"自分","セリフ":"（というか、きゅうりよりも、帰り道を教えて欲しいんだけど……）"},{"キャラ名":"イチカ","セリフ":"あれ？\nあんまり嬉しくなさそう……"},{"キャラ名":"イチカ","セリフ":"あ、そっか。\n元のところに帰りたいんだよね"},{"キャラ名":"イチカ","セリフ":"うーん……\n帰る方法かあ……"},{"キャラ名":"イチカ","セリフ":"もしかしたら、ルイさんなら何か知ってるかも。案内するね"},{"キャラ名":"ルイ","セリフ":"なるほど！人間の迷子！\n不思議なことが起こるものだ","キャラ画像":"assets/webp/content/character/img_rui_1.webp","背景画像":"assets/webp/content/bg/bg_content_02.webp"},{"キャラ名":"イチカ","セリフ":"ルイさんは、あやかし横丁で一番の物知りなんだよ","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"イチカ","セリフ":"きっとあなたが帰る方法も知ってるはず！\nね、ルイさん！"},{"キャラ名":"ルイ","セリフ":"ああ、もちろんだとも！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"イチカ","セリフ":"わぁ、さすがルイさん！","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"自分","セリフ":"（すごい！早く教えてください！）"},{"キャラ名":"ルイ","セリフ":"もちろん教えよう……ただし！\n教えるにはひとつ条件がある","キャラ画像":"assets/webp/content/character/img_rui_2.webp","キャラアニメーション":"is-anim-bounce"},{"キャラ名":"自分","セリフ":"（え！？条件……！？）"},{"キャラ名":"ルイ","セリフ":"今、ここ……あやかし横丁では夏祭りの準備をしているところなんだ","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"しかし、ハプニングが絶えなくてなかなか準備が進まなくてね"},{"キャラ名":"ルイ","セリフ":"無事に夏祭りを開催できるよう、\n横丁のみんなに力を貸してくれないか？"},{"キャラ名":"ルイ","セリフ":"無事に夏祭りを開催することができたら、君を元の世界に帰してあげようじゃないか"},{"キャラ名":"自分","セリフ":"（ええ！？そんなこと急に言われても……）"},{"キャラ名":"イチカ","セリフ":"大丈夫！\n横丁のみんなも、きっと力を貸してくれると思う","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"イチカ","セリフ":"もちろん、私も協力するしね！"},{"キャラ名":"自分","セリフ":"（どちらにしろ、協力しないと帰り道はわからないんだし……）"},{"キャラ名":"自分","セリフ":"（うん！やってみよう！）"},{"キャラ名":"ルイ","セリフ":"フフ、どうやら決心がついたようだね","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"では、この中から対処できそうな事件を選んでくれたまえ！","選択肢ID":"opening","キャラアニメーション":"is-anim-bounce"}],"route1":[{"キャラ名":"自分","セリフ":"（屋台から食材が消える事件を解決するため、商店街に向かうことにした）","背景画像":"assets/webp/content/bg/bg_content_02.webp"},{"キャラ名":"ハルカ","セリフ":"ああ、あなたが例の……\n手伝いに来てくれてありがとう","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"ハルカ","セリフ":"それじゃあ、早速だけど\nみんなに聞き込みに行こうか"},{"キャラ名":"ミノリ","セリフ":"ハルカちゃ〜ん！\nわたしのキャベツが無くなっちゃったんだよ～！","キャラ画像":"assets/webp/content/character/img_minori_2.webp"},{"キャラ名":"ミノリ","セリフ":"うぅ～っ！\n絶対取り返して、はやく千切りにしたいよ〜！"},{"キャラ名":"ミノリ","セリフ":"はやく！{p}千切りに！{p}したい！！","キャラアニメーション":"is-anim-minori-angry"},{"キャラ名":"ハルカ","セリフ":"ミノリ、落ち着いて","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"トウヤ","セリフ":"俺の屋台からも食材が消えているんだ","キャラ画像":"assets/webp/content/character/img_toya_2.webp"},{"キャラ名":"トウヤ","セリフ":"せっかく、皆に俺の料理を振る舞おうと思っていたのに……！","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"アキト","セリフ":"ふたりの屋台だけじゃなくて、\n他の店も似たような状況だな","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"アキト","セリフ":"こんなに大量の食材、\n一体どうするつもりなんだか……"},{"キャラ名":"ハルカ","セリフ":"今のところ、犯人に繋がるような手がかりはなし……","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"ハルカ","セリフ":"このハッキリしない状況……\nなんだかすごく悔しい……！","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"ミノリ","セリフ":"どうしたら犯人を見つけられるかな？","キャラ画像":"assets/webp/content/character/img_minori_2.webp"},{"キャラ名":"ミノリ","セリフ":"あ！ハルカちゃん、前に\n“嘘を見破れる鏡”を持ってるって言ってなかった？","キャラ画像":"assets/webp/content/character/img_minori_1.webp"},{"キャラ名":"ミノリ","セリフ":"この横丁の妖怪達みんなに使えば\n犯人がすぐにわかるかも！"},{"キャラ名":"ミノリ","セリフ":"そう！！すぐに！！","キャラ画像":"assets/webp/content/character/img_minori_2.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"ハルカ","セリフ":"あぁ、それなら地獄から\n横丁に引っ越してくる時に置いてきちゃったんだよね","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"ハルカ","セリフ":"閻魔業も引退したし、\n今はミノリの千切り屋台の手伝いに集中したいから","キャラ画像":"assets/webp/content/character/img_haruka_2.webp"},{"キャラ名":"ミノリ","セリフ":"ハ、ハルカちゃん……！","キャラ画像":"assets/webp/content/character/img_minori_1.webp"},{"キャラ名":"自分","セリフ":"（ミノリちゃんが感動して泣いている……）"},{"キャラ名":"カイト","セリフ":"持っていかれたのは__STR_2__食材……。\nそこにヒントがあるとすれば……","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"メイコ","セリフ":"あら、思わせぶりな言い方ね\n今から烏天狗サマの名推理でも聞けるのかしら？","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"カイト","セリフ":"そ、そんなプレッシャーかけないで……！","キャラ画像":"assets/webp/content/character/img_kaito_2.webp","キャラアニメーション":"is-anim-step-back"},{"キャラ名":"アキト","セリフ":"まぁまぁ、メイコさん。\nカイトさんの話を一旦聞いてみませんか？","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"カイト","セリフ":"あ、ありがとうアキトくん。\nメイコも一度僕の話を\n聞いてくれると嬉しいな","キャラ画像":"assets/webp/content/character/img_kaito_2.webp"},{"キャラ名":"メイコ","セリフ":"ふん……まぁいいわ","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"カイト","セリフ":"え、えっと実は気になっていることがあって……これを見て","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"自分","セリフ":"（うわ！巨大な足跡だ……！）"},{"キャラ名":"ハルカ","セリフ":"山の方に向かっているみたいだね","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"トウヤ","セリフ":"屋台にこんな大きい店主はいなかった。\n犯人の可能性があるから、追いかけるか","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"アキト","セリフ":"お手柄ですね、カイトさん","キャラ画像":"assets/webp/content/character/img_akito_2.webp"},{"キャラ名":"カイト","セリフ":"ほら、ちゃんと手がかりになったよ！\nメイコ！","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"メイコ","セリフ":"ふん……それくらい当然でしょう？","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"カイト","セリフ":"うぅ......","キャラ画像":"assets/webp/content/character/img_kaito_2.webp"},{"キャラ名":"ハルカ","セリフ":"ん？ここ、台車を動かした跡があるね","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"ミノリ","セリフ":"しかもすっごくたくさん……！\nこっちも怪しい！","キャラ画像":"assets/webp/content/character/img_minori_2.webp"},{"キャラ名":"ミノリ","セリフ":"さっそく追いかけようよ！\nそう！今すぐに！"},{"キャラ名":"自分","セリフ":"（巨大な足跡か大量の台車の跡。どっちを追うのについていこうかな）","選択肢ID":"route1"}],"route1_1":[{"キャラ名":"自分","セリフ":"（巨大な足跡を追って、山までやってきた）","背景画像":"assets/webp/content/bg/bg_content_03.webp"},{"キャラ名":"トウヤ","セリフ":"ここで足跡が途切れた以上、\n近くに犯人がいると思うんだが……","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"アキト","セリフ":"……！\nおい、あれ！","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"自分","セリフ":"（うわぁ……妖怪達があんなにいっぱい……！）"},{"キャラ名":"カイト","セリフ":"あれは山妖怪達だね。\nみんなで宴会を開いているみたいだ","キャラ画像":"assets/webp/content/character/img_kaito_2.webp"},{"キャラ名":"トウヤ","セリフ":"ん……？あれは……","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"俺が選んだ食材じゃないか！","キャラ画像":"assets/webp/content/character/img_toya_2.webp"},{"キャラ名":"アキト","セリフ":"ダイダラボッチの姿も見える。\n足跡は多分、あいつのものだろうな","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"カイト","セリフ":"つまり、山妖怪達が犯人みたいだね。\n消えた食材で宴会をしているようだ","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"アキト","セリフ":"一部は料理されちまってるが、\n手付かずの食材もかなり残ってるな","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"アキト","セリフ":"トウヤ、お前変化得意だろ。\n山妖怪になって取ってこれねぇか"},{"キャラ名":"カイト","セリフ":"メイコとうまく話せない僕のために\nよくメイコに変化してくれるけれど","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"カイト","セリフ":"本当にそっくりだよね。\nたしかにトウヤくんの変化なら\nバレなさそう！"},{"キャラ名":"トウヤ","セリフ":"…………","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"アキト","セリフ":"トウヤ？","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"トウヤ","セリフ":"料理されている……\nつまり、あちらにも料理人がいるのか","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"アキト","セリフ":"お、おい","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"トウヤ","セリフ":"ならば","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"料理勝負をして正々堂々と食材を返してもらおう！","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"自分","セリフ":"（えぇ！？）"},{"キャラ名":"アキト","セリフ":"おいおい、いくらトウヤの料理が美味くたってそいつは難しいだろ","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"アキト","セリフ":"食材を勝手に持ってくようなヤツらだぞ。\nそんな都合良くいくか？"},{"キャラ名":"トウヤ","セリフ":"勝負をするなら、何の料理がいいだろうか。宴会なら大皿料理が定番だが——","キャラ画像":"assets/webp/content/character/img_toya_2.webp"},{"キャラ名":"カイト","セリフ":"もう聞こえてないみたいだね","キャラ画像":"assets/webp/content/character/img_kaito_2.webp"},{"キャラ名":"アキト","セリフ":"はあ、仕方ねえ。\nバレないうちにさっさと取り返すか","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"カイト","セリフ":"うーんたしかに実力行使、という手もあるけれど……","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"カイト","セリフ":"でも、僕は同じ妖怪同士だし、\nもっと穏便に解決したいかな"},{"キャラ名":"カイト","セリフ":"宴会に混ざって交渉してみるのはどう？"},{"キャラ名":"アキト","セリフ":"まあ、そういう手もあるけどさ……","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"アキト","セリフ":"うーん……いまいち決まらねえな。\n……よし","キャラ画像":"assets/webp/content/character/img_akito_2.webp"},{"キャラ名":"アキト","セリフ":"どの手を取るか、お前が決めろ"},{"キャラ名":"自分","セリフ":"（どうしようかな……）","選択肢ID":"route1_1"}],"route1_1_1":[{"キャラ名":"自分","セリフ":"（正々堂々と料理勝負を挑むことにした）","背景画像":"assets/webp/content/bg/bg_content_05.webp","BGM":"bgmTension"},{"キャラ名":"トウヤ","セリフ":"この材料を切るのを手伝ってくれないか？","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"自分","セリフ":"（包丁を渡された……）"},{"キャラ名":"トウヤ","セリフ":"どうした？もしかして料理は苦手か？","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"いいか、包丁を持たない方は怪我をしないよう狐の手だ！"},{"キャラ名":"自分","セリフ":"（狐の手……？）"},{"キャラ名":"トウヤ","セリフ":"切れているな！なかなかの手際だ","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"よし、トマトが煮えてきたぞ！\nカレーのルーを持ってきてくれ！"},{"キャラ名":"自分","セリフ":"（トウヤくんから炎がでている……火加減が絶妙だ……！）"},{"キャラ名":"トウヤ","セリフ":"野菜から水分が出ているから\nこのままでもいけるはずだが……よし","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"“夏野菜の無水カレー”、完成だ。\n山妖怪達、食べてみてくれ"},{"キャラ名":"山妖怪","セリフ":"う、美味すぎる！\nこんな美味いものが食べられるなら、食材は全部返す！"},{"キャラ名":"山妖怪","セリフ":"食材を盗んだりして悪かった！\nもっとこのカレーを食べさせてくれ！"},{"キャラ名":"トウヤ","セリフ":"だったら、俺の屋台に来るんだな。\nそこで食べていってくれ","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"山妖怪","セリフ":"ああ！必ず行くよ！"},{"キャラ名":"自分","セリフ":"（食材を返してもらった）"},{"キャラ名":"トウヤ","セリフ":"さて、これで無事に屋台を出せるな。\n手伝ってくれて助かった","キャラ画像":"assets/webp/content/character/img_toya_1.webp","BGM":"bgmBright"},{"キャラ名":"トウヤ","セリフ":"しかし、カレーか……\nリクエストで増えるメニューはパンケーキに続いてふたつ目だ"},{"キャラ名":"自分","セリフ":"（パンケーキ？）"},{"キャラ名":"トウヤ","セリフ":"あぁ、パンケーキは\nアキトのリクエストでな","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"アキトは三食パンケーキなんだ"},{"キャラ名":"トウヤ","セリフ":"毎日食べているから飽きないよう\n色々な工夫をこらしていてな","キャラ画像":"assets/webp/content/character/img_toya_2.webp"},{"キャラ名":"トウヤ","セリフ":"おかげで俺のパンケーキレシピは1000種類以上ある","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"自分","セリフ":"（作る方も、食べる方もすごい……！）"},{"キャラ名":"トウヤ","セリフ":"それはそうと、山妖怪達にカレーを気に入ってもらえたが……","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"元々屋台のメニューに入っていないんだ"},{"キャラ名":"トウヤ","セリフ":"想定していなかった調理工程が増えるな……","キャラ画像":"assets/webp/content/character/img_toya_2.webp"},{"キャラ名":"トウヤ","セリフ":"…………","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"自分","セリフ":"（あれ、こっちを見てる……？）"},{"キャラ名":"トウヤ","セリフ":"先ほどの調理の手さばき、\n実に見事なものだった","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"よければ、このまま屋台も\n手伝ってくれないだろうか？"},{"キャラ名":"自分","セリフ":"（自分で良ければ……！）"},{"キャラ名":"トウヤ","セリフ":"……頼もしい頷きだ。\n引き続き、頼らせてもらおう","キャラ画像":"assets/webp/content/character/img_toya_1.webp","エンディングID":18}],"route1_1_2":[{"キャラ名":"自分","セリフ":"（山妖怪達にバレないように、\nこっそりと食材を奪い返すことにした）","背景画像":"assets/webp/content/bg/bg_content_05.webp"},{"キャラ名":"アキト","セリフ":"ったく、本当なら今ごろトウヤの作った\nパンケーキを食べてるはずだったのによ〜……","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"アキト","セリフ":"近くまでは来れたが、ここからどうするかな……"},{"キャラ名":"アキト","セリフ":"妖怪の数も多いし、食材も大量だ。\nなんとか隙を作ってまとめて運びたいが……"},{"キャラ名":"自分","セリフ":"（飛んで運ぶのは難しいのかな……？）"},{"キャラ名":"アキト","セリフ":"ちなみに、飛んで運ぶってのはパスな","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"アキト","セリフ":"オレは飛べても、ツカサセンパイみたいに大量の荷物を運ぶのは苦手なんだよ"},{"キャラ名":"自分","セリフ":"（ツカサセンパイ……？）"},{"キャラ名":"アキト","セリフ":"俺にとってはセンパイなんだが……\nツカサって名前の天狗がいるんだよ。"},{"キャラ名":"アキト","セリフ":"オレとカイトさんと\nツカサセンパイは翼仲間なんだ"},{"キャラ名":"アキト","セリフ":"よく一緒に裏山までびゅーんと\nひとっ飛びしてるんだが……"},{"キャラ名":"アキト","セリフ":"よかったら今度お前も来るか？\n楽しいぞ"},{"キャラ名":"アキト","セリフ":"……ってそんなことより今は食材だな。\n早く奪い返してトウヤのパンケーキを食わねぇと"},{"キャラ名":"自分","セリフ":"（あれくらいの食材なら、自分が頑張れば一気に運べるかも……）"},{"キャラ名":"アキト","セリフ":"……お前、なんか頼もしい目つきだな","キャラ画像":"assets/webp/content/character/img_akito_2.webp"},{"キャラ名":"アキト","セリフ":"よし！じゃあ食材の運搬はお前に任せた","キャラ画像":"assets/webp/content/character/img_akito_2.webp"},{"キャラ名":"アキト","セリフ":"お前が食材を運んでる間、\nオレが空を飛んであいつらのオトリになる","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"アキト","セリフ":"……頼んだぞ","キャラ画像":"assets/webp/content/character/img_akito_2.webp"},{"キャラ名":"アキト","セリフ":"——お前ら、よくも食材を持ってったな！\n迷惑してんだよ！","キャラ画像":"assets/webp/content/character/img_akito_1.webp","BGM":"bgmTension","キャラアニメーション":"is-anim-angry"},{"キャラ名":"アキト","セリフ":"本当なら今ごろ\nパンケーキを食べてるはずだったんだぞ！","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"アキト","セリフ":"パンケーキの恨み……！！！","効果音":"seFly"},{"キャラ名":"自分","セリフ":"（アキトくんが山妖怪達のオトリになっている間に、なんとか食材を運び出した——）"},{"キャラ名":"アキト","セリフ":"はは、やったな！\nお前、なかなかガッツあるじゃん","キャラ画像":"assets/webp/content/character/img_akito_2.webp","BGM":"bgmBright"},{"キャラ名":"アキト","セリフ":"人間って言われて正直どんなもんかと思ってたけど、ちょっと見直した","キャラ画像":"assets/webp/content/character/img_akito_1.webp"},{"キャラ名":"アキト","セリフ":"これなら、夏祭りもできるし、\nお前も無事に……帰れそうだな","キャラ画像":"assets/webp/content/character/img_akito_2.webp"},{"キャラ名":"アキト","セリフ":"さて、トウヤ達に報告だな。\n早く呼びに行ってパンケーキ食べようぜ！","エンディングID":17}],"route1_1_3":[{"キャラ名":"自分","セリフ":"（宴会に交ざって交渉することにした）","背景画像":"assets/webp/content/bg/bg_content_05.webp"},{"キャラ名":"自分","セリフ":"（しかし、よそ者だとすぐにバレて、あっという間に取り囲まれてしまった……！）","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"山妖怪","セリフ":"なんだぁ、お前ら！","BGM":"bgmTension"},{"キャラ名":"カイト","セリフ":"大丈夫、僕に任せて","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"自分","セリフ":"（そう言うとカイトさんは、いろんな山妖怪達と話し始めた——）"},{"キャラ名":"カイト","セリフ":"——屋台の料理を楽しみにしていたのに\n今年は無いってなったら、みんな悲しむと思うんだ","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"山妖怪","セリフ":"まあ、確かに黙って持ってきたのは悪い事しちまったかもな。\n残ってる分だけなら、全部返すよ"},{"キャラ名":"カイト","セリフ":"本当かい？\nどうもありがとう！","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"山妖怪","セリフ":"そっちの人間も、\nなんだか面白えやつだな！\n夏祭り、楽しんでってくれよ！"},{"キャラ名":"カイト","セリフ":"それじゃ、話もついたし、\nあやかし横丁に持っていこうか","キャラ画像":"assets/webp/content/character/img_kaito_1.webp","BGM":"bgmBright"},{"キャラ名":"自分","セリフ":"（カイトさん……あっという間に仲良くなって、すごかったな）"},{"キャラ名":"カイト","セリフ":"まぁ、同じ妖怪だからね。\n僕からしたら、君の方がすごいと思うけど","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"カイト","セリフ":"だって、現に\n妖怪の僕と友達になっただろう？\n仲良くなる才能なら、君にもあるんだよ"},{"キャラ名":"カイト","セリフ":"それに、僕なんてまだまだだよ……"},{"キャラ名":"カイト","セリフ":"はあ……メイコともこんな風に\n打ち解けられたらいいんだけれど……","キャラ画像":"assets/webp/content/character/img_kaito_2.webp"},{"キャラ名":"自分","セリフ":"（そういえば、メイコさんはカイトさんに対して、ちょっとピリピリしていたかも……）"},{"キャラ名":"カイト","セリフ":"メイコは蛇女だからヘビ。\n僕が烏天狗だから、カラス","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"カイト","セリフ":"ヘビにとってカラスは天敵だからね……。\nずっと敵だと思われているみたいなんだ……"},{"キャラ名":"カイト","セリフ":"普通に話したいだけなんだけどな～……\n何かいい方法はないかな？","キャラ画像":"assets/webp/content/character/img_kaito_2.webp"},{"キャラ名":"自分","セリフ":"（メイコさんの好きなものを渡す、とか？）"},{"キャラ名":"カイト","セリフ":"ヘビの好きなもの？\nネズミ……？\nネズミといえば……シホちゃん！","キャラ画像":"assets/webp/content/character/img_kaito_1.webp"},{"キャラ名":"カイト","セリフ":"横丁にシホちゃんっていう旧鼠がいるんだ"},{"キャラ名":"カイト","セリフ":"シホちゃんを呼んだら\n３人で仲良くおしゃべりできるかな！"},{"キャラ名":"カイト","セリフ":"わぁ……！なんだかうまくいく気がしてきたよ！良い案をありがとう！"},{"キャラ名":"自分","セリフ":"（たしかネズミもカラスが天敵だったような……）"},{"キャラ名":"自分","セリフ":"（でも、もしかしたら仲良くなれるかも！）"},{"キャラ名":"カイト","セリフ":"おっと！そろそろ戻らないと、みんなが心配するね。それじゃあ、帰ろうか","キャラ画像":"assets/webp/content/character/img_kaito_1.webp","エンディングID":6}],"route1_2":[{"キャラ名":"自分","セリフ":"（台車の跡を辿ると、お祭り会場の外れに別の屋台が見えてきた）","背景画像":"assets/webp/content/bg/bg_content_04.webp"},{"キャラ名":"ハルカ","セリフ":"こんなところに屋台があるなんて変だね。\n一体、犯人は何のために……","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"ミノリ","セリフ":"こっちに張り紙があるよ！\nなになに……\n“夏祭り前フードフェス”だって！","キャラ画像":"assets/webp/content/character/img_minori_1.webp"},{"キャラ名":"メイコ","セリフ":"お祭りの前に仲間だけで楽しもうって事みたいね。\nこのために食材を集めてたんだわ！","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"ミノリ","セリフ":"友達と遊びたいのもわかるけど、\nだからって迷惑をかけるのはダメだよ！","キャラ画像":"assets/webp/content/character/img_minori_2.webp"},{"キャラ名":"ミノリ","セリフ":"早く捕まえなくっちゃ！"},{"キャラ名":"ミノリ","セリフ":"そう、{em}早く！{/em}捕まえなくちゃ！"},{"キャラ名":"ハルカ","セリフ":"ミノリ、慌てちゃダメだよ。\nまずは誰が犯人かはっきりさせなくちゃ","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"メイコ","セリフ":"そうね\n違う妖怪を犯人扱いしちゃよくないもの","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"ハルカ","セリフ":"犯人を見つけたら私の本領発揮かな","キャラ画像":"assets/webp/content/character/img_haruka_2.webp"},{"キャラ名":"ハルカ","セリフ":"まずは熱い釜を用意して……"},{"キャラ名":"ミノリ","セリフ":"そこにわたしが千切りしたお野菜をいれたら美味しいお鍋が完成するかな〜！","キャラ画像":"assets/webp/content/character/img_minori_1.webp"},{"キャラ名":"メイコ","セリフ":"ハルカちゃんが言っているのは\n釜茹で地獄のことじゃないかしら？","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"ミノリ","セリフ":"えぇ！？\n……可哀想だからぬるま湯くらいにしない？","キャラ画像":"assets/webp/content/character/img_minori_2.webp"},{"キャラ名":"メイコ","セリフ":"ミノリちゃん、それじゃあただのお風呂よ","キャラ画像":"assets/webp/content/character/img_meiko_2.webp"},{"キャラ名":"ハルカ","セリフ":"とにかく、まずは犯人をおびき出す案を考えよう","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"ミノリ","セリフ":"って言われても、すぐには何も思いつかないよ～！","キャラ画像":"assets/webp/content/character/img_minori_2.webp"},{"キャラ名":"メイコ","セリフ":"私もピンとこないわね……","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"自分","セリフ":"（それなら——）","選択肢ID":"route1_2"}],"route1_2_1":[{"キャラ名":"自分","セリフ":"（おとりの屋台で犯人をおびき寄せることにした——）","背景画像":"assets/webp/content/bg/bg_content_06.webp"},{"キャラ名":"ミノリ","セリフ":"シュババババババ〜！","キャラ画像":"assets/webp/content/character/img_minori_2.webp","効果音":"seCut"},{"キャラ名":"ミノリ","セリフ":"ふ〜鎌で氷を削るのって結構疲れるね〜！","キャラ画像":"assets/webp/content/character/img_minori_1.webp"},{"キャラ名":"ミノリ","セリフ":"でもこれもキャベツの千切り屋台を開くため！がんばるぞ〜！！","キャラ画像":"assets/webp/content/character/img_minori_2.webp"},{"キャラ名":"自分","セリフ":"（キャベツの千切り屋台……？）"},{"キャラ名":"ミノリ","セリフ":"うん！\nお醤油とかソースとか\n色々な調味料を用意して","キャラ画像":"assets/webp/content/character/img_minori_1.webp"},{"キャラ名":"ミノリ","セリフ":"わたしが千切りにしたキャベツにかけて食べてもらうの！"},{"キャラ名":"ミノリ","セリフ":"去年も出店して大盛況だったんだ〜！\n一番人気はごま油！"},{"キャラ名":"ミノリ","セリフ":"そういえばハルカちゃんは\n何もかけずに食べてて格好よかったな〜"},{"キャラ名":"自分","セリフ":"（ストイックだ……！）"},{"キャラ名":"ミノリ","セリフ":"ふぅ……これくらい作れたら十分かな。\nそれじゃあ開店しよっか！","キャラ画像":"assets/webp/content/character/img_minori_1.webp"},{"キャラ名":"ミノリ","セリフ":"皆さーん！\n美味しい手作りかき氷ですよー！"},{"キャラ名":"ミノリ","セリフ":"イチゴにメロン、ブルーハワイ！\n夏のおともにどうですかー！？"},{"キャラ名":"妖怪","セリフ":"あれ、フェス出店名簿にこんな店あったかな……？"},{"キャラ名":"妖怪","セリフ":"まあ、美味そうだしいいか！\nいやー、フードフェスを\n主催した甲斐があった！"},{"キャラ名":"ミノリ","セリフ":"あ〜！今主催したって言った！","キャラ画像":"assets/webp/content/character/img_minori_2.webp","BGM":"bgmTension","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"自分","セリフ":"（この妖怪が犯人だ……！）"},{"キャラ名":"ミノリ","セリフ":"こ、こらー！\nみんなの食材を返しなさーい！","キャラ画像":"assets/webp/content/character/img_minori_2.webp"},{"キャラ名":"ミノリ","セリフ":"食材を返さないと、\nえーっと、えーっと……！"},{"キャラ名":"ミノリ","セリフ":"た、たまねぎのみじん切りを\n目の前でやっちゃいますからねー！"},{"キャラ名":"ミノリ","セリフ":"いいのかな〜？いいのかな〜？\n涙が止まらなくなっちゃうよ〜？"},{"キャラ名":"妖怪","セリフ":"ぎゃーっ！\nそんな恐ろしいことはやめてー！"},{"キャラ名":"妖怪","セリフ":"お、お祭りの雰囲気で楽しくなっちゃって……！ごめんなさーい！"},{"キャラ名":"自分","セリフ":"（ミノリちゃんの脅しに降伏した犯人を捕まえて、残った食材も取り戻すことができた）"},{"キャラ名":"ミノリ","セリフ":"これで一件落着だね！","キャラ画像":"assets/webp/content/character/img_minori_1.webp","BGM":"bgmBright"},{"キャラ名":"ミノリ","セリフ":"わたしのキャベツも戻ってきたし、\nこれで夏祭りも無事にできそうだよ"},{"キャラ名":"ミノリ","セリフ":"あなたもお手伝いしてくれて本当にありがとう！"},{"キャラ名":"ミノリ","セリフ":"えへへ、人間のお友達ができるなんて、\n考えたこともなかった！"},{"キャラ名":"ミノリ","セリフ":"わたしの鎌さばきを見に\nよかったら屋台に遊びに来てね！"},{"キャラ名":"ミノリ","セリフ":"キャベツの高速千切りを披露するよ！","エンディングID":11}],"route1_2_2":[{"キャラ名":"自分","セリフ":"（幻の屋台飯が出るという情報をあちこちに流すことにした——）","背景画像":"assets/webp/content/bg/bg_content_06.webp"},{"キャラ名":"ハルカ","セリフ":"今回の夏祭りでは“幻の屋台飯”が出るって話、みんなは聞いたことある？","キャラ画像":"assets/webp/content/character/img_haruka_2.webp"},{"キャラ名":"妖怪達","セリフ":"幻の……！？\nそ、そんな話聞いてないぞ！"},{"キャラ名":"ハルカ","セリフ":"でも、食材が足りなくなっちゃったから、出店自体しないかも、って","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"妖怪達","セリフ":"そんな！\n俺達が食材を全部持ってきたからか……！"},{"キャラ名":"自分","セリフ":"（まさかこの妖怪達が犯人……！？）"},{"キャラ名":"妖怪達","セリフ":"今から返してくるよ！\nその幻の屋台飯を出すのはどこの屋台なんだ！？"},{"キャラ名":"ハルカ","セリフ":"私もわからないんだ。\nわからないから、幻なんだと思うよ","キャラ画像":"assets/webp/content/character/img_haruka_2.webp"},{"キャラ名":"妖怪達","セリフ":"ぐっ……それもそうだ……！\nだったら、どうすればいいんだ……！？"},{"キャラ名":"ハルカ","セリフ":"だったら、全部の屋台に\n食材を返すのはどうかな？","キャラ画像":"assets/webp/content/character/img_haruka_2.webp"},{"キャラ名":"ハルカ","セリフ":"その中のどれかには、\n幻の屋台飯を出す屋台があるはずだから"},{"キャラ名":"妖怪達","セリフ":"なるほど！！\nよし、全部の屋台に食材を返しに行くぞ！"},{"キャラ名":"妖怪達","セリフ":"そんな美味そうな料理、\n見逃せるはずない！"},{"キャラ名":"自分","セリフ":"（妖怪達は足早に去って行った）"},{"キャラ名":"ハルカ","セリフ":"……ふふ、私の演技どうだった？","キャラ画像":"assets/webp/content/character/img_haruka_2.webp","BGM":"bgmBright"},{"キャラ名":"ハルカ","セリフ":"幻の屋台飯を求めて\nいろんな屋台の売り上げも伸びると思うし一石二鳥だね"},{"キャラ名":"ハルカ","セリフ":"あなたのアイディアのおかげだね"},{"キャラ名":"ハルカ","セリフ":"さてと……犯人達をこらしめるのは\n食材を返してもらってからとして……","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"自分","セリフ":"（さすが閻魔さま……！見逃したわけじゃなかったんだ！）"},{"キャラ名":"ハルカ","セリフ":"それまでせっかくだから、\n私達なりの幻の屋台飯を\n探してみるのはどう？","キャラ画像":"assets/webp/content/character/img_haruka_1.webp"},{"キャラ名":"ハルカ","セリフ":"せっかくの夏祭りだから、\nあなたともめいっぱい楽しみたいな","キャラ画像":"assets/webp/content/character/img_haruka_2.webp"},{"キャラ名":"ハルカ","セリフ":"ふふ！じゃあ、一緒に行こっか！","エンディングID":12}],"route1_2_3":[{"キャラ名":"自分","セリフ":"（夏祭りに出店してもらえるように、フードフェスの主催者を説得することにした——）","背景画像":"assets/webp/content/bg/bg_content_06.webp"},{"キャラ名":"メイコ","セリフ":"ここの料理、\nどれもとっても美味しそうね！","キャラ画像":"assets/webp/content/character/img_meiko_2.webp"},{"キャラ名":"メイコ","セリフ":"どこもプライドを持って\n料理しているのが見てわかるわ！"},{"キャラ名":"メイコ","セリフ":"でもせっかくなんだから、\nみんなも参加者として\n夏祭りに屋台を出店してみるのはどう？","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"妖怪達","セリフ":"たしかに、フードフェスを開いたのも\n美味しいご飯をみんなで楽しむため……"},{"キャラ名":"妖怪達","セリフ":"客が増えるのはこっちとしても、\n願ってもないことだ"},{"キャラ名":"メイコ","セリフ":"夏祭りも一緒に楽しんだら、\n美味しさも2倍3倍になると思うわ♪","キャラ画像":"assets/webp/content/character/img_meiko_2.webp"},{"キャラ名":"主催者","セリフ":"それもそうだな！\nよしみんな！\n夏祭りに出店するため、移動するぞ！"},{"キャラ名":"自分","セリフ":"（主催の妖怪達はたくさんの屋台を引き連れてあっという間にいなくなってしまった）"},{"キャラ名":"メイコ","セリフ":"食材も返してくれるそうだし、\nこれで夏祭りは無事に開けそうね！","キャラ画像":"assets/webp/content/character/img_meiko_2.webp","BGM":"bgmBright"},{"キャラ名":"メイコ","セリフ":"フードフェスの主催者達が\n食に真面目で本当によかったわ"},{"キャラ名":"メイコ","セリフ":"おかげでこんなに早く解決したもの！"},{"キャラ名":"メイコ","セリフ":"あなたも一緒に来てくれてありがとう！"},{"キャラ名":"自分","セリフ":"（カイトさんがいる時は怖い印象だったけど勘違いだったみたい……）"},{"キャラ名":"メイコ","セリフ":"普段の私はこういう感じなんだけれど","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"メイコ","セリフ":"カイトにはつい、ああいう態度を取ってしまうのよね"},{"キャラ名":"メイコ","セリフ":"なんでかしら——\nヘビの本能かしらね？"},{"キャラ名":"自分","セリフ":"（カイトさん、頑張れ……！）"},{"キャラ名":"メイコ","セリフ":"それにしても……\n本当にどの屋台も美味しそうだったわね","キャラ画像":"assets/webp/content/character/img_meiko_1.webp"},{"キャラ名":"メイコ","セリフ":"食材を盗んだのは悪いことだけれど、\nいいものを作りたい気持ちは本物だったわ"},{"キャラ名":"自分","セリフ":"（たしかに、どの屋台のご飯もおいしそうだった。他の屋台のご飯もいろいろ食べてみたいな……）"},{"キャラ名":"メイコ","セリフ":"……あら、もしかして\nお腹が空いちゃった？","キャラ画像":"assets/webp/content/character/img_meiko_2.webp"},{"キャラ名":"メイコ","セリフ":"ふふ、私もいろいろ\n食べ比べしてみたかったの♪\nこの後、一緒に回りましょ！","エンディングID":5}],"route2":[{"キャラ名":"自分","セリフ":"（逃げ出した巨大提灯を探し出すことにした）","背景画像":"assets/webp/content/bg/bg_content_07.webp"},{"キャラ名":"リン","セリフ":"もー！全然見つからないよー！\nいっぱい走り回って疲れちゃった〜！","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"エム","セリフ":"ふわふわちょうちんさん、\nどこ行っちゃったんだろうねー？","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"はっ！もしかして、\nちょうちんさんはかくれんぼで遊びたいとか！？","キャラ画像":"assets/webp/content/character/img_emu_2.webp"},{"キャラ名":"ネネ","セリフ":"違うと思う……けど、\n見失ったのをそう思えるのがうらやましい……","キャラ画像":"assets/webp/content/character/img_nene_2.webp","キャラアニメーション":"is-anim-nod"},{"キャラ名":"ネネ","セリフ":"でも……わたしも\nポジティブになれるように頑張る！","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ネネ","セリフ":"かくれんぼなら、\n探してあげればいいんだから！"},{"キャラ名":"エム","セリフ":"ネネちゃん、その意気だ〜！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"ネネ","セリフ":"よし、エム\n一緒に提灯探し、頑張ろう……！","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"カナデ","セリフ":"はぁ……はぁ……\n骨が、きしんで、痛い……","キャラ画像":"assets/webp/content/character/img_kanade_2.webp","キャラアニメーション":"is-anim-pant"},{"キャラ名":"自分","セリフ":"（カナデさん、辛そうだ……）"},{"キャラ名":"マフユ","セリフ":"カナデ、今日はもう牛乳飲んでおく？\nちゃんと冷やしてあるよ","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"カナデ","セリフ":"うん、そうするよ。\n牛乳があれば、これくらいの痛みでも、\nなんとか……なる……！","キャラ画像":"assets/webp/content/character/img_kanade_2.webp"},{"キャラ名":"カナデ","セリフ":"ごくごく……","キャラ画像":"assets/webp/content/character/img_kanade_2.webp","効果音":"seDrink"},{"キャラ名":"カナデ","セリフ":"やっぱり、牛乳は\nマフユが冷やしてくれた物に限るよ。\nいつもありがとう","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"マフユ","セリフ":"……うん\nあなたもいる……？","キャラ画像":"assets/webp/content/character/img_mafuyu_2.webp","効果音":"seSnow"},{"キャラ名":"レン","セリフ":"な、なんか夏なのに寒くなってない！？","キャラ画像":"assets/webp/content/character/img_ren_1.webp"},{"キャラ名":"自分","セリフ":"（マフユさん、もしかして嬉しいと冷気がでるのかな？）"},{"キャラ名":"レン","セリフ":"まあとりあえず、\nここからは手分けして探そっか！","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"エム","セリフ":"ぴぴーん！エムエムレーダーが\nあっちだって言ってる！\nあたし屋上行ってくるね！","キャラ画像":"assets/webp/content/character/img_emu_2.webp"},{"キャラ名":"ネネ","セリフ":"あっ！ちょっと、エム！\n行っちゃった……","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"ネネ","セリフ":"…………","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"自分","セリフ":"（あれ？なんだかネネさんの様子が……）"},{"キャラ名":"ネネ","セリフ":"エムってば、\nさっき一緒に探そうって約束したのに……！","キャラ画像":"assets/webp/content/character/img_nene_2.webp","キャラアニメーション":"is-anim-tremble","効果音":"seRumble"},{"キャラ名":"ネネ","セリフ":"約束を破って\nわたしを置いていくなんて許せない……！","キャラ画像":"assets/webp/content/character/img_nene_2.webp","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"カナデ","セリフ":"お、落ち着いて……！","キャラ画像":"assets/webp/content/character/img_kanade_2.webp"},{"キャラ名":"マフユ","セリフ":"牛乳ならあるけど……\nカルシウム、とる？","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"あ……行っちゃった","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"カナデ","セリフ":"ど、どっちも心配だ……","キャラ画像":"assets/webp/content/character/img_kanade_2.webp"},{"キャラ名":"カナデ","セリフ":"わたしは屋上に行くから\nマフユはこっちをお願いしてもいい？","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"マフユ","セリフ":"わかった","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"リン","セリフ":"じゃあ、わたしはどこを探そっかな～？","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"リン","セリフ":"そうだ！キミは何かアイディアはある？","キャラ画像":"assets/webp/content/character/img_rin_2.webp","選択肢ID":"route2"}],"route2_1":[{"キャラ名":"自分","セリフ":"（エムちゃんの言葉に従って、屋上に上って追いかけることにした）","背景画像":"assets/webp/content/bg/bg_content_08.webp"},{"キャラ名":"エム","セリフ":"あれあれ〜？ネネちゃんは〜？","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"自分","セリフ":"（ネネさんはエムちゃんに怒って別の場所へ行ってしまった……）"},{"キャラ名":"エム","セリフ":"え〜！そうなんだ〜！\nざんね〜ん！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"ネネちゃんはね、\nいつもムムム〜！ってしてるけど\n本当はすっごく優しいんだよ！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"あたしともよく一緒に遊んでくれるんだ〜！"},{"キャラ名":"エム","セリフ":"ネネちゃんのおうちって橋の下にあるから\nよく橋の上をどたどた〜って走るんだけど"},{"キャラ名":"エム","セリフ":"そのたびにネネちゃんが追いかけてくれて鬼ごっこができるんだ〜！"},{"キャラ名":"自分","セリフ":"（それは、鬼ごっこなんだろうか……）"},{"キャラ名":"カナデ","セリフ":"階段を上ったら、膝が……\nマフユ……は違うところに行ったんだった","キャラ画像":"assets/webp/content/character/img_kanade_2.webp"},{"キャラ名":"カナデ","セリフ":"牛乳……牛乳がない……","キャラ画像":"assets/webp/content/character/img_kanade_2.webp"},{"キャラ名":"エム","セリフ":"がんばれカナデちゃん！\nファイトおー！だよ！","キャラ画像":"assets/webp/content/character/img_emu_2.webp"},{"キャラ名":"エム","セリフ":"ってうしろー！\nあれってちょうちんさんだよね！？","キャラ画像":"assets/webp/content/character/img_emu_2.webp"},{"キャラ名":"カナデ","セリフ":"あ……本当だ。\nやっぱり、あなたは運がいいみたいだね","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"エム","セリフ":"えへへ〜！よく言われる〜！\nあたしがお家にいると幸せになれるんだって〜！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"なんでだろうね〜？","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"カナデ","セリフ":"とにかく、また逃げられないように\nここで捕まえよう","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"エム","セリフ":"ふっふっふ、絶対捕まえちゃうぞ～！","キャラ画像":"assets/webp/content/character/img_emu_2.webp"},{"キャラ名":"カナデ","セリフ":"捕まえるとは言ったけど、\nもうこれ以上動きたくない……","キャラ画像":"assets/webp/content/character/img_kanade_2.webp"},{"キャラ名":"カナデ","セリフ":"提灯……お祭り……といえば、\n祭り囃子とか好きそうだよね","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"祭り囃子の音色があれば\nうまく誘導できるかも……","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"エム","セリフ":"あ、それもすっごく楽しそう！\nどっちも捨てがたいな～！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"ねぇねぇ、あなたはどっちが良いと思う？","キャラ画像":"assets/webp/content/character/img_emu_1.webp","選択肢ID":"route2_1"}],"route2_1_1":[{"キャラ名":"自分","セリフ":"（正面から捕まえに行くのを手伝うことに決めた）","背景画像":"assets/webp/content/bg/bg_content_08.webp","BGM":"bgmTension"},{"キャラ名":"エム","セリフ":"ここまで来たらもう逃げられないぞ～っ","キャラ画像":"assets/webp/content/character/img_emu_2.webp"},{"キャラ名":"エム","セリフ":"さあ、ちょうちんさん——","キャラ画像":"assets/webp/content/character/img_emu_2.webp"},{"キャラ名":"エム","セリフ":"その背中に乗って、\nばびゅーん！って飛ばせてほしいな！","キャラ画像":"assets/webp/content/character/img_emu_1.webp","キャラアニメーション":"is-anim-emu-jump"},{"キャラ名":"自分","セリフ":"（巨大提灯が、首をきょとんとかしげた気がした）"},{"キャラ名":"エム","セリフ":"夏祭りってこの町全体でやるでしょ？","キャラ画像":"assets/webp/content/character/img_emu_1.webp","BGM":"bgmBright"},{"キャラ名":"エム","セリフ":"すっご～く広いから、あたしひとりじゃ全部回り切れるかわかんなくって……","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"でもちょうちんさんの背中に乗れば\nあっちからこっちまでぎゅいーん！って\n行けちゃうんじゃないかなって！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"あたしと一緒に、\n夏祭りをもりもりたくさん楽しもうよ～！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"自分","セリフ":"（巨大提灯は大きく頷いて、背中をこちらへ向けてくれた）"},{"キャラ名":"エム","セリフ":"ほら、あなたも！\n乗って乗って！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"一緒にかくれんぼしたし、\nみーんな仲良し！\nちょうちんさんも、あなたも！！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"あー！そうだ！\nこのままカナデちゃんや\nネネちゃん達を迎えに行こうよ！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"エム","セリフ":"ちゃんと乗った！？よーっし！\n『夏祭り楽しんじゃおう大作戦』にしゅっぱーつ！","キャラ画像":"assets/webp/content/character/img_emu_1.webp","エンディングID":20,"キャラアニメーション":"is-anim-bounce"}],"route2_1_2":[{"キャラ名":"自分","セリフ":"（祭り囃子で誘導するのを手伝うことに決めた）","背景画像":"assets/webp/content/bg/bg_content_08.webp"},{"キャラ名":"自分","セリフ":"（カナデさんに頼まれて骨でできたピアノのような何かを運んだ）"},{"キャラ名":"カナデ","セリフ":"ありがとう、助かったよ","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"牛乳さえあればもっと動けたんだけどな……","キャラ画像":"assets/webp/content/character/img_kanade_2.webp"},{"キャラ名":"カナデ","セリフ":"牛乳を飲むと力がみなぎるから\nすぐに飲めるようにしているんだけど","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"腐りやすいから\nいつもマフユに冷やしてもらってるんだ","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"だからマフユが近くにいないとこうなっちゃうんだよね","キャラ画像":"assets/webp/content/character/img_kanade_2.webp"},{"キャラ名":"カナデ","セリフ":"よし、これで完成。\nあとは、こっちに寄ってきてくれるといいんだけど……","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"自分","セリフ":"（あっというまに曲ができあがっていた）"},{"キャラ名":"祭り囃子","セリフ":"♪——————","BGM":"bgmTension"},{"キャラ名":"自分","セリフ":"（巨大提灯が動きを止めて、ゆっくりこちらを向いている……）"},{"キャラ名":"カナデ","セリフ":"何か、不満そう……？","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"もしかして、お祭り感が足りない……？\n誰かが踊ってる方が\n盛り上がれる……のかな","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"自分","セリフ":"（踊り……祭り囃子なら、盆踊りとか？）"},{"キャラ名":"カナデ","セリフ":"でも、もう体が限界……\n足はきしんでるし、腕の骨も痛い……","キャラ画像":"assets/webp/content/character/img_kanade_2.webp","キャラアニメーション":"is-anim-pant"},{"キャラ名":"自分","セリフ":"（そういえば、さっきマフユさんから牛乳をもらってたんだった）"},{"キャラ名":"自分","セリフ":"（すっかり忘れてた……！）"},{"キャラ名":"カナデ","セリフ":"あ！牛乳……！\nあなたに渡してくれてたんだ……！","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"牛乳があれば、なんでもできる……！","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"——ぷはっ。\nやっぱりこの味が一番","キャラ画像":"assets/webp/content/character/img_kanade_1.webp","効果音":"seDrink"},{"キャラ名":"カナデ","セリフ":"牛乳を飲んだら\nなんだか力がみなぎってきた気がする","キャラアニメーション":"is-anim-idle"},{"キャラ名":"カナデ","セリフ":"それじゃあ、ふたりで踊ろうか","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"巨大提灯","セリフ":"～～～♪","BGM":"bgmBright"},{"キャラ名":"カナデ","セリフ":"よかった、祭り囃子と盆踊りで\n巨大提灯も満足したみたい","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"あなたが一緒に\n踊ってくれたおかげかな\n……って、あれ？どうしたんだろう"},{"キャラ名":"自分","セリフ":"（巨大提灯がカナデさんの袖を引っ張っている）"},{"キャラ名":"カナデ","セリフ":"もしかして、一緒に踊りたいの……？","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"巨大提灯","セリフ":"～～～♪"},{"キャラ名":"カナデ","セリフ":"そっか……\nそれなら一緒に踊ろう","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"あなたも、もう一曲分\n付き合ってくれると嬉しいな","エンディングID":23}],"route2_2":[{"キャラ名":"自分","セリフ":"（提灯の好物でおびき寄せることにした）","背景画像":"assets/webp/content/bg/bg_content_07.webp"},{"キャラ名":"リン","セリフ":"でも、あんなにおっきな提灯……\nなにが好きなんだろ～？","キャラ画像":"assets/webp/content/character/img_rin_1.webp"},{"キャラ名":"レン","セリフ":"うーん……","キャラ画像":"assets/webp/content/character/img_ren_1.webp"},{"キャラ名":"リン","セリフ":"そういえば、前にも\nうちの神社でお祭りしたことあったよね","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"レン","セリフ":"うん、みんな遊びに来てくれて、\n楽しかった！\nそれがどうかした？","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"リン","セリフ":"あの時、小さい提灯達が\nわたあめを美味しそうに\n食べてたんだよね～","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"リン","セリフ":"大きい提灯もわたあめ、\n好きかもしれないよ～！","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"レン","セリフ":"そういえば、そのお祭りのとき、\nうちで用意していない提灯達も\n交ざってたね","キャラ画像":"assets/webp/content/character/img_ren_1.webp"},{"キャラ名":"レン","セリフ":"もしかして、\n提灯達ってお祭りの雰囲気とか、\n音が好きなのかな……？","キャラ画像":"assets/webp/content/character/img_ren_1.webp"},{"キャラ名":"リン","セリフ":"あ、そうかも～！\nお祭りの雰囲気が好きで集まって来たんだと思う！","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"レン","セリフ":"じゃあ、お祭り会場を\n思いっきり盛り上げてみるのもどう？","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"レン","セリフ":"雰囲気につられて、\n巨大提灯がやってくるかも！","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"リン","セリフ":"わたしはおっきなわたあめを作ってくるね！がんばるぞーっ！","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"自分","セリフ":"（どっちを手伝おうかな？）","選択肢ID":"route2_2"}],"route2_2_1":[{"キャラ名":"自分","セリフ":"（ふたりで協力して、巨大提灯が好きそうな特大わたあめを作った）","背景画像":"assets/webp/content/bg/bg_content_09.webp"},{"キャラ名":"リン","セリフ":"うわぁ～っ！\nふわっふわで美味しそう！","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"リン","セリフ":"こんなにおっきいんだから、\nひとくちくらい……","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"リン","セリフ":"ってダメダメ！\nこれは提灯に食べてもらうための物なんだから！","キャラ画像":"assets/webp/content/character/img_rin_1.webp"},{"キャラ名":"リン","セリフ":"大きな提灯さ～ん！\nこっちに美味しそうな\nわたあめがあるよ～！","キャラ画像":"assets/webp/content/character/img_rin_1.webp"},{"キャラ名":"リン","セリフ":"早くしないと、わたしが食べちゃうよ～！","キャラ画像":"assets/webp/content/character/img_rin_1.webp"},{"キャラ名":"自分","セリフ":"（あ、あれは巨大提灯……！）"},{"キャラ名":"巨大提灯","セリフ":"～～～！！！"},{"キャラ名":"自分","セリフ":"（一目散にこっちに来た……！）"},{"キャラ名":"リン","セリフ":"わわっ！びっくりした！\nそんなに食べたかったんだね♪","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"巨大提灯","セリフ":"～～～♪"},{"キャラ名":"リン","セリフ":"ふふ、いっぱい食べてね～♪","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"リン","セリフ":"……あれ、もう食べるの終わり？\nどうしたの？","キャラ画像":"assets/webp/content/character/img_rin_1.webp"},{"キャラ名":"自分","セリフ":"（巨大提灯が、わたあめをこっちにぐいぐい押し出してきてる……）"},{"キャラ名":"リン","セリフ":"……もしかして、一緒に食べようよ、って言いたいのかな？","キャラ画像":"assets/webp/content/character/img_rin_1.webp"},{"キャラ名":"巨大提灯","セリフ":"～～～♪","BGM":"bgmBright"},{"キャラ名":"リン","セリフ":"わぁっ！\nありがとう提灯さん！","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"リン","セリフ":"ほら、キミも一緒に作ったんだから\n一緒に食べよう？\nすっごいフワフワでおいしいよ～！","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"リン","セリフ":"それじゃあ……いっただきまーす！","キャラ画像":"assets/webp/content/character/img_rin_2.webp","エンディングID":2}],"route2_2_2":[{"キャラ名":"自分","セリフ":"（お祭りの会場を盛り上げるために、楽器のできる妖怪達に声をかけていった）","背景画像":"assets/webp/content/bg/bg_content_09.webp"},{"キャラ名":"自分","セリフ":"（その結果、ものすごい数の妖怪の祭り囃子楽器隊が完成した！）"},{"キャラ名":"レン","セリフ":"みんな、集まってくれてありがとう！","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"妖怪達","セリフ":"レンの頼みなら\nいつだって来るに決まってるだろ！"},{"キャラ名":"レン","セリフ":"これだけいたら、この辺りで\n一番の楽しい雰囲気になるね！","キャラ画像":"assets/webp/content/character/img_ren_1.webp"},{"キャラ名":"レン","セリフ":"あの巨大提灯も、\nこっちにおびき寄せられるはず！","キャラ画像":"assets/webp/content/character/img_ren_1.webp"},{"キャラ名":"レン","セリフ":"……というわけで、\nキミもDJとしてよろしくね！","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"自分","セリフ":"キュキュッ♪","効果音":"seScratch"},{"キャラ名":"レン","セリフ":"うん！オレの喉も温まってるし、\n準備万端！","キャラ画像":"assets/webp/content/character/img_ren_1.webp"},{"キャラ名":"レン","セリフ":"それじゃあ、\n盆踊りパーティースタート！","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"レン","セリフ":"♪————！————！","キャラ画像":"assets/webp/content/character/img_ren_2.webp","BGM":"bgmBright","キャラアニメーション":"is-anim-idle"},{"キャラ名":"自分","セリフ":"（……あ！巨大提灯がこっちに……！）"},{"キャラ名":"レン","セリフ":"ははっ、いいね！\nみんなの音に巨大提灯もつられてきてる！","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"レン","セリフ":"DJも回し最高だよ！\nさっすが！","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"レン","セリフ":"このまま夜通し歌って踊り明かそう！\nみんな、ついて来て！","キャラ画像":"assets/webp/content/character/img_ren_2.webp","エンディングID":3}],"route2_3":[{"キャラ名":"自分","セリフ":"（巨大提灯が落とす火の粉の痕跡を追いかけることにした）","背景画像":"assets/webp/content/bg/bg_content_07.webp"},{"キャラ名":"ネネ","セリフ":"約束を破ったエムなんてもう知らない……！","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ネネ","セリフ":"…………","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"自分","セリフ":"（ネネさん？）"},{"キャラ名":"ネネ","セリフ":"で、でもエム大丈夫かな……\n危ない目にあってないかな","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"マフユ","セリフ":"カナデ、私がいなくて大丈夫かな","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"自分","セリフ":"（ふたりともすごく心配そうだ......）"},{"キャラ名":"ネネ","セリフ":"あっ……こんなところにも火の粉が……","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"ネネ","セリフ":"逃げるためとはいえ、\nどうしてあの提灯にとって狭い道をわざわざ……？","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"マフユ","セリフ":"ここを通りたかった理由が\nあるんじゃない？","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"ネネ","セリフ":"通りたかった理由？","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"マフユ","セリフ":"今まで通ってきたところ、\nかなりお祭りっぽく\n飾り付けされてるところばかりだったから","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"ここも狭いけど、\nかなり飾り付けられてるし……\n巨大提灯にとって好きな道なのかも","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"ネネ","セリフ":"本当だ……そういえば、今までの場所も\nかなりお祭りっぽい雰囲気だった……","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"ネネ","セリフ":"冷静な観察力……\nう、うらやましい……！","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ネネ","セリフ":"うらやましいから、がんばって真似しよう……！次に提灯が行きそうな場所……お祭りっぽい雰囲気……","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ネネ","セリフ":"……あ、次に行く場所あそこかも。\nわたしはそっちに行ってみる","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"マフユ","セリフ":"私は火の粉を調べたいかな。\n少し気になることがあるから","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"それに……外は暑くて嫌い","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"自分","セリフ":"（どっちについていこうかな……）","選択肢ID":"route2_3"}],"route2_3_1":[{"キャラ名":"自分","セリフ":"（次に巨大提灯がやってきそうな場所を予測して、先回りすることにした）","背景画像":"assets/webp/content/bg/bg_content_07.webp"},{"キャラ名":"ネネ","セリフ":"ここもかなりお祭りっぽい雰囲気だし……\nたぶん、ここに来る……はず……！","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"ネネ","セリフ":"ここで待ち伏せして、\n巨大提灯が通りがかる時に捕まえよう","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"自分","セリフ":"（ネネさんと一緒に、建物の陰に隠れた）"},{"キャラ名":"ネネ","セリフ":"はあ……こういう時、\n俊敏に動ける妖怪がうらやましい……","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ネネ","セリフ":"わたしがエムだったら、\n待ち伏せしなくても……\n走って捕まえられたのかな……","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ネネ","セリフ":"うらやましい……\nから、今日ここでわたしの限界を超える……！","キャラ画像":"assets/webp/content/character/img_nene_2.webp","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"自分","セリフ":"（あ……！巨大提灯が……！）"},{"キャラ名":"ネネ","セリフ":"来たね……。\nタイミング合わせて、いくよ……！"},{"キャラ名":"ネネ","セリフ":"……せーのっ！","キャラ画像":"assets/webp/content/character/img_nene_1.webp","キャラアニメーション":"is-anim-gather"},{"キャラ名":"ネネ","セリフ":"掴んだ！\nアンタも絶対離さないで……！","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"ネネ","セリフ":"このまま、逃げないように……\n捕まえ、て……と！","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"自分","セリフ":"（やった！巨大提灯を捕まえた！）"},{"キャラ名":"ネネ","セリフ":"……運動が得意じゃなくっても、できた……。ちょっとだけ嬉しい……かも","キャラ画像":"assets/webp/content/character/img_nene_2.webp","BGM":"bgmBright"},{"キャラ名":"ネネ","セリフ":"でも、うまくいったのは……\nアンタが手伝ってくれたから……だね","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"ネネ","セリフ":"それじゃ、飾りつける場所まで持っていって……","キャラ画像":"assets/webp/content/character/img_nene_1.webp"},{"キャラ名":"ネネ","セリフ":"……うぅ、やっぱり重い……無理……","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ネネ","セリフ":"ごめん、まだ手伝って……","キャラ画像":"assets/webp/content/character/img_nene_2.webp","エンディングID":21}],"route2_3_2":[{"キャラ名":"自分","セリフ":"（巨大提灯の火の粉を回収して、調べてみることにした）","背景画像":"assets/webp/content/bg/bg_content_07.webp"},{"キャラ名":"マフユ","セリフ":"うん……やっぱり、思った通り","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"これ、見て","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"自分","セリフ":"（これ……火の粉が凍ってる……？マフユさんがやったんだ……）"},{"キャラ名":"マフユ","セリフ":"本来より、かなり火の粉が少ない。\n……燃料切れが近いんだと思う","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"提灯の燃料はこの先。\n補給するために、この廊下を必ず通るはず","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"だから、ここで待っていれば——","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"自分","セリフ":"（あ！本当に巨大提灯が……！マフユさん、すごい……！）"},{"キャラ名":"マフユ","セリフ":"……別に、状況から考えただけだから","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"それより、ここで逃がすと面倒になる。\n私の合図で、一緒に飛びかかって","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"——集中して","キャラ画像":"assets/webp/content/character/img_mafuyu_2.webp"},{"キャラ名":"マフユ","セリフ":"……今！","キャラ画像":"assets/webp/content/character/img_mafuyu_2.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"自分","セリフ":"（マフユさんの合図で、無事に巨大提灯を捕まえることに成功した）","BGM":"bgmBright"},{"キャラ名":"マフユ","セリフ":"火が点いてる提灯を直接持ち運ぶなんて……","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"熱いのは苦手だから嫌なんだけどな……。すごく、大きいし……","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"こうなるなら、ミズキに手袋でも\n作ってもらえば良かった……","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"ちょっと熱い……から、冷ますね","キャラ画像":"assets/webp/content/character/img_mafuyu_2.webp","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"自分","セリフ":"（あ……！）"},{"キャラ名":"マフユ","セリフ":"……ごめん。\nうっかり、消しちゃった","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"マフユ","セリフ":"まあ、後で点けなおせばいい……よね？","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"自分","セリフ":"（その後、マフユさんと一緒に火を点けなおした）","エンディングID":24}],"route3":[{"キャラ名":"自分","セリフ":"（あやかしオークションに出品された祭具を取り戻す手伝いをすることにした）","背景画像":"assets/webp/content/bg/bg_content_10.webp"},{"キャラ名":"ツカサ","セリフ":"さあ！オークションの会場に到着だ！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ルイ","セリフ":"上空から様子を見れるツカサくんのおかげで会場を見つけることができたね！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"サキ","セリフ":"翼があるっていいな〜！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"空を飛べたら\nアタシももっと色んな驚かせ方ができるのに〜！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"ツカサ","セリフ":"そうだろう！そうだろう！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"こんなにも迅速に会場を見つけられるのはこのオレの飛行能力があってこそだな！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"もっと褒めてもいいんだぞ！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"シホ","セリフ":"ちょっと……！声が大きいですよ\n見つかったらどうするんですか","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"ツカサ","セリフ":"その時はその時だ！！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"ミク","セリフ":"そうだね、\nその時はみんなで力を合わせよう","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"シズク","セリフ":"えぇ……！\nみんな一緒ならなんとかなるはずよ","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"シホ","セリフ":"もう……能天気なんだから……","キャラ画像":"assets/webp/content/character/img_shiho_2.webp"},{"キャラ名":"ツカサ","セリフ":"よ〜し！\nオレはどこかから侵入できないか、\n上空から見てくる！","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"ツカサ","セリフ":"オレにかかれば一瞬で見つけられるだろう！では、いってくる！とおっ！"},{"キャラ名":"ルイ","セリフ":"ああ、まかせたよツカサくん！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"アイリ","セリフ":"それにしても祭具がないとお祭りができないっていうのに盗んだだけじゃなくてオークションに出品だなんて！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"アイリ","セリフ":"とんだ不届き者がいたものね！\n見つけたらこらしめてやるんだから！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"シズク","セリフ":"アイリちゃんたらやる気十分ね〜","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"アイリ","セリフ":"なにのんびりしてるの！\nわたし達のコンビネーションで祭具を取り戻すのよ！","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"自分","セリフ":"（アイリさん、すごい気迫だ……！）"},{"キャラ名":"シホ","セリフ":"会場にきたのはいいけど、\nどうやって祭具を取り戻すんですか？","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"ルイ","セリフ":"そうだね……オークションという形式である以上、正面から競り落とすことも可能ではあると思うけれど……","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"サキ","セリフ":"でも、こういう場所って招待状とかがいるイメージなんですけど……","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"ルイさん、持ってたりしません？","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"ルイ","セリフ":"いつもなら色々お誘いがあるのだけど、残念ながら、今回は持ち合わせていないねえ","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ミク","セリフ":"その招待状って……\nこれのことかな？","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"サキ","セリフ":"絶対それだよ！\nミクちゃん、すごい！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"ミク","セリフ":"よかった\n家に届いていたから一応持ってきたんだ","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ルイ","セリフ":"すばらしい！\nこの招待状を有効利用させてもらおう！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"アイリ","セリフ":"シズクー！シズクー！？\nちょっと、どこ行っちゃったのよー！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"シズク","セリフ":"アイリちゃん、ここよ～","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"シズク","セリフ":"ってあら？金棒さんが重くって……。\nあら、あららら……","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"アイリ","セリフ":"ちょっとシズクー！？\nフラフラしないでよ！\n金棒でなにか壊したら大事なんだからね！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"シズク","セリフ":"うふふ、ごめんなさ～い","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"ツカサ","セリフ":"お〜い！見えたぞ！\n上空から、裏口のようなものを確認した！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"こんなにあっという間に見つけるなんてさすがオレだな！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ルイ","セリフ":"あぁ、さすがツカサくんだ！\n横丁一の配達屋と言っても過言ではないだろう！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ツカサ","セリフ":"ハーッハッハッハ！\nこの国一番の配達屋の間違いではないか？","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ルイ","セリフ":"よっ日本一！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"アイリ","セリフ":"なんだかこのふたりのテンション\n見ていて疲れるわね……","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"ツカサ","セリフ":"裏口からスタッフとして潜入すれば\n持ち出せるんじゃないか！？","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"シホ","セリフ":"……そもそも、祭具が会場に\n運び込まれる前にカイチュウ……回収する方が確実","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"サキ","セリフ":"だったら、どこから運び込まれるか\n運搬ルートを調べないとね！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"ルイ","セリフ":"いやいや、せっかく招待状があるんだ\n客として正面から入るのも手だと思うよ？","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"アイリ","セリフ":"……ってシズク！？シズクはどこ！？\nも～～っ！！また迷子になって……！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"自分","セリフ":"（どのルートから祭具を取り戻そうかな……）","選択肢ID":"route3"}],"route3_1":[{"キャラ名":"自分","セリフ":"（ミクさんの招待状で、客として潜入することにした）","背景画像":"assets/webp/content/bg/bg_content_11.webp"},{"キャラ名":"ミク","セリフ":"すっごく賑わっているね","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ルイ","セリフ":"貴重な祭具をこれほどの妖怪達が狙うかもしれない……\nフフ、楽しくなってきたねえ","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"自分","セリフ":"（とてもきらびやかな空間で場違いっぽい……！でも、ふたりは慣れているようだ……！）"},{"キャラ名":"ルイ","セリフ":"おや？もしかして緊張しているのかい？","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ミク","セリフ":"すぐに慣れるから大丈夫だよ","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"自分","セリフ":"（た、頼もしい……！）"},{"キャラ名":"ルイ","セリフ":"さてさて、ここまでは順調なわけだけれど、ここからの作戦はどうしようか？","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"僕個人としては、\nせっかくのオークションだ！\nぜひとも参加してみたいと思っているよ！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"自分","セリフ":"（でも、いまはそんなにたくさんのお金を持ってない……）"},{"キャラ名":"ミク","セリフ":"舞台に出た本物を、\n偽物と取り換えちゃうのはどうかな？","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ルイ","セリフ":"なるほど！\nいいアイディアじゃないかミクくん！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"さて、鬼のふたりは\n何か良い案はあるかい？","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"アイリ","セリフ":"シズクがいないのよ……！\nもう、どこ行っちゃったのよあの子は……！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"アイリ","セリフ":"仕方ないわね……\nわたしだけでなんとかするしかないわ！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"アイリ","セリフ":"全部ぶっ叩いて、\n正面から手に入れてやろうじゃない！","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"アイリ","セリフ":"それに、シズクもわたしが暴れていたら\n騒ぎを聞きつけて戻ってくるかも"},{"キャラ名":"自分","セリフ":"（え、え〜〜〜〜〜！？）"},{"キャラ名":"ルイ","セリフ":"なるほど、強行突破かい？\nいやはや、面白い展開になりそうだ！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"どの作戦も捨てがたいね\n君はどう思う？","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"自分","セリフ":"（どうしよう……）","選択肢ID":"route3_1"}],"route3_1_1":[{"キャラ名":"自分","セリフ":"（富豪になりきって、祭具を競り落とすことにした）","背景画像":"assets/webp/content/bg/bg_content_11.webp"},{"キャラ名":"ルイ","セリフ":"せっかくのオークションなんだから、楽しまなくてはね！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"実にドラマティックで愉快な作戦だ！\nそして、華麗に事件解決といこうじゃないか！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"自分","セリフ":"（なんだかルイさん、すごく楽しそう）"},{"キャラ名":"ルイ","セリフ":"以前いた場所ではこういったことはなくてね","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"このあやかし横丁では毎日楽しいことばかりだ！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"自分","セリフ":"（以前いた場所……？）"},{"キャラ名":"ルイ","セリフ":"あぁ……僕は以前、\nみんなをまとめるような立場でね","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"たまたま郵便配達に来たツカサくんに\nこの横丁の話を聞いて","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"面白そうだから引っ越してきたんだよ"},{"キャラ名":"ルイ","セリフ":"ツカサくんの飛ぶ勢いが凄まじくて\n僕の家につっこんできてね","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"あの時のことを思い出すだけで……\nフフッ……","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"……そんな昔話はさておき","キャラ画像":"assets/webp/content/character/img_rui_2.webp"},{"キャラ名":"ルイ","セリフ":"この作戦を成功させるには\n僕達の演技力がカギというわけだ","キャラ画像":"assets/webp/content/character/img_rui_2.webp"},{"キャラ名":"ルイ","セリフ":"フフ……大船に乗ったつもりで\nこの僕に任せてくれたまえよ！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"自分","セリフ":"（そして、オークションが始まった……）","BGM":"bgmTension"},{"キャラ名":"自分","セリフ":"（ルイさんは強気な競りで、祭具の金額勝負に張り合っている）"},{"キャラ名":"ルイ","セリフ":"——では、\nさらに上乗せといこうじゃないか","キャラ画像":"assets/webp/content/character/img_rui_2.webp","キャラアニメーション":"is-anim-nod"},{"キャラ名":"自分","セリフ":"（すごい……！なんだか、本物の富豪に見えてきた……！）"},{"キャラ名":"お化け","セリフ":"なっ……！\n一体どこからそんな金額が……！？"},{"キャラ名":"お化け","セリフ":"えぇい、降りる降りる！\nこれ以上、やってられるか！"},{"キャラ名":"ルイ","セリフ":"では、これで僕が\n競り落としたというわけだね","キャラ画像":"assets/webp/content/character/img_rui_2.webp"},{"キャラ名":"ルイ","セリフ":"——と言いたいところなんだが、\n念の為に本物かどうか触って確かめてもいいかい？","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"自分","セリフ":"（ルイさんが祭具のそばに……）"},{"キャラ名":"ルイ","セリフ":"ふむ……なるほどなるほど。\nこれは間違いなく本物だね","キャラ画像":"assets/webp/content/character/img_rui_2.webp"},{"キャラ名":"ルイ","セリフ":"では……いただいていくとしよう！","キャラ画像":"assets/webp/content/character/img_rui_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"スタッフ","セリフ":"え……お支払いは……！"},{"キャラ名":"ルイ","セリフ":"さぁ、逃げるよ！\n君もしっかりついておいで！","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"自分","セリフ":"（え……！？）"},{"キャラ名":"スタッフ","セリフ":"待てーー！"},{"キャラ名":"ルイ","セリフ":"ははは！\n待てと言われて待つものはいないよ！\n君達にこの僕を捕まえられるかな！？","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"ハーッハッハッハ！"},{"キャラ名":"自分","セリフ":"（ルイさん、すごく楽しそうだ）"},{"キャラ名":"ルイ","セリフ":"いやはや、気分はさながら怪盗だねえ。\nまさか、妖怪としては名のある僕が\nこんなことをするなんて……","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"ルイ","セリフ":"君と共にいると、\nまだまだ面白いことが起きそうだ！\nもう少し、観察させてもらうとしよう","キャラ画像":"assets/webp/content/character/img_rui_1.webp","エンディングID":22}],"route3_1_2":[{"キャラ名":"自分","セリフ":"（本物の祭具を偽物とすり替えることにした）","背景画像":"assets/webp/content/bg/bg_content_11.webp","BGM":"bgmTension"},{"キャラ名":"ミク","セリフ":"電気のスイッチは、ここみたいだね","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"本物が出てきたらどっちかが電気を消して、その間にもうひとりがささっとすり替えちゃう……","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"作戦はこれでどうかな？","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"完璧な作戦？ふふ、ありがとう\nさて、役割分担は……","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"自分","セリフ":"（ミクさんの服動き辛そうだしすり替えるのは自分がやったほうがよさそうだ）"},{"キャラ名":"ミク","セリフ":"すり替えるの、わたしがやってみてもいいかな？","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"いつも側仕えが何でもやってくれちゃうから、こういうスリルがあることやってみたかったんだよね","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"自分","セリフ":"（側仕え！？ミクさん、もしかして高貴な方なのでは……？）"},{"キャラ名":"ミク","セリフ":"うん、やっぱり私にやらせて！"},{"キャラ名":"自分","セリフ":"（で、でも危険じゃ……！）"},{"キャラ名":"ミク","セリフ":"心配してくれてありがとう","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"危険かもしれないけど……\n何かあったらキミが助けてくれるよね？","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"自分","セリフ":"（結局ミクさんの強い眼差しに負けてすり替え役をお願いすることにした）"},{"キャラ名":"ミク","セリフ":"オークション、どうかな？\nもう少しで出てきそうなんだけど……","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"自分","セリフ":"（……！祭具が出てきた！）"},{"キャラ名":"自分","セリフ":"（電気のスイッチを消さないと……！）"},{"キャラ名":"客たち","セリフ":"なんだなんだ……？\n何も見えないぞ……！","効果音":"sePowerOff"},{"キャラ名":"ミク","セリフ":"よいしょ、よいしょ……。\nここで取り替えて……"},{"キャラ名":"ミク","セリフ":"急がないと……"},{"キャラ名":"自分","セリフ":"（あ、照明が……！ミクさん、間に合ったのかな……？）"},{"キャラ名":"ミク","セリフ":"お待たせ、持ってきたよ","キャラ画像":"assets/webp/content/character/img_miku_1.webp","BGM":"bgmBright"},{"キャラ名":"ミク","セリフ":"普段は側仕えがいるから、\nあまり自分では動かなくて\n手間取っちゃった"},{"キャラ名":"ミク","セリフ":"それじゃあやることも終わったし……","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"オークション、見学していこう！","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"自分","セリフ":"（え、いいのかな……？）"},{"キャラ名":"ミク","セリフ":"せっかくこんなところまで来たんだから、見ていかなきゃ損だよ","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"それに見知った顔も結構いるみたいだし\nみんなにキミを紹介させてほしいな","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"挨拶はとっても大事だからね？","キャラ画像":"assets/webp/content/character/img_miku_2.webp","エンディングID":1}],"route3_1_3":[{"キャラ名":"自分","セリフ":"（あやかしオークションそのものをめちゃくちゃにすることにした）","背景画像":"assets/webp/content/bg/bg_content_11.webp","BGM":"bgmTension"},{"キャラ名":"自分","セリフ":"（金棒を強く握りしめるアイリさんは、頭から湯気が出そうなほど熱く燃え上がっている）"},{"キャラ名":"アイリ","セリフ":"いい？わたしが摘発に来たってことで\n会場をめちゃくちゃにするから","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"アイリ","セリフ":"その間に、アンタは騒ぎに乗じて祭具を持ち出して","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"アイリ","セリフ":"——さて、そろそろかしらね","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"司会者","セリフ":"続きまして！\n本日行われる夏祭りに使用される\n祭具の出品で——"},{"キャラ名":"アイリ","セリフ":"全員動くんじゃないわよ！\n怪しい動きをしたらただじゃ置かないわ！！！","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"警備員","セリフ":"なっ！どこから入り込んだ！"},{"キャラ名":"アイリ","セリフ":"よくもみんなの大切な祭具を盗んでくれたわね！","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"アイリ","セリフ":"かかってきなさい！\nわたしはいつでも準備万端よ！","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"警備員","セリフ":"引っ捕らえろ！"},{"キャラ名":"アイリ","セリフ":"そう簡単にやられるもんですか！\nおりゃーー！！","キャラ画像":"assets/webp/content/character/img_airi_1.webp","キャラアニメーション":"is-anim-angry"},{"キャラ名":"自分","セリフ":"（今のうちに祭具を……！）"},{"キャラ名":"アイリ","セリフ":"——ふう、なんとか脱出できたわね","キャラ画像":"assets/webp/content/character/img_airi_1.webp","BGM":"bgmBright"},{"キャラ名":"アイリ","セリフ":"お互い無傷みたいだし……\nアンタ、なかなかやるじゃない","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"アイリ","セリフ":"わたしの方もちょっとはスッキリしたし、かなり上々の結果ね","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"自分","セリフ":"（よかった。祭具も取り戻せたし、アイリさんも満足したみたい）"},{"キャラ名":"アイリ","セリフ":"これだけ暴れたら\nシズクも戻ってくると思ったんだけど"},{"キャラ名":"アイリ","セリフ":"戻ってこなかったわね……"},{"キャラ名":"アイリ","セリフ":"はぁ……仕方ないわね……","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"アイリ","セリフ":"アンタもシズクを探すの\n手伝ってちょうだい！","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"アイリ","セリフ":"あの子の方向音痴っぷりは天才的なのよ……！もう信じられないくらい！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"アイリ","セリフ":"あ～～、今もこうやって目を離している間にどんなことに巻き込まれているか……！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"アイリ","セリフ":"あっちから探していきましょ。\nシズクー！どこー！？","キャラ画像":"assets/webp/content/character/img_airi_2.webp","エンディングID":13}],"route3_2":[{"キャラ名":"自分","セリフ":"（裏口からこっそり忍び込んで例の祭具を探すことにした）","背景画像":"assets/webp/content/bg/bg_content_12.webp"},{"キャラ名":"ツカサ","セリフ":"ふむ、まだ搬入されていないようだな","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"シズク","セリフ":"あらら？ここは……\nもしかしてオークションの会場かしら？","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"シズク","セリフ":"アイリちゃんは……いないわね。\n迷子になっちゃったのかしら？","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"ツカサ","セリフ":"なるほど！つまり、迷子とは\n迷子と言われた方が迷子になるのだな！","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"シズク","セリフ":"あらあら、ツカサくん。\nさっきから忙しそうね","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"ツカサ","セリフ":"む！？それはオレじゃないぞ！\nおそらく、オークションの司会だ！","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"自分","セリフ":"（……あの司会の妖怪、ツカサさんと同じ黒い翼だ！）"},{"キャラ名":"ツカサ","セリフ":"なるほど……あの司会になりきれば、\n祭具を持ち出せるかもしれないな！","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"ツカサ","セリフ":"よし！いくぞおおぉ！！！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"シズク","セリフ":"ツカサくんはあっちに行くのね。\nそれじゃあ私はこっちにしようかしら","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"自分","セリフ":"（ふたりとも逆の方向に……！どっちについていこう……？）","選択肢ID":"route3_2"}],"route3_2_1":[{"キャラ名":"自分","セリフ":"（ツカサさんにそっくりな司会のフリをすることにした）","背景画像":"assets/webp/content/bg/bg_content_12.webp","BGM":"bgmTension"},{"キャラ名":"自分","セリフ":"（ツカサさんは司会の変装を、自分は助手の変装をして会場の裏手を歩いている）"},{"キャラ名":"ツカサ","セリフ":"こういう時には堂々としている方が、\n怪しまれにくい！もっと胸を張るといい！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"目線は正面！歩幅は大きめにとって\n自信を周囲に見せるように！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"そうだ！いい調子だぞ！\nならば次はもっと！！！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"自分","セリフ":"（そ、そんなに声が大きいと正体が……！）"},{"キャラ名":"妖怪","セリフ":"ちょ、声がデカすぎませんか……！？\n司会さん、急にどうしたんです？"},{"キャラ名":"ツカサ","セリフ":"む？特にどうもしていないぞ！\nオレはいつもこうだったじゃないか！","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"妖怪","セリフ":"そうでしたっけ？\n……ま、いいや"},{"キャラ名":"ツカサ","セリフ":"ほら見たことか！堂々としていれば、\n存外バレないものだろう？","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"自分","セリフ":"（す、すごい……！）"},{"キャラ名":"ツカサ","セリフ":"よし、祭具を手に取れそうだ。\nこのまま自然に持ち帰って……","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"妖怪","セリフ":"おい！！\nあの司会、やっぱりニセモノだろ！"},{"キャラ名":"ツカサ","セリフ":"くっ！なぜバレてしまったんだ！\nオレ達の変装は完璧だったはずなのに！！！","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"妖怪","セリフ":"あんな声と態度がデカい司会がいるか！"},{"キャラ名":"ツカサ","セリフ":"こうなっては仕方がない……！","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"ツカサ","セリフ":"共に逃げるぞ！\nオレに捕まれ！！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp","背景画像":"assets/webp/content/bg/bg_content_13.webp","効果音":"seFly"},{"キャラ名":"自分","セリフ":"（と、飛んでる……！？）"},{"キャラ名":"ツカサ","セリフ":"なんだ？そんなに驚いて\nもしかして、飛ぶのは初めてか？","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp","BGM":"bgmBright"},{"キャラ名":"ツカサ","セリフ":"飛ぶ、というのはいいものだろう\n風が気持ちよくないか？","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"こうやって風に身を任せて飛ぶと\nとてもリラックスできるんだ","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"今度お前もやってみるといい！\nって……お前には翼がないんだったな！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"うっかりさんだなオレは！\nハーッハッハッハ！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"自分","セリフ":"（ツカサさん何か色々喋っているけど、下からオナモミが飛んできている……！）"},{"キャラ名":"ツカサ","セリフ":"むむっ！？\n攻撃されているな！？","キャラ画像":"assets/webp/content/character/img_tsukasa_2.webp"},{"キャラ名":"ツカサ","セリフ":"いつもなら神通力で跳ね返すところだが……これはこれでスリル満点でいいじゃないか！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ツカサ","セリフ":"ハーッハッハッハ！\nオレの速度について来れるかな！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp","キャラアニメーション":"is-anim-tsukasa-move"},{"キャラ名":"自分","セリフ":"（は、速すぎる……！）"},{"キャラ名":"自分","セリフ":"（その後もツカサさんはとてつもない速度で飛び続けた）"},{"キャラ名":"自分","セリフ":"（一緒に飛んでいた自分はあまりの浮遊感に酔ってしまった）","エンディングID":19}],"route3_2_2":[{"キャラ名":"自分","セリフ":"（ステージの裏で、祭具を偽物とすり替えることにした）","背景画像":"assets/webp/content/bg/bg_content_12.webp","BGM":"bgmTension"},{"キャラ名":"シズク","セリフ":"みんなが言っていた祭具は\nこれで合っているのかしら？","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"シズク","セリフ":"それじゃあ、偽物と交換して……\nうん、これでバッチリね！","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"シズク","セリフ":"さて、またアイリちゃんを探しに行きましょうか","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"自分","セリフ":"（こんなにあっさりとすり替えられるなんて……。これが鬼の力……！？）"},{"キャラ名":"シズク","セリフ":"うーん……アイリちゃん、いないわね。\nどこに行っちゃったのかしら……","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"シズク","セリフ":"そうだ！迷子の相談なら、\n警備員さんにするのが一番よね","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"シズク","セリフ":"警備員さーん！","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"自分","セリフ":"（ああ！シズクさん！祭具を持ったままじゃ……！）"},{"キャラ名":"警備員","セリフ":"おい！それは祭具じゃないか！\n盗人か！？今すぐ捕まえて——"},{"キャラ名":"シズク","セリフ":"きゃあっ！","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp","効果音":"seThud"},{"キャラ名":"警備員","セリフ":"うわぁ！！"},{"キャラ名":"自分","セリフ":"（驚いたシズクさんが持っていた金棒が、警備員に直撃した！？）"},{"キャラ名":"シズク","セリフ":"あらあら……なんだか悪いことをしちゃったわね。その……ごめんなさい","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"シズク","セリフ":"お詫びに節分の時にもらった\nお豆を置いておきましょう……","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"シズク","セリフ":"節分の日はいつも色んなお家に呼ばれて大忙しなのよ","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"シズク","セリフ":"どうしてかみんなお豆を投げて渡してくれるのよね","キャラ画像":"assets/webp/content/character/img_shizuku_1.webp"},{"キャラ名":"自分","セリフ":"（それはシズクさんが鬼だからでは……？）"},{"キャラ名":"シズク","セリフ":"ふふ、でもこれで\nアイリちゃんをのんびりと探せるわね","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp","BGM":"bgmBright"},{"キャラ名":"シズク","セリフ":"それじゃあ、一緒に探しにいきましょうか","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp","エンディングID":14}],"route3_3":[{"キャラ名":"自分","セリフ":"（祭具がオークション会場に運搬されるルートを探りに来た）","背景画像":"assets/webp/content/bg/bg_content_10.webp"},{"キャラ名":"シホ","セリフ":"——このあたりを経由して、\n会場の裏口から搬入するみたいだね","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"サキ","セリフ":"それじゃあ、ここに来るまでのどこかで\nおっきな物を抱えている妖怪は怪しいってことだね！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"シホ","セリフ":"いや、そのくくりはおおざっぱすぎ……ん？","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"あ、あのお店……\nあれは……チ、チーズ専門店……！","キャラ画像":"assets/webp/content/character/img_shiho_2.webp"},{"キャラ名":"サキ","セリフ":"シ、シホちゃん……？","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"シホ","セリフ":"こんな所にこんなお店が……！\nちょっと覗くだけ、覗くだけだから……！","キャラ画像":"assets/webp/content/character/img_shiho_2.webp","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"サキ","セリフ":"シホちゃん！\nとっても大事な道具を取り返すんでしょ！？","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"シホ","セリフ":"そ、そうだった。\n……でもチーズ……","キャラ画像":"assets/webp/content/character/img_shiho_2.webp"},{"キャラ名":"自分","セリフ":"（すごく残念そうだ）"},{"キャラ名":"サキ","セリフ":"も〜！シホちゃんってば〜！\n今は祭具のほうが大事でしょ？","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"チーズは今度\nイッちゃんやホナちゃんと食べに行こうよ〜！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"あ！ねぇ、こういうのはどう？\n持ってくる途中の道で、\n思いっきり驚かすの！","キャラ画像":"assets/webp/content/character/img_saki_2.webp"},{"キャラ名":"サキ","セリフ":"きっとびっくりしたら、\n祭具を落っことしちゃうよね！ふっふっふ……","キャラ画像":"assets/webp/content/character/img_saki_2.webp"},{"キャラ名":"シホ","セリフ":"だったら、\n私は会場入り口の近くで待ってる。\n受け渡しの時が一番油断するだろうから","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"サキ","セリフ":"それって、\nチーズのお店が近いからでしょ？\nほんっとにチーズ大好きなんだから","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"シホ","セリフ":"うっ……美味しいものは仕方ないでしょ","キャラ画像":"assets/webp/content/character/img_shiho_2.webp"},{"キャラ名":"サキ","セリフ":"ねぇ、あなたはどっちを手伝ってくれる？","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"自分","セリフ":"（ここで待つか、運んでいる最中を狙うか……）","選択肢ID":"route3_3"}],"route3_3_1":[{"キャラ名":"自分","セリフ":"（祭具の受け渡し現場を押さえることにした）","背景画像":"assets/webp/content/bg/bg_content_10.webp","BGM":"bgmTension"},{"キャラ名":"自分","セリフ":"（ずいぶん待ってるけど……なかなか来ないな……）"},{"キャラ名":"シホ","セリフ":"……祭具の受け渡し、\nなかなか始まらないね","キャラ画像":"assets/webp/content/character/img_shiho_1.webp","キャラアニメーション":"is-anim-idle"},{"キャラ名":"自分","セリフ":"（シホさん、さっきからチーズのお店をずっとちらちら見てる……）"},{"キャラ名":"シホ","セリフ":"早く来てくれないかな……\nそろそろお腹が限界……！","キャラ画像":"assets/webp/content/character/img_shiho_2.webp"},{"キャラ名":"自分","セリフ":"（シホさん、もうかなり限界そう……）"},{"キャラ名":"シホ","セリフ":"……もう……いいよね……\nたくさん待ったし……","キャラ画像":"assets/webp/content/character/img_shiho_2.webp"},{"キャラ名":"シホ","セリフ":"ごめん、ちょっとここにいて。\n私、今すぐチーズを買いに——","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"妖怪","セリフ":"——おう、すっかり遅れて悪いな。\nこれが例の祭具だ"},{"キャラ名":"自分","セリフ":"（祭具の受け渡しが始まってる……！）"},{"キャラ名":"シホ","セリフ":"……！タイミングが悪い……っ！\nなんなの、もう！","キャラ画像":"assets/webp/content/character/img_shiho_2.webp"},{"キャラ名":"シホ","セリフ":"……ちょっと、そこのあんた。\n今すぐ、それを渡して","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"妖怪","セリフ":"なっ、なんだお前ら！"},{"キャラ名":"シホ","セリフ":"私は今チーズを邪魔されて機嫌が悪いの。\nいいから黙ってそれを渡して","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"渡さないなら——","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"妖怪","セリフ":"渡さないならどうするんだ？"},{"キャラ名":"自分","セリフ":"（この妖怪、大きくて強そうだ……！）"},{"キャラ名":"自分","セリフ":"（体格差があるから自信ありげだ……どうしよう……）"},{"キャラ名":"自分","セリフ":"（シホさんも怯んでる）"},{"キャラ名":"シホ","セリフ":"渡さないなら——","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"この前歯であんたを丸かじりするっ！！","キャラ画像":"assets/webp/content/character/img_shiho_1.webp","キャラアニメーション":"is-anim-bounce"},{"キャラ名":"妖怪","セリフ":"痛っ！？"},{"キャラ名":"シホ","セリフ":"言っておくけどこれだけじゃないからね","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"妖怪","セリフ":"な、なに！？"},{"キャラ名":"シホ","セリフ":"私の仲間にはもういいって言っても\nきゅうりを無限に渡してくる妖怪がいて","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"三食きゅうりにさせることもできるけど？","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"せっかくだから\n私のチーズも追加してあげる","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"妖怪","セリフ":"ひ、ひぃ！\n三食きゅうりなんて飽きちまう……！"},{"キャラ名":"妖怪","セリフ":"しかもきゅうりとチーズだけなんて、\n主食がほしくなるじゃねぇか！"},{"キャラ名":"シホ","セリフ":"他にもこわ〜い鬼の知り合いがいて、\nいつでもここに呼べちゃうけど","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"妖怪","セリフ":"ま、まさか鬼って、\n持っている金棒を投げつけてくるって噂の……？"},{"キャラ名":"妖怪","セリフ":"ほ、ほら、祭具を返すよ！\nそれじゃあな！あばよ！"},{"キャラ名":"自分","セリフ":"（すっかり震え上がって、いなくなっちゃった……）","BGM":"bgmBright"},{"キャラ名":"自分","セリフ":"（追い込まれたシホさんの反撃すごかったな）"},{"キャラ名":"シホ","セリフ":"ふぅ……","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"まぁ実際にその鬼は\nたまたま持っている金棒が手からすっぽ抜けてるだけで","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"凶暴とはほど遠い存在なんだけどね","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"……はぁ、まぁいいや！\nとりあえず、今はチーズが食べたい！","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"そういうわけだから、\nちょっと付き合って。\nチーズ代は私が出すから","キャラ画像":"assets/webp/content/character/img_shiho_1.webp"},{"キャラ名":"シホ","セリフ":"というか出させて。\n心置きなく食べたいから","キャラ画像":"assets/webp/content/character/img_shiho_1.webp","エンディングID":10}],"route3_3_2":[{"キャラ名":"自分","セリフ":"（輸送中の祭具を奪って逃げることにした）","背景画像":"assets/webp/content/bg/bg_content_03.webp","BGM":"bgmTension"},{"キャラ名":"自分","セリフ":"（祭具を運ぶルートに大きな公園があったので、サキさんと一緒に待ち伏せをしている）"},{"キャラ名":"サキ","セリフ":"もう大分暗いし……\nこうなったら、もう驚かせ放題だよね！","キャラ画像":"assets/webp/content/character/img_saki_2.webp"},{"キャラ名":"サキ","セリフ":"早く来ないかな～！","キャラ画像":"assets/webp/content/character/img_saki_2.webp"},{"キャラ名":"自分","セリフ":"（サキさん、楽しそう。驚かせるのがよっぽど楽しみみたいだ）"},{"キャラ名":"サキ","セリフ":"あ……！来た！\nアレじゃない！？","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"よーし、いくよー！\nいっせーの——","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"ばあっ！！！","キャラ画像":"assets/webp/content/character/img_saki_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"妖怪","セリフ":"うわあっ！"},{"キャラ名":"サキ","セリフ":"ねえ！どう、びっくりした！？\nびっくりしてくれたよね！？","キャラ画像":"assets/webp/content/character/img_saki_2.webp","キャラアニメーション":"is-anim-bounce"},{"キャラ名":"妖怪","セリフ":"あ、ああ……すごく驚いたよ……"},{"キャラ名":"サキ","セリフ":"やった～！腰抜かせるほどびっくりさせちゃった～！","キャラ画像":"assets/webp/content/character/img_saki_2.webp"},{"キャラ名":"妖怪","セリフ":"一体なんなんだ……？"},{"キャラ名":"自分","セリフ":"（今のうちに祭具を回収して……と）"},{"キャラ名":"サキ","セリフ":"ねえねえ、見てたよね！\nやっぱり驚かせるのって最高～っ！","キャラ画像":"assets/webp/content/character/img_saki_1.webp","BGM":"bgmBright"},{"キャラ名":"サキ","セリフ":"毎日シホちゃんやホナちゃん達を\n驚かしてるんだけど反応がイマイチでさ〜","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"あっ！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"でもこの前、お家に郵便配達に来てくれた妖怪さんは驚いた声が大きすぎて","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"逆にアタシのほうが驚いちゃった！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"自分","セリフ":"（どれだけ大きかったんだろう……）"},{"キャラ名":"サキ","セリフ":"祭具も取り戻せたし、\nアタシ達って最高の驚かせ仲間みたい！","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"あー、でもまだまだ驚かせ足りないなー！\nまたここで待ってたら誰か来ないかな！？","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"サキ","セリフ":"アタシと一緒に、\nもーっといろんな妖怪を驚かせちゃお！","キャラ画像":"assets/webp/content/character/img_saki_1.webp","エンディングID":8}],"route4":[{"キャラ名":"自分","セリフ":"（流しそうめんの装置が暴走しているので、その対処を手伝うことにした）","背景画像":"assets/webp/content/bg/bg_content_14.webp"},{"キャラ名":"自分","セリフ":"（この流しそうめんの装置は、どうやら、町をぐるっと取り囲むほどに大きなものらしい）"},{"キャラ名":"コハネ","セリフ":"ひゃあ……凄い勢いで水が流れてる……！","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"こ、これじゃ流しそうめんっていうより、\nウォータースライダーそうめんだね……！","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"自分","セリフ":"（ウォータースライダーそうめん……？）"},{"キャラ名":"イチカ","セリフ":"私とホナミなら泳げる速度ではあるけど、\nお箸でこの速さで流れるそうめんを\n掴めって言われると難しそう","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"せっかくそうめんに合うと思って\nきゅうりをたくさん用意したのに……","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"自分","セリフ":"（イチカさん、すごく残念そう）"},{"キャラ名":"ルカ","セリフ":"イチカちゃん、いつもよりたくさん用意していたものね","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"ホナミ","セリフ":"うーん、まずは水を止めた方がいいと思うな。じゃないとおそうめんが気の毒で……","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"エナ","セリフ":"水を止めるんだったら、\n上流側に行くのが良さそうね","キャラ画像":"assets/webp/content/character/img_ena_1.webp"},{"キャラ名":"アン","セリフ":"はあ……はあ……み、みんな若いね……。\n私、もう限界かも……","キャラ画像":"assets/webp/content/character/img_an_2.webp","キャラアニメーション":"is-anim-pant"},{"キャラ名":"ミズキ","セリフ":"アンってば、ちょっと歩いただけで疲れすぎじゃない？こっち座りなよ","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"アン","セリフ":"ありがとミズキ、\nじゃあお言葉に甘えて——","キャラ画像":"assets/webp/content/character/img_an_2.webp"},{"キャラ名":"アン","セリフ":"よいしょ……","キャラ画像":"assets/webp/content/character/img_an_2.webp"},{"キャラ名":"自分","セリフ":"（アンさん、どうしてこんなに疲れているんだろう？）"},{"キャラ名":"コハネ","セリフ":"アンちゃんは横丁で一番の長生きなんだよ","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"ミズキ","セリフ":"たしかミクやルイも\n同じくらい長生きなんだっけ？","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"アン","セリフ":"そうなんだけど\nなぜか私だけ疲れやすくて……\nいつまでも元気なふたりが羨ましいよ","キャラ画像":"assets/webp/content/character/img_an_2.webp"},{"キャラ名":"アン","セリフ":"って、あれ……？\nなんか、装置から変な感じしない？\n覚えのない妖力を感じるんだけど……","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"ミズキ","セリフ":"あー、これ、\n誰かが勝手にいじったっぽいね。\nその痕跡が残ってるんじゃないかな","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"イチカ","セリフ":"待って。\nこっちの方にも怪しい妖力がある。\nこれを追いかけた方がいいんじゃない？","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"ルカ","セリフ":"うーん……みんな、気になることが\nそれぞれ違うみたいね","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"ルカ","セリフ":"あなたが気になるのはどれ？","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"自分","セリフ":"（気になるのはどれだろう……）","選択肢ID":"route4"}],"route4_1":[{"キャラ名":"自分","セリフ":"（水を止めるため、上流に向かうことにした）","背景画像":"assets/webp/content/bg/bg_content_03.webp"},{"キャラ名":"エナ","セリフ":"原因はこれね……。\n水の量が大変なことになってる","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"まずはここの装置をどうにかして、\n水を止めた方がいいと思う","キャラ画像":"assets/webp/content/character/img_ena_1.webp"},{"キャラ名":"ホナミ","セリフ":"でも、そもそも川上から\n大量の水が流れてきてますよね","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"ホナミ","セリフ":"原因を探った方がいいんじゃないですか？","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"コハネ","セリフ":"あ、そ、その……このままじゃ、夏祭り当日に食べるそうめんがなくなっちゃうんじゃないかなって……","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"ここで、そうめんの回収もした方がいい気がします……！","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"ホナミ","セリフ":"それもそうだね……！","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"ホナミ","セリフ":"えぇっと…\nど、どこから手を付けたら……！","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"エナ","セリフ":"はい、慌てない！","キャラ画像":"assets/webp/content/character/img_ena_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"エナ","セリフ":"それぞれ手分けして対処しない？\nどれも重要なことだし","キャラ画像":"assets/webp/content/character/img_ena_1.webp"},{"キャラ名":"コハネ","セリフ":"エナさん、カッコいい……！","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"ホナミ","セリフ":"リーダーシップ、ですね！\nわたしも見習いたいな……！","キャラ画像":"assets/webp/content/character/img_honami_2.webp"},{"キャラ名":"自分","セリフ":"（エナさん、頼りになる……！）"},{"キャラ名":"エナ","セリフ":"ちょ、ちょっとみんな、やめてってば","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"ほら、それぞれ分かれるわよ","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"あんたも何を手伝うか決めておきなさい","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"自分","セリフ":"（何を手伝おうかな……？）","選択肢ID":"route4_1"}],"route4_1_1":[{"キャラ名":"自分","セリフ":"（とにかく水の流れを止めることにした）","背景画像":"assets/webp/content/bg/bg_content_03.webp","BGM":"bgmTension"},{"キャラ名":"自分","セリフ":"（水をせきとめるため、エナさんと協力して大きな丸太を運んでいる）"},{"キャラ名":"エナ","セリフ":"ほんっとに……重たい……！","キャラ画像":"assets/webp/content/character/img_ena_2.webp","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"エナ","セリフ":"なんで、私がこんなこと……！","キャラ画像":"assets/webp/content/character/img_ena_2.webp","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"エナ","セリフ":"はぁ……\nミズキの糸があればもう少し運びやすかったかな","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"こんなことなら、\nこっちに連れてくるべきだった……！","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"はぁ……\nあんたは？疲れていない？","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"自分","セリフ":"（エナさん、文句は言ってるけどなんだかんだで優しいんだな……）"},{"キャラ名":"エナ","セリフ":"ちょっと！その生暖かい視線やめて！","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"あのね、私は幽霊なの。\n怖がられるのが存在意義なわけ。わかる？","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"自分","セリフ":"（エナさんが怖い……？）"},{"キャラ名":"エナ","セリフ":"だからその顔やめてって！\n私は怖いの！怖がられるべきなのー！","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"ほら！さっさと丸太で水路をふさぐわよ！\n手伝って！","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"自分","セリフ":"（水路に丸太を設置して、水の流れを整理した。その結果、水かさはみるみる下がっていく）"},{"キャラ名":"エナ","セリフ":"はあ……もう疲れた……","キャラ画像":"assets/webp/content/character/img_ena_2.webp","BGM":"bgmBright"},{"キャラ名":"エナ","セリフ":"力仕事だったから、\n手伝ってくれて助かったわ。\n……ありがと","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"自分","セリフ":"（……怖がられる要素、やっぱりないよね）"},{"キャラ名":"エナ","セリフ":"ちょっと……！\nいま失礼なこと考えてない？","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"なによ〜！\n最近ミズキ達からも怖くなってきたって言われてたのに……！","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"エナ","セリフ":"そっちがその気なら……"},{"キャラ名":"自分","セリフ":"（……！……エナさんの姿が消えた……？）"},{"キャラ名":"自分","セリフ":"（あれ……？）"},{"キャラ名":"エナ","セリフ":"ばぁ！","キャラ画像":"assets/webp/content/character/img_ena_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"エナ","セリフ":"ほらね？怖いでしょ","キャラ画像":"assets/webp/content/character/img_ena_1.webp","エンディングID":25}],"route4_1_2":[{"キャラ名":"自分","セリフ":"（川の上流に原因があると考えて、川を遡っていくことにした）","背景画像":"assets/webp/content/bg/bg_content_15.webp"},{"キャラ名":"ホナミ","セリフ":"あ、やっぱり……。\nこれが原因だったんだね","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"自分","セリフ":"（ダムの水路が詰まってる……）"},{"キャラ名":"ホナミ","セリフ":"大丈夫！\nお掃除したらなんとかなる気がするから！","キャラ画像":"assets/webp/content/character/img_honami_2.webp"},{"キャラ名":"ホナミ","セリフ":"ちょっとやってみるね！","キャラ画像":"assets/webp/content/character/img_honami_2.webp"},{"キャラ名":"自分","セリフ":"（ホナミさんはダムを泳いで掃除を始めた）"},{"キャラ名":"ホナミ","セリフ":"ふふふ、よくイチカちゃんと隣町まで泳いでるんだ","キャラ画像":"assets/webp/content/character/img_honami_2.webp"},{"キャラ名":"ホナミ","セリフ":"だからこれくらいの広さならどうってことないの","キャラ画像":"assets/webp/content/character/img_honami_2.webp"},{"キャラ名":"ホナミ","セリフ":"それにね、お掃除も得意でカナデさんのお家に転がっている骨の整理やイチカちゃんのお皿を磨いたりしてるんだ"},{"キャラ名":"自分","セリフ":"（頼もしい……！）"},{"キャラ名":"ホナミ","セリフ":"うーん……どこかにまだお掃除できていない場所がある気がするんだけど……","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"自分","セリフ":"（あ……あんなところにも水路がある！）"},{"キャラ名":"ホナミ","セリフ":"あ……こんなところにも！\n多分、これをお掃除すれば完璧だね！","キャラ画像":"assets/webp/content/character/img_honami_2.webp"},{"キャラ名":"ホナミ","セリフ":"よかった……水の量もどんどん減ってきたみたい","キャラ画像":"assets/webp/content/character/img_honami_1.webp","BGM":"bgmBright"},{"キャラ名":"ホナミ","セリフ":"教えてくれてありがとう！\nすっごく助かっちゃった","キャラ画像":"assets/webp/content/character/img_honami_2.webp"},{"キャラ名":"ホナミ","セリフ":"それで、あの……お礼と言ってはなんだけど、わたしの絵を描いてみない？","キャラ画像":"assets/webp/content/character/img_honami_2.webp"},{"キャラ名":"自分","セリフ":"（絵！？しかもこっちが描くの！？）"},{"キャラ名":"ホナミ","セリフ":"病気が流行しているときにわたしの絵を持っていると、無事に過ごせるっていう話があるんだよ！","キャラ画像":"assets/webp/content/character/img_honami_2.webp","キャラアニメーション":"is-anim-bounce"},{"キャラ名":"ホナミ","セリフ":"なのでその……健康祈願として、\nお土産に１枚持って帰るのはどうかなって……","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"ホナミ","セリフ":"大丈夫！遠慮しないでどんどん描いて！\nそうだ！アップルパイも付けるから！","キャラ画像":"assets/webp/content/character/img_honami_2.webp","エンディングID":9,"キャラアニメーション":"is-anim-bounce"}],"route4_1_3":[{"キャラ名":"自分","セリフ":"（流れてくるそうめんを回収することにした）","背景画像":"assets/webp/content/bg/bg_content_03.webp"},{"キャラ名":"コハネ","セリフ":"あ、あれ……？\nそうめん、全然見つからないね……","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"あんなに流れてるから……\n絶対どこかにあるはずなのに……","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"はあ……最近、なんだか\n全然うまくいかないことばっかりで……","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"お友達も増えてきたから\n家に招待しようと思ったんだけど、みんなから断られちゃって","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"ちゃんと掃除もしてるし、\nおもてなしの準備もしてるんだけどな……","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"みんな、私のお家のことを聞くと\n全然遊びに来てくれないんだ……","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"自分","セリフ":"（一体、どんな家に住んでるんだろう……）"},{"キャラ名":"コハネ","セリフ":"……あのね、私の家――トイレなの。\nトイレのコハネさんだから","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"自分","セリフ":"（トイレ……か……）"},{"キャラ名":"コハネ","セリフ":"あ！でもトイレ全部じゃないよ！\n私のお家は三番目の個室なの","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"コハネ","セリフ":"来る時は三回ノックしてから声をかけてね\nじゃないと……","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"自分","セリフ":"（じゃないと……？）"},{"キャラ名":"コハネ","セリフ":"あ！見て！\nあんなところにそうめんがたくさん！","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"自分","セリフ":"（じゃないとなんだろう……！？き、気になる）"},{"キャラ名":"コハネ","セリフ":"しかも、そうめんが装置に詰まっちゃってる！すぐ掃除しなきゃ！","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"こういう詰まりには……\nすっぽんがあると、便利なんだけど……！","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"でも、今は私達の手でお掃除しなくっちゃ……！","キャラ画像":"assets/webp/content/character/img_kohane_1.webp"},{"キャラ名":"コハネ","セリフ":"……うん、取れた！\nこれで水が減っていくはず！","キャラ画像":"assets/webp/content/character/img_kohane_1.webp","BGM":"bgmBright"},{"キャラ名":"コハネ","セリフ":"お疲れさま。\nあなたが見つけてくれたおかげだよ！","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"コハネ","セリフ":"そうだ、よかったらこの後…\n私の家でお礼をさせてほしいな","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"コハネ","セリフ":"あ、家に入る前にノックは忘れないようにね？","キャラ画像":"assets/webp/content/character/img_kohane_2.webp","エンディングID":15}],"route4_2":[{"キャラ名":"自分","セリフ":"（誰が装置をいじったのか、詳しく調べてみることにした）","背景画像":"assets/webp/content/bg/bg_content_14.webp"},{"キャラ名":"ミズキ","セリフ":"うわぁ……よく見たら\n土台から大改造されちゃってるね～","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"アン","セリフ":"たしかに、元の装置のままじゃ\nこんな勢いの水は絶対耐えられないよね","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"アン","セリフ":"つまり、誰かがこうしてやろうと思って\n改造したってことじゃん！","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"ミズキ","セリフ":"おっ、犯人捕まえる気まんまんだね。\n大丈夫？またヘロヘロになってもうダメ～ってならない？","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"アン","セリフ":"もう大丈夫だって！\nちゃんと座って休んだし！","キャラ画像":"assets/webp/content/character/img_an_2.webp"},{"キャラ名":"ミズキ","セリフ":"そう？ならいいんだけど","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"ボクはこれの修理とかやってみようかな\nいつも服を作ったりしてるから細かい作業は得意だし","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"ミズキ","セリフ":"ここに布を張って地面に少しずつ水を逃がしていけば……うん、水の勢いは落とせそうだよ","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"アン","セリフ":"私は、ここに残ってる妖力をたどって、\n犯人を追いかけてみる！","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"ミズキ","セリフ":"それじゃ、別行動ってことで！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"キミはどっちを手伝ってくれる？","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"自分","セリフ":"（どっちを手伝おうかな……？）","選択肢ID":"route4_2"}],"route4_2_1":[{"キャラ名":"自分","セリフ":"（装置の修理をすることにした）","背景画像":"assets/webp/content/bg/bg_content_14.webp"},{"キャラ名":"ミズキ","セリフ":"あ、そこの糸弱くなってる。\nもうちょっと引っ張って……そうそう！","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"自分","セリフ":"（装置から水を逃すための布を作るため、ミズキさんの機織りを手伝っている）"},{"キャラ名":"ミズキ","セリフ":"いやー、キミが手伝ってくれたから、\n思ったより早く仕上がりそうだよ！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"それにしても、キミ……","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"自分","セリフ":"（な、なんかすごく見られてる……）"},{"キャラ名":"ミズキ","セリフ":"人間なんだってね\nそれってさ——","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"自分","セリフ":"（ひぇ……！）"},{"キャラ名":"ミズキ","セリフ":"すっっっごいインスピレーション湧いてくるんだけど！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp","BGM":"bgmBright","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"ミズキ","セリフ":"ねぇねぇ！キミにはどんな服が似合うと思う！？なにがいいかな！？","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"ミズキ","セリフ":"フリルたくさんつけてかわいい雰囲気の服がいいかな……それとも、スポーティに仕上げてカッコよさに振ろうか……！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"ああ～、どんな服でも似合いそうなのに、\n頭の中でどの服を着せても物足りない！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"ねえ、ここから帰りたいってのは聞いたんだけど、それちょっとだけ待てないかな！？","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"絶対キミに似合う服を作ってみせるから！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"5着、いや10……20着くらい！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"ああ、ボク……今、すっごく楽しいよ！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"もう待ちきれない！\n早く装置の修理終わらせちゃおう！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ミズキ","セリフ":"それで、空いた時間でキミの採寸をさせてくれると嬉しいな！","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp","エンディングID":26}],"route4_2_2":[{"キャラ名":"自分","セリフ":"（改造した犯人を追いかけることにした）","背景画像":"assets/webp/content/bg/bg_content_16.webp"},{"キャラ名":"アン","セリフ":"こっちかな……？あ、この先！","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"自分","セリフ":"（アンさんすごい身のこなし……！どんどん引き離されてく……！）"},{"キャラ名":"アン","セリフ":"ねぇ、あなたは——って、やだ！\nすっかり置いてっちゃってる！","キャラ画像":"assets/webp/content/character/img_an_2.webp"},{"キャラ名":"アン","セリフ":"ごめんごめん、つい夢中になっちゃって。\nちょっと休憩しよっか。疲れたよね？","キャラ画像":"assets/webp/content/character/img_an_2.webp"},{"キャラ名":"アン","セリフ":"（あっという間にこっちに戻ってきてくれた……。本当に身軽なんだな）"},{"キャラ名":"アン","セリフ":"私、猫又だからさ。\n動くのはすっごく得意なんだ！","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"アン","セリフ":"まー、若い頃に比べたら\n体力はかなり落ちてるけど……","キャラ画像":"assets/webp/content/character/img_an_2.webp"},{"キャラ名":"アン","セリフ":"あれ？この妖気の感じ……","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"アン","セリフ":"これ、犯人のだ！\nこっち！ついてきて！","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"妖怪","セリフ":"ふんふ～ん♪\nジェットな水での水浴びサイコ～♪","背景画像":"assets/webp/content/bg/bg_content_15.webp","BGM":"bgmTension"},{"キャラ名":"アン","セリフ":"ちょっと！勝手に流しそうめんの装置\n改造したでしょ！","キャラ画像":"assets/webp/content/character/img_an_1.webp","キャラアニメーション":"is-anim-bounce"},{"キャラ名":"アン","セリフ":"しかもその装置を使って水浴びとか！\n自分勝手すぎ！今すぐ戻して！","キャラ画像":"assets/webp/content/character/img_an_1.webp","キャラアニメーション":"is-anim-bounce"},{"キャラ名":"妖怪","セリフ":"げっ、もう気づかれたのかよ！"},{"キャラ名":"妖怪","セリフ":"そいじゃ、\nオイラはすたこらさっさ～っと♪"},{"キャラ名":"アン","セリフ":"あっ、待て！逃がすか！","キャラ画像":"assets/webp/content/character/img_an_1.webp","キャラアニメーション":"is-anim-bounce"},{"キャラ名":"アン","セリフ":"シャーッ！","キャラ画像":"assets/webp/content/character/img_an_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"自分","セリフ":"（ああ！アンさんが本気ダッシュで……！置いていかれる……！）"},{"キャラ名":"自分","セリフ":"（あっ！こっちの近道を使ったら追いつけるかも……！？）"},{"キャラ名":"妖怪","セリフ":"へへっこのまま逃げ切ってやるぜ！","背景画像":"assets/webp/content/bg/bg_content_03.webp"},{"キャラ名":"妖怪","セリフ":"ってなに！？なんでお前がここに！？"},{"キャラ名":"自分","セリフ":"（近道をした結果、犯人の目の前に出ることができた！）"},{"キャラ名":"アン","セリフ":"よし！これで挟み撃ちね！\n観念しなさい！","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"アン","セリフ":"どりゃあ〜〜〜〜〜！","キャラ画像":"assets/webp/content/character/img_an_1.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"自分","セリフ":"（アンさんが犯人に飛びかかった）"},{"キャラ名":"妖怪","セリフ":"な、なに〜〜〜！？"},{"キャラ名":"アン","セリフ":"捕まえた！\nどういう改造をしたのか洗いざらい吐いてもらうからね！","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"妖怪","セリフ":"くっそ〜〜〜……"},{"キャラ名":"アン","セリフ":"あなたのおかげで犯人を捕まえることができたよ！","キャラ画像":"assets/webp/content/character/img_an_1.webp","BGM":"bgmBright"},{"キャラ名":"アン","セリフ":"知り合いがお店をやってるからさ\nお礼に、ごちそうさせてよ！","キャラ画像":"assets/webp/content/character/img_an_1.webp","エンディングID":16}],"route4_3":[{"キャラ名":"自分","セリフ":"（妖力というものの反応をみんなで調べることにした）","背景画像":"assets/webp/content/bg/bg_content_14.webp"},{"キャラ名":"ルカ","セリフ":"うーん……どの妖怪なのかしら。\n調べてもピンとくるものがないわね……","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"イチカ","セリフ":"誰も知らない、\n新しい妖怪がやってきたのかも……！","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"こんなに水が好きなんだったら\nきゅうりも好きだよね。\n絶対食べさせてあげないと……！","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"ルカ","セリフ":"ふふ、イチカちゃんは相変わらずね","キャラ画像":"assets/webp/content/character/img_luka_2.webp"},{"キャラ名":"ルカ","セリフ":"……うん？\n今……遠くだけど、\n同じ妖力の反応があったわ","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"ルカ","セリフ":"首を伸ばしてみてくるから、\n少し待っててもらえるかしら～……","キャラ画像":"assets/webp/content/character/img_luka_1.webp","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"自分","セリフ":"（首が伸びた……！？）"},{"キャラ名":"イチカ","セリフ":"あっ、ルカ！\n首用コルセットが取れちゃいそう！","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"ルカ","セリフ":"えっ！？ちょっと巻きなおしてもらえる？","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"イチカ","セリフ":"こう……こんな感じで大丈夫？","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"ルカ","セリフ":"ええ、完璧よ。ありがとう","キャラ画像":"assets/webp/content/character/img_luka_2.webp"},{"キャラ名":"ルカ","セリフ":"おかげさまで、\n犯人もバッチリ見つけちゃった！\n追いかけたら捕まえられそうよ","キャラ画像":"assets/webp/content/character/img_luka_2.webp"},{"キャラ名":"イチカ","セリフ":"え、捕まえるの！？\nやっぱり、話し合いとかしてみた方が……","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"ルカ","セリフ":"そうね……\nあなたはどうしたい？","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"自分","セリフ":"（犯人をどうしよう）","選択肢ID":"route4_3"}],"route4_3_1":[{"キャラ名":"自分","セリフ":"（悪さをする妖怪なら捕まえないと……！）","背景画像":"assets/webp/content/bg/bg_content_15.webp"},{"キャラ名":"イチカ","セリフ":"そうだよね。\n悪さをする妖怪なら\n捕まえた方がいいと思う","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"そして、きゅうりを食べさせてあげないと……きゅうりを食べれば、きっと悪さなんてしなくなるから","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"どこかな……隠れてるのかな……\n出てきて大丈夫なんだけどな……","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"きゅうり……ふふ……\n一緒にきゅうり、食べようよ……","キャラ画像":"assets/webp/content/character/img_ichika_2.webp","キャラアニメーション":"is-anim-pant"},{"キャラ名":"自分","セリフ":"（イチカさん、目つきが怖い……）"},{"キャラ名":"自分","セリフ":"（きゅうりに対する執着がすごいけどイチカさんは他に好きなものはないのかな？）"},{"キャラ名":"イチカ","セリフ":"え……？きゅうり以外に好きなもの……？\nそうだなー……","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"あっ、そうそう\n最近さぼてんが気になってるんだ","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"見た目が少しきゅうりに似てるでしょ？","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"自分","セリフ":"（結局、きゅうり……！）"},{"キャラ名":"イチカ","セリフ":"あ……","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"……いた！\nあの子じゃない？","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"妖怪","セリフ":"ふぅ～……やっぱり潤いって大事だよね～","BGM":"bgmTension"},{"キャラ名":"自分","セリフ":"（流しそうめんの装置を改造して、勝手にシャワーを浴びてる……！）"},{"キャラ名":"イチカ","セリフ":"あの子、水が好きそう……。\nだったら、\nきゅうりも気に入ってくれるよね","キャラ画像":"assets/webp/content/character/img_ichika_1.webp"},{"キャラ名":"イチカ","セリフ":"そこのあなた！きゅうりはいりませんか？","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"イチカ","セリフ":"しゃっきりポリっと、水分たっぷりで美味しいきゅうりだよ"},{"キャラ名":"妖怪","セリフ":"えっ！？き、きゅうり！？\nじゃあ、1本だけ……"},{"キャラ名":"イチカ","セリフ":"１本と言わず何本でも食べて大丈夫だよ。\nまだまだたくさん持ってるから","キャラ画像":"assets/webp/content/character/img_ichika_2.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"イチカ","セリフ":"ほら、食べて……！\nもっと食べて……！","キャラ画像":"assets/webp/content/character/img_ichika_2.webp","キャラアニメーション":"is-anim-surprise"},{"キャラ名":"妖怪","セリフ":"そ、そんなきゅうりばっかり……\nこれってもしかしてそういう拷問っすか！？"},{"キャラ名":"妖怪","セリフ":"すみません！捕まるんで勘弁してください！"},{"キャラ名":"自分","セリフ":"（そして、イチカさんのきゅうり責めに音を上げた妖怪は装置を直して、自ら出頭していった——）"},{"キャラ名":"イチカ","セリフ":"あの子、思ったより、\nきゅうり好きじゃなかったみたい……。","キャラ画像":"assets/webp/content/character/img_ichika_1.webp","BGM":"bgmBright"},{"キャラ名":"イチカ","セリフ":"全然食べてくれなかったな……\nたくさん余っちゃった……"},{"キャラ名":"イチカ","セリフ":"そういうわけだから……\nはい、どうぞ♪","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"自分","セリフ":"（またきゅうり……！）"},{"キャラ名":"イチカ","セリフ":"さっきの子の分も、あなたが食べてね。\nまだまだ……いっぱいあるからね……","キャラ画像":"assets/webp/content/character/img_ichika_2.webp","エンディングID":7}],"route4_3_2":[{"キャラ名":"自分","セリフ":"（犯人の妖怪を見つけて、交渉することにした）","背景画像":"assets/webp/content/bg/bg_content_15.webp","BGM":"bgmTension"},{"キャラ名":"ルカ","セリフ":"妖力をたどっていくと……多分こっちね","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"ルカ","セリフ":"ほら、いたわ。\nあの子じゃない？","キャラ画像":"assets/webp/content/character/img_luka_2.webp"},{"キャラ名":"妖怪","セリフ":"はぁ～乾燥はお肌の大敵だよね。\nやっぱり潤っておかないと……"},{"キャラ名":"自分","セリフ":"（流しそうめんの装置を改造して、勝手にミストを出してる……！）"},{"キャラ名":"ルカ","セリフ":"ねぇ、そこのあなた。\n少し話を聞いてくれると嬉しいのだけれど……","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"ルカ","セリフ":"あなたが潤いを求めてるのはわかるんだけど、装置を勝手に改造したから、大変なことになっているの","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"妖怪","セリフ":"ふ～ん……それって、\nなんかオイラに関係あるの～？"},{"キャラ名":"ルカ","セリフ":"夏祭りが開催できなくなっちゃうわ。\nみんな、このお祭りを首を長くして待っていて——","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"ルカ","セリフ":"だから、首を長くして……\nあら、あらら～？","キャラ画像":"assets/webp/content/character/img_luka_1.webp","キャラアニメーション":"is-anim-tremble"},{"キャラ名":"自分","セリフ":"（ルカさんの首が本当に長くなってるー！？）"},{"キャラ名":"ルカ","セリフ":"いけない、コルセットの締めが甘かったかしら……首がどんどん伸びて～……","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"妖怪","セリフ":"うわあっ！く、首長お化けだぁっ！"},{"キャラ名":"妖怪","セリフ":"おたすけ～！！"},{"キャラ名":"ルカ","セリフ":"あ、ちょ、ちょっと……！\nあなただってお化けじゃないの……！","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"ルカ","セリフ":"残念……交渉は失敗しちゃったわね","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"ルカ","セリフ":"でも、もう戻っては来ないでしょうしね。\n装置を戻して、解決としましょうか","キャラ画像":"assets/webp/content/character/img_luka_1.webp","BGM":"bgmBright"},{"キャラ名":"ルカ","セリフ":"……そういえば、あなたは私が怖くないの……？","キャラ画像":"assets/webp/content/character/img_luka_1.webp"},{"キャラ名":"自分","セリフ":"（首を振った）"},{"キャラ名":"ルカ","セリフ":"ふふ、そう……ありがとう","キャラ画像":"assets/webp/content/character/img_luka_2.webp"},{"キャラ名":"ルカ","セリフ":"それじゃあ装置を戻して……\nでも、その前に……","キャラ画像":"assets/webp/content/character/img_luka_2.webp"},{"キャラ名":"ルカ","セリフ":"ごめんなさい、ちょっとコルセットを締めるのをお願いしていいかしら？","キャラ画像":"assets/webp/content/character/img_luka_2.webp","エンディングID":4}],"route5":[{"キャラ名":"自分","セリフ":"（無事にすべての問題を解決して、夏祭りが開催されることになった！）","背景画像":"assets/webp/content/bg/bg_content_06.webp","BGM":"bgmBright"},{"キャラ名":"自分","セリフ":"（まずは屋台のエリアから。おいしそうな匂いがいたるところから漂って来る……！）"},{"キャラ名":"ハルカ","セリフ":"いらっしゃいませ。\nキャベツの千切りはいかがですか？","キャラ画像":"assets/webp/content/character/img_haruka_2.webp"},{"キャラ名":"ハルカ","セリフ":"ドレッシング、ソース、\nごま油色々用意してます。\n何も付けずに食べるのもおすすめですよ","キャラ画像":"assets/webp/content/character/img_haruka_2.webp"},{"キャラ名":"ミノリ","セリフ":"今年はハルカちゃんがお店を手伝ってくれるから千切りに集中できるよ〜！","キャラ画像":"assets/webp/content/character/img_minori_1.webp"},{"キャラ名":"ミノリ","セリフ":"シュババババババ〜！"},{"キャラ名":"ミク","セリフ":"イチカちゃんのきゅうりもシャキシャキで\nとっても美味しいよ","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"イチカ","セリフ":"本当……！？","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"イチカ","セリフ":"きゅうりで喜んでくれるの\nミクくらいだよ……！\nまだあるから、たくさん食べてね！","キャラ画像":"assets/webp/content/character/img_ichika_2.webp"},{"キャラ名":"トウヤ","セリフ":"——“特製無水カレー”に、\n“特製ふわっとパンケーキ”だ","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"トウヤ","セリフ":"食べ歩きできるようにしてあるが、\n落とさないように気を付けて食べてくれ","キャラ画像":"assets/webp/content/character/img_toya_1.webp"},{"キャラ名":"アキト","セリフ":"うま……っ！\nトウヤ！あと3個追加！\n先に作っといてくれよな！","キャラ画像":"assets/webp/content/character/img_akito_2.webp"},{"キャラ名":"ツカサ","セリフ":"ほう、アキトがここまで気に入るとは…！\nトウヤ！\nこっちにもパンケーキをもらえるか！！","キャラ画像":"assets/webp/content/character/img_tsukasa_1.webp"},{"キャラ名":"ルイ","セリフ":"ふふっ、賑やかでいいね\n僕もパンケーキをいただこうかな","キャラ画像":"assets/webp/content/character/img_rui_1.webp"},{"キャラ名":"シズク","セリフ":"アイリちゃん、幻の屋台ご飯があるんですって！一緒に探してみない？","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"アイリ","セリフ":"いいけど、絶対わたしから離れないように！こんな人混みではぐれたら——","キャラ画像":"assets/webp/content/character/img_airi_1.webp"},{"キャラ名":"シズク","セリフ":"あっ、美味しそうなたこ焼きがあるわ！\n行ってみましょう～！","キャラ画像":"assets/webp/content/character/img_shizuku_2.webp"},{"キャラ名":"アイリ","セリフ":"言ったそばから……！","キャラ画像":"assets/webp/content/character/img_airi_2.webp"},{"キャラ名":"シホ","セリフ":"チ、チーズハットグ……！\n絶対に食べなきゃ……！","キャラ画像":"assets/webp/content/character/img_shiho_2.webp"},{"キャラ名":"自分","セリフ":"（こっちは広場かな。爆音でアゲアゲな祭り囃子が聞こえてくる……！）"},{"キャラ名":"サキ","セリフ":"ばぁ～っ！\n……ねえねえ、びっくりした！？","キャラ画像":"assets/webp/content/character/img_saki_1.webp"},{"キャラ名":"カイト","セリフ":"びっくりはした……けど、急にどうしたの？","キャラ画像":"assets/webp/content/character/img_kaito_2.webp"},{"キャラ名":"サキ","セリフ":"びっくりしてくれたんだ！\nありがとう！また別の人探すね～っ！","キャラ画像":"assets/webp/content/character/img_saki_2.webp"},{"キャラ名":"カイト","セリフ":"な、なんだったんだろう……","キャラ画像":"assets/webp/content/character/img_kaito_2.webp"},{"キャラ名":"エム","セリフ":"——じゃーん！\nくじ引きでパンパカ大当たり～！\n見て見て！おっきなぬいぐるみ～！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"ネネ","セリフ":"うう……そんな素敵なものを引き当てる運がうらやましい……ねたましい……っ！","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ネネ","セリフ":"……でも挑戦しないのにうらやんでも意味ないよね。わたしも引いてくる！","キャラ画像":"assets/webp/content/character/img_nene_2.webp"},{"キャラ名":"ルカ","セリフ":"そうね、挑戦しないと何もないもの。\n私もくじ引き、やってみようかしら！","キャラ画像":"assets/webp/content/character/img_luka_2.webp"},{"キャラ名":"エム","セリフ":"だったら、みんなでドキドキくじ引きターイム！だねっ！","キャラ画像":"assets/webp/content/character/img_emu_1.webp"},{"キャラ名":"ミズキ","セリフ":"じゃ～ん！クモの糸柄のハンカチ～！\nすっごくかわいくない！？","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"エナ","セリフ":"土蜘蛛がクモの糸柄って、\n流石に自分好きすぎるんじゃないの？","キャラ画像":"assets/webp/content/character/img_ena_2.webp"},{"キャラ名":"ミズキ","セリフ":"え～？ホナミちゃんだって\nよく自分の絵を色んな人に描いてもらってるよね？","キャラ画像":"assets/webp/content/character/img_mizuki_1.webp"},{"キャラ名":"ミズキ","セリフ":"自分推しはトレンドだよ、トレンド～","キャラ画像":"assets/webp/content/character/img_mizuki_2.webp"},{"キャラ名":"ホナミ","セリフ":"ふ、ふたりだけど、トレンドでいいんでしょうか……？","キャラ画像":"assets/webp/content/character/img_honami_1.webp"},{"キャラ名":"コハネ","セリフ":"アンちゃん！\nよかったら、今度私の家で遊ばない？\n他のみんなも……できればいっぱい呼んで","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"アン","セリフ":"いいよ！いつにしよっか！\nたしか家に入る前に三回ノックしないといけないんだったよね？","キャラ画像":"assets/webp/content/character/img_an_1.webp"},{"キャラ名":"コハネ","セリフ":"わあ……っ！覚えてくれてたんだ！\nありがとうアンちゃん！それじゃあね——","キャラ画像":"assets/webp/content/character/img_kohane_2.webp"},{"キャラ名":"メイコ","セリフ":"カナデちゃんとマフユちゃんは、\nいつも一緒にいるわね","キャラ画像":"assets/webp/content/character/img_meiko_2.webp"},{"キャラ名":"マフユ","セリフ":"……そうかな","キャラ画像":"assets/webp/content/character/img_mafuyu_1.webp"},{"キャラ名":"カナデ","セリフ":"わたしはマフユの冷やしてくれる牛乳が無いと、すぐ疲れちゃうから……","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"カナデ","セリフ":"いつも付き合わせてごめん、マフユ"},{"キャラ名":"マフユ","セリフ":"気にしてないから。\n牛乳まだあるけど、飲む？","キャラ画像":"assets/webp/content/character/img_mafuyu_2.webp"},{"キャラ名":"カナデ","セリフ":"マフユ……なんだか喜んでる？\nひんやりしてきた……","キャラ画像":"assets/webp/content/character/img_kanade_1.webp"},{"キャラ名":"メイコ","セリフ":"ふふ、嬉しいとヒンヤリしちゃうのは相変わらずね。この季節だとありがたいわ","キャラ画像":"assets/webp/content/character/img_meiko_2.webp"},{"キャラ名":"リン","セリフ":"レン～！特大わたあめ持ってきたよ～！","キャラ画像":"assets/webp/content/character/img_rin_1.webp"},{"キャラ名":"レン","セリフ":"ありがとう、リン！\nやっぱり、これを食べないと夏祭りって感じがしなくてさ！","キャラ画像":"assets/webp/content/character/img_ren_2.webp"},{"キャラ名":"リン","セリフ":"わかるよ～！\nだから、わたしの分もあるの！\n一緒に食べよっ！","キャラ画像":"assets/webp/content/character/img_rin_2.webp"},{"キャラ名":"自分","セリフ":"（みんな楽しそう。無事に夏祭りが開催できてよかったな）"},{"キャラ名":"自分","セリフ":"（あれ、ここは……最初にやってきたところ……？）","背景画像":"assets/webp/content/bg/bg_content_17.webp"},{"キャラ名":"ミク","セリフ":"待ってたよ","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"自分","セリフ":"（ミクさん……？）"},{"キャラ名":"ミク","セリフ":"じつはキミに横丁の問題を解決してもらうようルイくんにお願いしたのはわたしなんだ","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"無事に全部の問題を解決してくれたみたいだね。\n本当にありがとう","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"短い間だったけど、\nみんなにとってもいい刺激になったみたい","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"じつはね、この夏祭り……\nまだ解決していないことがあるんだ","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"本当は……夏祭りを成功させるために、\n毎年、人間の供物がひとり必要なの","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"今年は……キミだったんだよ","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"このまま無事に帰れる……と思った？","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"ふふふ……ごめんね\n冗談だよ、驚かせちゃった？","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"最後に、妖怪らしく驚かせてみようかと思ったんだ","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"…………","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"どこまで冗談かって？\nそれは秘密だよ","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"でも、キミの活躍で夏祭りは大成功","キャラ画像":"assets/webp/content/character/img_miku_1.webp","BGM":"bgmBright"},{"キャラ名":"ミク","セリフ":"それに、何より——\n横丁のみんながキミのことを気に入ったみたいだからね","キャラ画像":"assets/webp/content/character/img_miku_1.webp"},{"キャラ名":"ミク","セリフ":"そういうわけで、\nめでたし、めでたし！","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"それじゃあ、\n気を付けて元の世界に帰ってね\nこのまま進めば帰れるはずだよ","キャラ画像":"assets/webp/content/character/img_miku_2.webp"},{"キャラ名":"ミク","セリフ":"また出会うことがあったら……\nその時は違う結末かもしれないね","キャラ画像":"assets/webp/content/character/img_miku_2.webp","エンディングID":27}]}};
+
+        async function init() {
+            loadProgress();
+            loadAudioSettings();
+            scenarioData = EMBEDDED_SCENARIO_DATA;
+            renderCharacters();
+            renderEndings();
+            setupAudioUnlock();
+            switchMode('character');
+            startScenario('opening');
+        }
+
+        const AUDIO_ASSETS = {
+            bgmDefault: 'assets/audio/bgm/sound_bgm_normal.mp3',
+            bgmBright: 'assets/audio/bgm/sound_bgm_bright.mp3',
+            bgmTension: 'assets/audio/bgm/sound_bgm_tension.mp3',
+            seTap: 'assets/audio/se/sound_touch.mp3',
+            seConfirm: 'assets/audio/se/sound_confirm.mp3',
+            seClear: 'assets/audio/se/sound_clear_normal.mp3',
+            seTrueClear: 'assets/audio/se/sound_clear_true.mp3',
+            seFly: 'assets/audio/se/sound_fly.mp3',
+            seCut: 'assets/audio/se/sound_cut.mp3',
+            seDrink: 'assets/audio/se/sound_drink.mp3',
+            seSnow: 'assets/audio/se/sound_snow.mp3',
+            seRumble: 'assets/audio/se/sound_rumble.mp3',
+            seScratch: 'assets/audio/se/sound_scratch.mp3',
+            seThud: 'assets/audio/se/sound_thud.mp3',
+            sePowerOff: 'assets/audio/se/sound_poweroff.mp3'
+        };
+        const bgmAudio = new Audio();
+        bgmAudio.loop = true;
+        bgmAudio.preload = 'auto';
+        let currentBgmKey = null;
+        let pendingBgmKey = null;
+        let audioUnlocked = false;
+        let soundEnabled = true;
+        let bgmVolume = 0.35;
+        let seVolume = 0.65;
+
+        function localAsset(path) {
+            if (!path) return '';
+            const p = String(path);
+            return `${BASE_URL}${p.startsWith('./') ? p.slice(2) : p}`;
+        }
+
+        function loadAudioSettings() {
+            try {
+                soundEnabled = localStorage.getItem('ayakashi_sound_enabled') !== '0';
+                const bv = parseFloat(localStorage.getItem('ayakashi_bgm_volume'));
+                const sv = parseFloat(localStorage.getItem('ayakashi_se_volume'));
+                if (!Number.isNaN(bv)) bgmVolume = Math.max(0, Math.min(1, bv));
+                if (!Number.isNaN(sv)) seVolume = Math.max(0, Math.min(1, sv));
+            } catch (e) {}
+            bgmAudio.volume = bgmVolume;
+            const b = document.getElementById('bgm-volume'); if (b) b.value = bgmVolume;
+            const s = document.getElementById('se-volume'); if (s) s.value = seVolume;
+            updateAudioUI();
+        }
+
+        function setupAudioUnlock() {
+            const unlock = () => unlockAudio();
+            document.addEventListener('pointerdown', unlock, { once: true, capture: true });
+            document.addEventListener('keydown', unlock, { once: true, capture: true });
+        }
+
+        async function unlockAudio() {
+            if (audioUnlocked) return;
+            audioUnlocked = true;
+            updateAudioUI();
+            if (soundEnabled && pendingBgmKey) playBgm(pendingBgmKey, true);
+        }
+
+        function updateAudioUI(message = '') {
+            const btn = document.getElementById('sound-toggle');
+            const status = document.getElementById('audio-status');
+            if (btn) btn.textContent = soundEnabled ? '🔊 音声 ON' : '🔇 音声 OFF';
+            if (status) {
+                if (message) status.textContent = message;
+                else if (!soundEnabled) status.textContent = 'ミュート中';
+                else if (!audioUnlocked) status.textContent = '初回操作後に音声開始';
+                else status.textContent = currentBgmKey ? `BGM: ${currentBgmKey}` : '音声 ON';
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            try { localStorage.setItem('ayakashi_sound_enabled', soundEnabled ? '1' : '0'); } catch (e) {}
+            if (!soundEnabled) bgmAudio.pause();
+            else if (audioUnlocked && (currentBgmKey || pendingBgmKey)) playBgm(currentBgmKey || pendingBgmKey, true);
+            updateAudioUI();
+        }
+
+        function setBgmVolume(v) {
+            bgmVolume = Math.max(0, Math.min(1, Number(v)));
+            bgmAudio.volume = bgmVolume;
+            try { localStorage.setItem('ayakashi_bgm_volume', String(bgmVolume)); } catch (e) {}
+        }
+
+        function setSeVolume(v) {
+            seVolume = Math.max(0, Math.min(1, Number(v)));
+            try { localStorage.setItem('ayakashi_se_volume', String(seVolume)); } catch (e) {}
+        }
+
+        async function playBgm(key, forceResume = false) {
+            if (!AUDIO_ASSETS[key]) return;
+            pendingBgmKey = key;
+            if (!soundEnabled || !audioUnlocked) { updateAudioUI(); return; }
+            if (currentBgmKey === key && !bgmAudio.paused && !forceResume) return;
+            if (currentBgmKey !== key) {
+                currentBgmKey = key;
+                bgmAudio.src = localAsset(AUDIO_ASSETS[key]);
+                bgmAudio.currentTime = 0;
+            }
+            bgmAudio.volume = bgmVolume;
+            try {
+                await bgmAudio.play();
+                updateAudioUI();
+            } catch (e) {
+                updateAudioUI('BGMファイル未配置');
+            }
+        }
+
+        function playSe(key) {
+            if (!soundEnabled || !audioUnlocked || !AUDIO_ASSETS[key]) return;
+            const se = new Audio(localAsset(AUDIO_ASSETS[key]));
+            se.volume = seVolume;
+            se.play().catch(() => updateAudioUI('SEファイル未配置'));
+        }
+
+        function loadProgress() {
+            try {
+                const saved = localStorage.getItem('ayakashi_revealed_endings');
+                if (saved) {
+                    revealedEndings = JSON.parse(saved);
+                }
+            } catch (e) {
+                revealedEndings = [];
+            }
+        }
+
+        function saveProgress() {
+            try {
+                localStorage.setItem('ayakashi_revealed_endings', JSON.stringify(revealedEndings));
+            } catch (e) {}
+        }
+
+        function switchMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === mode);
+            });
+
+            document.getElementById('scenario-panel').classList.toggle('hidden', mode !== 'scenario');
+            document.getElementById('character-panel').classList.toggle('hidden', mode !== 'character');
+            document.getElementById('ending-panel').classList.toggle('hidden', mode !== 'ending');
+            document.getElementById('image-display-panel').classList.toggle('hidden', mode === 'scenario');
+
+            if (mode === 'scenario') {
+                stopAutoPlay();
+            } else if (mode === 'ending') {
+                resetImageDisplay();
+            } else if (mode === 'character') {
+                renderCharacters();
+            }
+        }
+
+        function startScenario(routeKey) {
+            currentRoute = routeKey;
+            currentIndex = 0;
+            currentSpeakerImg = '';
+            currentDisplayedCharEn = '';
+            pendingEndingId = null;
+            
+            const charImgElem = document.getElementById('sc-char');
+            charImgElem.src = '';
+            charImgElem.style.display = 'none';
+            charImgElem.classList.remove('dimmed');
+
+            updateRouteIndicator();
+            displayCurrentLine();
+        }
+
+        function updateRouteIndicator() {
+            const routeNameElem = document.getElementById('current-route-name');
+            const posElem = document.getElementById('current-position-info');
+            const lines = getCurrentScenarioArray();
+            
+            if (routeNameElem) {
+                routeNameElem.textContent = routeNames[currentRoute] || currentRoute;
+            }
+            if (posElem) {
+                posElem.textContent = `${currentIndex + 1} / ${lines.length}`;
+            }
+        }
+
+        function getCurrentScenarioArray() {
+            if (scenarioData && scenarioData["シナリオ"] && scenarioData["シナリオ"][currentRoute]) {
+                return scenarioData["シナリオ"][currentRoute];
+            }
+            return [{ "キャラ名": "システム", "セリフ": "シナリオデータの読み込みに失敗したか、ルートが存在しません。" }];
+        }
+
+        function displayCurrentLine() {
+            updateRouteIndicator();
+            const lines = getCurrentScenarioArray();
+            if (currentIndex >= lines.length) {
+                document.getElementById('sc-speaker').textContent = "【シナリオ終了】";
+                document.getElementById('sc-text').textContent = "お話はここまでです。別のルートやモードを選択してください。";
+                const charImgElem = document.getElementById('sc-char');
+                charImgElem.src = '';
+                charImgElem.style.display = 'none';
+                charImgElem.classList.remove('dimmed');
+                currentSpeakerImg = '';
+                currentDisplayedCharEn = '';
+                return;
+            }
+
+            const line = lines[currentIndex];
+
+            // シナリオJSONの音声指定をローカル音源へ接続
+            if (line["BGM"]) playBgm(line["BGM"]);
+            if (line["効果音"]) playSe(line["効果音"]);
+
+            let bgChanged = false;
+            if (line["背景画像"]) {
+                const newBg = localAsset(line["背景画像"]);
+                if (currentBg !== newBg) {
+                    currentBg = newBg;
+                    bgChanged = true;
+                }
+            }
+            if (currentBg) {
+                document.getElementById('sc-bg').src = currentBg;
+            }
+
+            if (bgChanged && !line.hasOwnProperty("キャラ画像")) {
+                currentSpeakerImg = '';
+                currentDisplayedCharEn = '';
+                const charImgElem = document.getElementById('sc-char');
+                if (charImgElem) {
+                    charImgElem.src = '';
+                    charImgElem.style.display = 'none';
+                    charImgElem.classList.remove('dimmed');
+                }
+            }
+
+            const speakerName = line["キャラ名"] || "";
+            document.getElementById('sc-speaker').textContent = speakerName === "自分" ? "（あなた）" : speakerName;
+
+            let text = line["セリフ"] || "";
+            // カイトさんのセリフ等のプレースホルダー誤表記対策
+            text = text.replace(/__STR_2__/g, '"大量の"');
+            text = text.replace(/\{p\}/g, "").replace(/\{em\}/g, "").replace(/\{\/em\}/g, "");
+            document.getElementById('sc-text').textContent = text;
+
+            const charImgElem = document.getElementById('sc-char');
+            
+            let activeCharEn = '';
+            if (line["キャラ画像"]) {
+                currentSpeakerImg = localAsset(line["キャラ画像"]);
+                const match = line["キャラ画像"].match(/img_([a-z]+)_[0-9]+/);
+                if (match) {
+                    activeCharEn = match[1];
+                }
+            }
+
+            const nonStandActors = ["自分", "？？？", "システム", "妖怪達", "妖怪", "山妖怪", "客たち", "スタッフ", "警備員", "祭り囃子", "巨大提灯"];
+            
+            if (nonStandActors.includes(speakerName)) {
+                if (line["キャラ画像"]) {
+                    charImgElem.src = localAsset(line["キャラ画像"]);
+                    charImgElem.style.display = 'block';
+                    currentDisplayedCharEn = activeCharEn;
+                } else if (!line.hasOwnProperty("キャラ画像")) {
+                    if (currentSpeakerImg) {
+                        charImgElem.src = currentSpeakerImg;
+                        charImgElem.style.display = 'block';
+                    } else {
+                        charImgElem.src = '';
+                        charImgElem.style.display = 'none';
+                    }
+                } else {
+                    charImgElem.src = '';
+                    charImgElem.style.display = 'none';
+                    currentDisplayedCharEn = '';
+                }
+            } else {
+                if (line["キャラ画像"]) {
+                    charImgElem.src = localAsset(line["キャラ画像"]);
+                    charImgElem.style.display = 'block';
+                    currentDisplayedCharEn = activeCharEn;
+                } else if (currentSpeakerImg) {
+                    charImgElem.src = currentSpeakerImg;
+                    charImgElem.style.display = 'block';
+                    const matchedObj = characters.find(c => c.ja === speakerName);
+                    if (matchedObj) {
+                        activeCharEn = matchedObj.en;
+                    }
+                } else {
+                    charImgElem.src = '';
+                    charImgElem.style.display = 'none';
+                }
+            }
+
+            if (charImgElem.style.display !== 'none' && charImgElem.src) {
+                const speakingCharObj = characters.find(c => c.ja === speakerName);
+                const speakingEn = speakingCharObj ? speakingCharObj.en : '';
+                const isUpdatedThisLine = line.hasOwnProperty("キャラ画像") && line["キャラ画像"];
+                
+                if (!isUpdatedThisLine) {
+                    const isIchikaAndUnknownMatch = (currentDisplayedCharEn === 'ichika' && (speakerName === 'イチカ' || speakerName === '？？？'));
+
+                    if (isIchikaAndUnknownMatch) {
+                        charImgElem.classList.remove('dimmed');
+                    } else if (speakingEn && currentDisplayedCharEn && speakingEn !== currentDisplayedCharEn) {
+                        charImgElem.classList.add('dimmed');
+                    } else if (nonStandActors.includes(speakerName) && speakerName !== '？？？') {
+                        charImgElem.classList.add('dimmed');
+                    } else if (speakerName === "自分") {
+                        charImgElem.classList.add('dimmed');
+                    } else {
+                        charImgElem.classList.remove('dimmed');
+                    }
+                } else {
+                    charImgElem.classList.remove('dimmed');
+                    if (activeCharEn) {
+                        currentDisplayedCharEn = activeCharEn;
+                    }
+                }
+            }
+
+            const choiceContainer = document.getElementById('choice-container');
+            if (line["選択肢ID"]) {
+                showChoices(line["選択肢ID"]);
+            } else {
+                choiceContainer.classList.add('hidden');
+            }
+
+            if (line["エンディングID"] && currentIndex === lines.length - 1) {
+                pendingEndingId = line["エンディングID"];
+            } else {
+                pendingEndingId = null;
+            }
+        }
+
+        function nextDialogue() {
+            playSe('seTap');
+            const choiceContainer = document.getElementById('choice-container');
+            if (!choiceContainer.classList.contains('hidden')) return;
+
+            if (pendingEndingId !== null) {
+                triggerEndingTransition(pendingEndingId);
+                return;
+            }
+
+            const lines = getCurrentScenarioArray();
+            if (currentIndex < lines.length - 1) {
+                currentIndex++;
+                displayCurrentLine();
+            } else {
+                stopAutoPlay();
+            }
+        }
+
+        function triggerEndingTransition(edId) {
+            stopAutoPlay();
+            playSe(edId === 27 ? 'seTrueClear' : 'seClear');
+            pendingEndingId = null;
+            
+            if (!revealedEndings.includes(edId)) {
+                revealedEndings.push(edId);
+                saveProgress();
+            }
+
+            const targetEnding = endings.find(e => e.endingId === edId);
+            if (targetEnding) {
+                const titleEl = document.getElementById(`title-${edId}`);
+                if (titleEl) {
+                    titleEl.textContent = targetEnding.title;
+                    titleEl.classList.remove('hidden-title');
+                }
+                
+                const iconEl = document.getElementById(`icon-${edId}`);
+                if (iconEl) {
+                    const iconKey = charIconMap[targetEnding.jaName];
+                    if (iconKey) {
+                        iconEl.src = `${BASE_URL}assets/webp/common/icon/icon_${iconKey}.webp`;
+                    }
+                }
+
+                const btn = document.getElementById(`ending-btn-${edId}`);
+                if (btn) btn.classList.add('revealed');
+
+                switchMode('ending');
+                showEndingImageById(edId);
+            }
+        }
+
+        function showChoices(choiceId) {
+            const container = document.getElementById('choice-container');
+            container.innerHTML = '';
+            container.classList.remove('hidden');
+            stopAutoPlay();
+
+            let rawOptions = [];
+            const convertedChoiceId = convertRouteKey(choiceId);
+
+            if (convertedChoiceId === 'opening') {
+                rawOptions = [
+                    { text: "屋台から食材が消える事件を解決する", next: "route1" },
+                    { text: "逃げ出した巨大提灯を探す", next: "route2" },
+                    { text: "オークションに出品された祭具を取り戻す", next: "route3" },
+                    { text: "流しそうめん装置の暴走を止める", next: "route4" }
+                ];
+
+                const all1to26Unlocked = Array.from({length: 26}, (_, i) => i + 1).every(id => revealedEndings.includes(id));
+                if (all1to26Unlocked) {
+                    rawOptions.push({ text: "(夏祭りが開催されるようだ...)", next: "route5", isTrue: true });
+                }
+
+            } else if (convertedChoiceId === 'route1') {
+                rawOptions = [
+                    { text: "巨大な足跡を追う", next: "route1_1" },
+                    { text: "大量の台車の跡を追う", next: "route1_2" }
+                ];
+            } else if (convertedChoiceId === 'route1_1') {
+                rawOptions = [
+                    { text: "正々堂々と料理勝負を挑む", next: "route1_1_1" },
+                    { text: "こっそりと食材を奪い返す", next: "route1_1_2" },
+                    { text: "宴会に混ざって交渉する", next: "route1_1_3" }
+                ];
+            } else if (convertedChoiceId === 'route1_2') {
+                rawOptions = [
+                    { text: "おとりの屋台を出す", next: "route1_2_1" },
+                    { text: "幻の屋台飯の情報をあちこちに流す", next: "route1_2_2" },
+                    { text: "主催者を説得する", next: "route1_2_3" }
+                ];
+            } else if (convertedChoiceId === 'route2') {
+                rawOptions = [
+                    { text: "屋上に上って追いかける", next: "route2_1" },
+                    { text: "提灯の好物でおびき寄せる", next: "route2_2" },
+                    { text: "火の粉の痕跡を追いかける", next: "route2_3" }
+                ];
+            } else if (convertedChoiceId === 'route2_1') {
+                rawOptions = [
+                    { text: "正面から捕まえに行く", next: "route2_1_1" },
+                    { text: "祭り囃子で誘導する", next: "route2_1_2" }
+                ];
+            } else if (convertedChoiceId === 'route2_2') {
+                rawOptions = [
+                    { text: "特大わたあめを作って待つ", next: "route2_2_1" },
+                    { text: "お祭り会場を音楽で盛り上げる", next: "route2_2_2" }
+                ];
+            } else if (convertedChoiceId === 'route2_3') {
+                rawOptions = [
+                    { text: "待ち伏せして捕まえる", next: "route2_3_1" },
+                    { text: "火の粉を回収して調べる", next: "route2_3_2" }
+                ];
+            } else if (convertedChoiceId === 'route3') {
+                rawOptions = [
+                    { text: "客として正面から潜入する", next: "route3_1" },
+                    { text: "裏口からこっそり忍び込む", next: "route3_2" },
+                    { text: "運搬ルートを探りにいく", next: "route3_3" }
+                ];
+            } else if (convertedChoiceId === 'route3_1') {
+                rawOptions = [
+                    { text: "富豪になりきって競り落とす", next: "route3_1_1" },
+                    { text: "本物を偽物とすり替える", next: "route3_1_2" },
+                    { text: "オークションをめちゃくちゃにする", next: "route3_1_3" }
+                ];
+            } else if (convertedChoiceId === 'route3_2') {
+                rawOptions = [
+                    { text: "司会のフリをして潜入する", next: "route3_2_1" },
+                    { text: "ステージ裏ですり替える", next: "route3_2_2" }
+                ];
+            } else if (convertedChoiceId === 'route3_3') {
+                rawOptions = [
+                    { text: "受け渡し現場を押さえる", next: "route3_3_1" },
+                    { text: "輸送中の隙を狙う", next: "route3_3_2" }
+                ];
+            } else if (convertedChoiceId === 'route4') {
+                rawOptions = [
+                    { text: "上流に向かい水を止める", next: "route4_1" },
+                    { text: "犯人や改造の痕跡を調べる", next: "route4_2" },
+                    { text: "妖力の反応をみんなで調べる", next: "route4_3" }
+                ];
+            } else if (convertedChoiceId === 'route4_1') {
+                rawOptions = [
+                    { text: "丸太で水の流れを止める", next: "route4_1_1" },
+                    { text: "川を遡ってお掃除する", next: "route4_1_2" },
+                    { text: "流れてくるそうめんを回収する", next: "route4_1_3" }
+                ];
+            } else if (convertedChoiceId === 'route4_2') {
+                rawOptions = [
+                    { text: "装置の修理を手伝う", next: "route4_2_1" },
+                    { text: "犯人を追いかける", next: "route4_2_2" }
+                ];
+            } else if (convertedChoiceId === 'route4_3') {
+                rawOptions = [
+                    { text: "悪さをする妖怪なら捕まえる", next: "route4_3_1" },
+                    { text: "しっかり交渉してみる", next: "route4_3_2" }
+                ];
+            }
+
+            rawOptions.forEach(opt => {
+                const btn = document.createElement('button');
+                
+                const remData = getRemainingCount(opt.next);
+                const isCompleted = remData && remData.total > 0 && remData.unrevealed === 0;
+
+                btn.className = opt.isTrue ? 'choice-btn true-route' : (isCompleted ? 'choice-btn completed-route' : 'choice-btn');
+                
+                const textSpan = document.createElement('span');
+                textSpan.className = 'choice-sub-text';
+                textSpan.textContent = opt.text;
+                btn.appendChild(textSpan);
+
+                if (remData && remData.total > 0) {
+                    const remSpan = document.createElement('span');
+                    remSpan.className = isCompleted ? 'choice-remaining is-completed' : 'choice-remaining';
+                    remSpan.textContent = isCompleted ? '回収済み' : `(${remData.unrevealed}/${remData.total})`;
+                    btn.appendChild(remSpan);
+                }
+
+                btn.onclick = () => {
+                    playSe('seConfirm');
+                    container.classList.add('hidden');
+                    startScenario(opt.next);
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function restartScenario() {
+            playSe('seTap');
+            startScenario('opening');
+        }
+
+        function cycleAutoPlay() {
+            playSe('seTap');
+            autoPlayMode = (autoPlayMode + 1) % 4;
+            
+            if (autoPlayTimer) {
+                clearInterval(autoPlayTimer);
+                autoPlayTimer = null;
+            }
+
+            const btn = document.getElementById('auto-btn');
+            
+            if (autoPlayMode === 0) {
+                btn.textContent = "オート: オフ";
+                btn.style.background = "rgba(255,255,255,0.1)";
+            } else {
+                btn.style.background = "#e94560";
+                
+                let intervalTime = 3500;
+                if (autoPlayMode === 2) {
+                    intervalTime = 1500;
+                    btn.textContent = "オート: 1.5秒";
+                } else if (autoPlayMode === 3) {
+                    intervalTime = 100;
+                    btn.textContent = "オート: 早送り";
+                } else {
+                    btn.textContent = "オート: 通常";
+                }
+
+                autoPlayTimer = setInterval(() => {
+                    const choiceContainer = document.getElementById('choice-container');
+                    if (!choiceContainer.classList.contains('hidden')) {
+                        stopAutoPlay();
+                        return;
+                    }
+
+                    if (pendingEndingId !== null) {
+                        triggerEndingTransition(pendingEndingId);
+                        return;
+                    }
+
+                    const lines = getCurrentScenarioArray();
+                    if (currentIndex < lines.length - 1) {
+                        currentIndex++;
+                        displayCurrentLine();
+                    } else {
+                        const line = lines[currentIndex];
+                        if (line && line["エンディングID"]) {
+                            pendingEndingId = line["エンディングID"];
+                            return;
+                        }
+                        stopAutoPlay();
+                    }
+                }, intervalTime);
+            }
+        }
+
+        function stopAutoPlay() {
+            autoPlayMode = 0;
+            const btn = document.getElementById('auto-btn');
+            if (btn) {
+                btn.textContent = "オート: オフ";
+                btn.style.background = "rgba(255,255,255,0.1)";
+            }
+            if (autoPlayTimer) {
+                clearInterval(autoPlayTimer);
+                autoPlayTimer = null;
+            }
+        }
+
+        function renderCharacters() {
+            const grid = document.getElementById('char-grid');
+            let listHtml = characters.map(c => 
+                `<button class="char-btn" data-char="${c.en}" onclick="selectCharacter('${c.en}', '${c.ja}')">${c.ja}</button>`
+            ).join('');
+
+            if (revealedEndings.includes(27)) {
+                listHtml += `<button class="char-btn" data-char="other" onclick="selectCharacter('other', 'その他')" style="border-color: #ffd700; color: #ffd700;">その他</button>`;
+            }
+
+            grid.innerHTML = listHtml;
+        }
+
+        function renderEndings() {
+            const list = document.getElementById('ending-list');
+            list.innerHTML = endings.map(e => {
+                const isTrue = e.isTrueEnding;
+                const trueMark = isTrue ? ' ★' : '';
+                const isRevealed = revealedEndings.includes(e.endingId);
+                const iconKey = charIconMap[e.jaName];
+                
+                let iconUrl = `${BASE_URL}assets/webp/common/icon/icon_secret.webp`;
+                if (iconKey) {
+                    if (isRevealed) {
+                        iconUrl = `${BASE_URL}assets/webp/common/icon/icon_${iconKey}.webp`;
+                    } else {
+                        iconUrl = `${BASE_URL}assets/webp/common/icon/icon_${iconKey}_silhouette.webp`;
+                    }
+                }
+
+                return `
+                <div class="ending-item" data-ending="${e.endingId}" style="display:contents;" onclick="handleEndingClick(${e.endingId})">
+                    <button class="ending-btn ${isRevealed ? 'revealed' : ''}" data-ending="${e.endingId}" id="ending-btn-${e.endingId}">
+                        <span class="ending-id">END${e.endingId}</span>
+                        <img class="ending-icon" id="icon-${e.endingId}" src="${iconUrl}" alt="${e.jaName}">
+                        <span class="ending-title ${isRevealed ? '' : 'hidden-title'}" id="title-${e.endingId}">${isRevealed ? e.title : '？？？'}</span>
+                        <span class="ending-char" id="char-${e.endingId}">${e.jaName}${trueMark}</span>
+                    </button>
+                </div>
+                `;
+            }).join('');
+        }
+
+        let selectedChar = null;
+        let selectedPattern = null;
+
+        function selectCharacter(enName, jaName) {
+            playSe('seTap');
+            selectedChar = {en: enName, ja: jaName};
+            
+            document.querySelectorAll('.char-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.char === enName);
+            });
+
+            const patternBtnsContainer = document.getElementById('pattern-btns');
+            patternBtnsContainer.style.display = 'flex';
+
+            if (enName === 'other') {
+                patternBtnsContainer.innerHTML = `
+                    <button class="pattern-btn" data-type="pattern" data-value="self" onclick="selectOtherSub('self', '自分')">自分</button>
+                    <button class="pattern-btn" data-type="pattern" data-value="all" onclick="selectOtherSub('all', '全員')">全員</button>
+                `;
+                selectOtherSub('self', '自分');
+            } else {
+                patternBtnsContainer.innerHTML = `
+                    <button class="pattern-btn" data-type="pattern" data-value="1" onclick="selectPattern('1')">表情 1</button>
+                    <button class="pattern-btn" data-type="pattern" data-value="2" onclick="selectPattern('2')">表情 2</button>
+                    <button class="pattern-btn" data-type="pattern" data-value="icon" onclick="selectPattern('icon')">アイコン</button>
+                `;
+                selectPattern('1');
+            }
+        }
+
+        function selectPattern(pattern) {
+            playSe('seTap');
+            if (!selectedChar || selectedChar.en === 'other') return;
+            selectedPattern = pattern;
+
+            document.querySelectorAll('.pattern-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.value === pattern);
+            });
+
+            let url = "";
+            let caption = "";
+
+            if (pattern === 'icon') {
+                const iconKey = charIconMap[selectedChar.ja];
+                url = `${BASE_URL}assets/webp/common/icon/icon_${iconKey}.webp`;
+                caption = `${selectedChar.ja} - アイコン`;
+            } else {
+                url = `${BASE_URL}assets/webp/content/character/img_${selectedChar.en}_${pattern}.webp`;
+                caption = `${selectedChar.ja} - 表情 ${pattern}`;
+            }
+
+            showImage(url, caption);
+        }
+
+        function selectOtherSub(type, label) {
+            playSe('seTap');
+            selectedPattern = type;
+
+            document.querySelectorAll('.pattern-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.value === type);
+            });
+
+            let url = "";
+            if (type === 'self') {
+                url = `${BASE_URL}assets/webp/common/icon/icon_player.webp`;
+            } else if (type === 'all') {
+                url = `${BASE_URL}assets/webp/common/icon/icon_all.webp`;
+            }
+
+            showImage(url, `その他 - ${label}アイコン`);
+        }
+
+        function handleEndingClick(endingId) {
+            playSe('seTap');
+            const ending = endings.find(e => e.endingId === endingId);
+            if (!ending) return;
+
+            if (ending.isTrueEnding && !revealedEndings.includes(endingId)) {
+                const display = document.getElementById('image-display');
+                display.innerHTML = `
+                    <div class="confirm-area">
+                        <div class="ending-name-display"><span class="true-mark">★ 最終エンド ★</span><br>END27（${ending.jaName}）</div>
+                        <div class="hint-display">${ending.hint}</div>
+                        <div class="confirm-subtext" style="color: #e94560;">※ このエンディング画像はルート5をクリアして解放する必要があります。</div>
+                        <div class="confirm-btn-area">
+                            <button class="confirm-action-btn" onclick="resetImageDisplay()">閉じる</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            document.querySelectorAll('.ending-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            const btn = document.getElementById(`ending-btn-${endingId}`);
+            if (btn) btn.classList.add('selected');
+
+            const titleEl = document.getElementById(`title-${endingId}`);
+            const isRevealed = titleEl && !titleEl.classList.contains('hidden-title');
+
+            if (isRevealed) {
+                showEndingImageById(endingId);
+            } else {
+                showConfirmArea(ending);
+            }
+        }
+
+        function showConfirmArea(ending) {
+            const display = document.getElementById('image-display');
+            const isTrue = ending.isTrueEnding;
+
+            let confirmSubtext = isTrue ? '※ これは最終エンドの画像です。ネタバレにご注意ください。' : '';
+
+            display.innerHTML = `
+                <div class="confirm-area">
+                    <div class="ending-name-display">${isTrue ? '<span class="true-mark">★ 最終エンド ★</span><br>' : ''}END${ending.endingId}（${ending.jaName}）</div>
+                    <div class="hint-display" id="hint-box-${ending.endingId}" onclick="handleHintClick(${ending.endingId})" title="タップするとルートの答えを表示します">${ending.hint} <span style="font-size:0.75rem; color:#e94560; display:block; margin-top:2px;">（💡さらにヒントをタップするとルート解答が表示されます）</span></div>
+                    <div id="answer-box-${ending.endingId}"></div>
+                    <div class="confirm-subtext">${confirmSubtext}</div>
+                    <div class="confirm-btn-area">
+                        <button class="confirm-action-btn primary" onclick="showEndingImageById(${ending.endingId})">画像を表示する</button>
+                        <button class="confirm-action-btn" onclick="resetImageDisplay()">キャンセル</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        let hintClickCounts = {};
+
+        function handleHintClick(endingId) {
+            playSe('seTap');
+            const ending = endings.find(e => e.endingId === endingId);
+            if (!ending) return;
+
+            if (!hintClickCounts[endingId]) {
+                hintClickCounts[endingId] = 0;
+            }
+            hintClickCounts[endingId]++;
+
+            const answerBox = document.getElementById(`answer-box-${endingId}`);
+            if (hintClickCounts[endingId] >= 2) {
+                if (answerBox) {
+                    answerBox.innerHTML = `
+                        <div class="answer-reveal-box">
+                            <div>${ending.routeAnswer}</div>
+                            <button class="control-btn" style="margin-top:8px; background:#e94560; border-color:#ffd700;" onclick="jumpToRoute('${ending.targetRoute}')">▶ このルートで再生を開始する</button>
+                        </div>
+                    `;
+                }
+            } else {
+                if (answerBox) {
+                    answerBox.innerHTML = `<div style="font-size:0.8rem; color:#ffd700; margin-bottom:10px;">もう一度ヒントをタップするとルートの答えが表示されます</div>`;
+                }
+            }
+        }
+
+        function jumpToRoute(routeKey) {
+            switchMode('scenario');
+            startScenario(routeKey);
+        }
+
+        function showEndingImageById(endingId) {
+            const ending = endings.find(e => e.endingId === endingId);
+            if (!ending) return;
+
+            if (!revealedEndings.includes(endingId)) {
+                revealedEndings.push(endingId);
+                saveProgress();
+            }
+
+            const url = `${BASE_URL}assets/webp/ogp/ogp_ed_${ending.ogpFile}.webp`;
+            const trueMark = ending.isTrueEnding ? '【最終エンド】' : '';
+            showImage(url, `${trueMark}END${ending.endingId}「${ending.title}」(${ending.jaName})`);
+
+            const titleEl = document.getElementById(`title-${ending.endingId}`);
+            if (titleEl) {
+                titleEl.textContent = ending.title;
+                titleEl.classList.remove('hidden-title');
+            }
+
+            const iconEl = document.getElementById(`icon-${endingId}`);
+            if (iconEl) {
+                const iconKey = charIconMap[ending.jaName];
+                if (iconKey) {
+                    iconEl.src = `${BASE_URL}assets/webp/common/icon/icon_${iconKey}.webp`;
+                }
+            }
+
+            const btn = document.getElementById(`ending-btn-${endingId}`);
+            if (btn) btn.classList.add('revealed');
+        }
+
+        function showImage(url, caption) {
+            const display = document.getElementById('image-display');
+            display.innerHTML = `<div class="loading"></div>`;
+
+            const img = new Image();
+            img.onload = function() {
+                display.innerHTML = `
+                    <img src="${url}" alt="${caption}">
+                    <div class="image-info">${caption}</div>
+                `;
+            };
+            img.onerror = function() {
+                display.innerHTML = `<div class="error-msg">⚠ ローカル画像の読み込みに失敗しました。<br><small>${url}</small><br>assetsフォルダに対象ファイルが配置されているか確認してください。</div>`;
+            };
+            img.src = url;
+        }
+
+        function resetImageDisplay() {
+            const display = document.getElementById('image-display');
+            if (display) {
+                display.innerHTML = '<div class="placeholder">キャラクターを選択してください</div>';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

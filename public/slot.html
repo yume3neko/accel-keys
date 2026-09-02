@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Game - Endless BIG Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@900&display=swap');
+        
+        body {
+            background-color: #050505;
+            font-family: 'M PLUS 1p', sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .reel-frame {
+            width: 100px;
+            height: 180px;
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            transition: background-color 1.0s ease, opacity 0.25s ease, filter 0.25s ease;
+        }
+
+        .reel-dimmed {
+            opacity: 0.15;
+            filter: grayscale(1) brightness(0.3);
+        }
+
+        .lv-1 { background-color: #ffffff; }
+        .lv-2 { background-color: #dbeafe; } 
+        .lv-3 { background-color: #dcfce7; } 
+        .lv-4 { background-color: #f3e8ff; } 
+        .lv-5 { background-color: #fee2e2; } 
+
+        .symbol-container {
+            position: absolute;
+            width: 100%;
+            top: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .symbol {
+            height: 60px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            box-sizing: border-box;
+            background: transparent;
+            color: #222;
+        }
+
+        .symbol-7 { color: #e11d48; text-shadow: 0 0 8px rgba(225, 29, 72, 0.4); }
+        .symbol-bar-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        .symbol-bar { color: #fff; font-size: 1rem; background: #000; border: 2px solid #333; height: 36px; width: 85%; border-radius: 2px; display: flex; justify-content: center; align-items: center; font-family: monospace; font-weight: 900; }
+        .symbol-rep { color: #3b82f6; font-size: 2.2rem; }
+
+        .payline {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            border-top: 2px solid rgba(255, 0, 0, 0.6);
+            border-bottom: 2px solid rgba(255, 0, 0, 0.6);
+            background: rgba(255, 0, 0, 0.05);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .btn-blink { animation: btn-blink-kf 0.15s infinite alternate !important; }
+        @keyframes btn-blink-kf {
+            from { filter: brightness(2.5) saturate(1.5); transform: scale(1.08); box-shadow: 0 0 20px #ef4444; }
+            to { filter: brightness(0.7); transform: scale(0.95); box-shadow: 0 0 0px transparent; }
+        }
+
+        .btn-stop {
+            width: 100px;
+            height: 55px;
+            background: radial-gradient(circle, #ef4444 0%, #7f1d1d 100%);
+            border: 4px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 5px 0 #450a0a;
+            transition: all 0.1s;
+        }
+
+        .btn-stop:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 #450a0a; }
+        .btn-stop:disabled { filter: grayscale(1) brightness(0.2) !important; box-shadow: none; opacity: 0.5; }
+
+        .bonus-active-machine { animation: bonus-glow 1.5s infinite alternate; }
+        @keyframes bonus-glow { from { box-shadow: 0 0 15px #fbbf24; } to { box-shadow: 0 0 40px #f59e0b; } }
+        .endless-active-machine { animation: endless-glow 1.5s infinite alternate; }
+        @keyframes endless-glow { from { box-shadow: 0 0 15px #a855f7; } to { box-shadow: 0 0 40px #7e22ce; } }
+
+        .stat-label { font-size: 9px; color: #71717a; font-weight: bold; }
+        .stat-val { font-size: 16px; font-family: monospace; color: #fbbf24; }
+        
+        .stat-box { cursor: pointer; transition: background 0.1s; }
+        .stat-box:active { background: #3f3f46; }
+
+        #lever:disabled { cursor: not-allowed; filter: brightness(0.4) grayscale(0.5); pointer-events: none; }
+
+        .nav-num {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #fbbf24;
+            text-shadow: 0 0 15px rgba(251, 191, 36, 1), 0 0 4px #000;
+            line-height: 1;
+        }
+
+        #top-msg-area {
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            font-size: 1.1rem;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body id="body" class="flex flex-col items-center justify-center min-h-screen text-white p-4">
+
+    <div id="freeze-fx" class="fixed inset-0 bg-white opacity-0 pointer-events-none z-[100] transition-opacity duration-500"></div>
+
+    <div class="mb-4 grid grid-cols-5 gap-2 w-full max-w-lg">
+        <div id="box-big" class="stat-box bg-zinc-900 border border-zinc-700 p-2 rounded text-center" onclick="handleCounterTap('big')">
+            <div class="stat-label">BIG</div>
+            <div id="cnt-big" class="stat-val">0</div>
+        </div>
+        <div id="box-bar" class="stat-box bg-zinc-900 border border-zinc-700 p-2 rounded text-center" onclick="handleCounterTap('bar')">
+            <div class="stat-label">BAR-BIG</div>
+            <div id="cnt-bar" class="stat-val">0</div>
+        </div>
+        <div id="box-sbig" class="stat-box bg-zinc-900 border border-zinc-700 p-2 rounded text-center" onclick="handleCounterTap('sbig')">
+            <div class="stat-label">S-BIG</div>
+            <div id="cnt-sbig" class="stat-val">0</div>
+        </div>
+        <div id="box-fbig" class="stat-box bg-zinc-900 border border-zinc-700 p-2 rounded text-center" onclick="handleCounterTap('fbig')">
+            <div class="stat-label">F-BIG</div>
+            <div id="cnt-fbig" class="stat-val">0</div>
+        </div>
+        <div class="bg-zinc-800 border border-zinc-700 p-2 rounded text-center">
+            <div class="stat-label text-blue-400">GAMES</div>
+            <div id="cnt-games" class="stat-val text-blue-400">0</div>
+        </div>
+    </div>
+
+    <div id="bonus-header" class="mb-4 w-full max-w-sm hidden">
+        <div id="header-bg" class="border-2 p-2 rounded-lg text-center">
+            <div class="flex justify-center items-center px-4">
+                <span id="bonus-label" class="text-sm font-black italic mr-4 uppercase"></span>
+                <span class="text-xl font-mono" id="bonus-progress"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="machine" class="bg-zinc-800 p-8 rounded-[40px] border-[10px] border-zinc-700 shadow-2xl relative">
+        <div id="top-msg-area" class="absolute -top-12 left-0 w-full h-10 flex items-center justify-center font-black italic"></div>
+
+        <div class="flex gap-3 relative">
+            <div class="payline"></div>
+            
+            <div class="relative flex flex-col items-center">
+                <div id="reel-1-frame" class="reel-frame lv-1">
+                    <div id="strip-1" class="symbol-container"></div>
+                </div>
+                <div id="chance-area-1" class="h-12 flex items-center justify-center mt-1"></div>
+                <button id="btn-1" class="btn-stop mt-1" disabled></button>
+            </div>
+
+            <div class="relative flex flex-col items-center">
+                <div id="reel-2-frame" class="reel-frame lv-1">
+                    <div id="strip-2" class="symbol-container"></div>
+                </div>
+                <div id="chance-area-2" class="h-12 flex items-center justify-center mt-1"></div>
+                <button id="btn-2" class="btn-stop mt-1" disabled></button>
+            </div>
+
+            <div class="relative flex flex-col items-center">
+                <div id="reel-3-frame" class="reel-frame lv-1">
+                    <div id="strip-3" class="symbol-container"></div>
+                </div>
+                <div id="chance-area-3" class="h-12 flex items-center justify-center mt-1"></div>
+                <button id="btn-3" class="btn-stop mt-1" disabled></button>
+            </div>
+        </div>
+
+        <div class="mt-8 flex justify-center">
+            <button id="lever" class="group active:scale-95 transition-transform">
+                <div class="w-16 h-16 bg-zinc-700 rounded-full border-4 border-zinc-500 shadow-lg flex items-center justify-center">
+                    <div class="w-10 h-10 bg-red-600 rounded-full border-2 border-red-400"></div>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <div id="msg" class="mt-6 text-xl font-black h-8 text-center drop-shadow-md"></div>
+
+    <script>
+        const SYMBOLS_DEF = {
+            '7': { id: '7', char: '7', class: 'symbol-7' },
+            'BAR': { id: 'BAR', char: 'BAR', class: '' },
+            'BEL': { id: 'BEL', char: '🔔', class: '' },
+            'WML': { id: 'WML', char: '🍉', class: '' },
+            'CHE': { id: '🍒', char: '🍒', class: '' },
+            'REP': { id: 'REP', char: '○', class: 'symbol-rep' },
+            'BLK': { id: 'BLK', char: '□', class: 'symbol-blk' }
+        };
+
+        const REEL_STRIPS = [
+            ['BEL', 'REP', '7', 'BEL', 'REP', 'WML', 'BEL', 'REP', 'BAR', 'CHE', 'BLK', 'BEL', 'REP', 'WML', '7', 'WML', 'BEL', 'REP', 'BAR', 'CHE', 'BLK'],
+            ['WML', 'BEL', '7', 'REP', 'WML', 'BAR', '7', 'BAR', 'REP', 'BEL', 'CHE', '7', 'WML', 'REP', 'BEL', 'BAR', 'CHE', 'BAR', 'BEL', 'CHE', 'REP'],
+            ['BAR', 'CHE', '7', 'REP', 'BEL', 'WML', 'CHE', 'REP', 'BEL', 'BAR', '7', 'REP', 'BEL', 'WML', 'CHE', 'REP', 'BEL', 'WML', 'CHE', 'REP', 'BEL']
+        ];
+
+        let game = {
+            counts: { big: 0, bar: 0, sbig: 0, fbig: 0, games: 0 },
+            mode: 'READY', 
+            bonusCount: 0,
+            guarantee: 0,
+            maxBonus: 10,
+            level: 1,
+            spinning: [false, false, false],
+            stopping: [false, false, false],
+            pos: [0, 0, 0],
+            targetPos: [0, 0, 0],
+            speeds: [0, 0, 0],
+            internalOrder: [1, 2, 3],
+            stopCount: 0,
+            isMissed: false,
+            navType: 'NORMAL', 
+            isFreezing: false,
+            freezeType: null,
+            bonusSetType: null,
+            isEndless: false,
+            lastTapKey: null,
+            tapCount: 0,
+            endlessReady: false,
+            isEndlessStarting: false,
+            isBarCutin: false,
+            cutinTaku: 'ANY', 
+            correctFirstReel: 0, 
+            isCorrected: true
+        };
+
+        const SYMBOL_H = 60;
+        const NORMAL_SPEED = 30;
+
+        function initReels() {
+            for(let i=0; i<3; i++) {
+                const container = document.getElementById(`strip-${i+1}`);
+                const stripData = REEL_STRIPS[i];
+                [...stripData, ...stripData, ...stripData].forEach(key => {
+                    const s = SYMBOLS_DEF[key];
+                    const div = document.createElement('div');
+                    if (key === 'BAR') {
+                        div.className = `symbol`;
+                        div.innerHTML = `<div class="symbol-bar-container"><div class="symbol-bar">BAR</div></div>`;
+                    } else {
+                        div.className = `symbol ${s.class}`;
+                        div.innerHTML = s.char;
+                    }
+                    container.appendChild(div);
+                });
+            }
+        }
+
+        function renderReels() {
+            for(let i=0; i<3; i++) {
+                document.getElementById(`strip-${i+1}`).style.transform = `translateY(-${game.pos[i]}px)`;
+            }
+        }
+
+        function animate() {
+            game.spinning.forEach((s, i) => {
+                const totalH = REEL_STRIPS[i].length * SYMBOL_H;
+                if(s) {
+                    if (game.stopping[i]) {
+                        const dist = (game.pos[i] - game.targetPos[i] + totalH) % totalH;
+                        if (dist <= Math.abs(game.speeds[i])) {
+                            game.pos[i] = game.targetPos[i];
+                            game.spinning[i] = false;
+                            game.stopping[i] = false;
+                            onReelStopped(i);
+                        } else {
+                            game.pos[i] = (game.pos[i] - game.speeds[i] + totalH) % totalH;
+                        }
+                    } else {
+                        game.pos[i] = (game.pos[i] - game.speeds[i] + totalH) % totalH;
+                    }
+                }
+            });
+            renderReels();
+            requestAnimationFrame(animate);
+        }
+
+        function onReelStopped(i) {
+            if (game.isFreezing || game.isEndlessStarting) return;
+            if (game.stopCount === 3) {
+                document.getElementById('top-msg-area').textContent = "";
+                document.getElementById('top-msg-area').className = "absolute -top-12 left-0 w-full h-10 flex items-center justify-center font-black italic";
+
+                for(let k=1; k<=3; k++) {
+                    document.getElementById(`btn-${k}`).classList.remove('btn-blink');
+                    document.getElementById(`btn-${k}`).disabled = true;
+                    document.getElementById(`chance-area-${k}`).innerHTML = "";
+                    document.getElementById(`reel-${k}-frame`).classList.remove('reel-dimmed');
+                }
+                checkResult();
+            } else {
+                updateVisuals();
+            }
+        }
+
+        function updateVisuals() {
+            if (game.isFreezing || game.isEndlessStarting) return;
+            const step = game.stopCount + 1;
+
+            for(let i=1; i<=3; i++) {
+                const reelFrame = document.getElementById(`reel-${i}-frame`);
+                reelFrame.classList.remove('lv-1', 'lv-2', 'lv-3', 'lv-4', 'lv-5');
+                reelFrame.classList.add(`lv-${game.level}`);
+            }
+
+            for(let i=0; i<3; i++) {
+                const btn = document.getElementById(`btn-${i+1}`);
+                const chanceArea = document.getElementById(`chance-area-${i+1}`);
+                const reelFrame = document.getElementById(`reel-${i+1}-frame`);
+                btn.classList.remove('btn-blink');
+                
+                if (game.spinning[i] && !game.stopping[i]) {
+                    const myOrder = game.internalOrder[i];
+                    
+                    // すでにミスしている場合はナビを表示しない（暗転したままにする）
+                    if (game.isMissed) {
+                        reelFrame.classList.add('reel-dimmed');
+                        chanceArea.innerHTML = "";
+                        continue;
+                    }
+
+                    if (game.isBarCutin) {
+                        if (step === 1) {
+                            if (game.cutinTaku === '2TAKU') {
+                                if (i === 0 || i === 2) {
+                                    reelFrame.classList.remove('reel-dimmed');
+                                    btn.classList.add('btn-blink');
+                                } else {
+                                    reelFrame.classList.add('reel-dimmed');
+                                }
+                            } else {
+                                reelFrame.classList.remove('reel-dimmed');
+                                btn.classList.add('btn-blink');
+                            }
+                        } else {
+                            reelFrame.classList.remove('reel-dimmed');
+                            if (myOrder === step) btn.classList.add('btn-blink');
+                        }
+                    } 
+                    else if (game.navType === 'PERFECT') {
+                        if (myOrder === step) {
+                            chanceArea.innerHTML = `<span class="nav-num">${myOrder}</span>`;
+                            btn.classList.add('btn-blink');
+                            reelFrame.classList.remove('reel-dimmed');
+                        } else {
+                            chanceArea.innerHTML = "";
+                            reelFrame.classList.add('reel-dimmed');
+                        }
+                    } 
+                    else if (game.navType === 'TWO_CHOICE_X2') {
+                        if (step <= 2) {
+                            if (myOrder === step || myOrder === step + 1) {
+                                reelFrame.classList.remove('reel-dimmed');
+                                btn.classList.add('btn-blink');
+                            } else {
+                                reelFrame.classList.add('reel-dimmed');
+                            }
+                        } else {
+                            reelFrame.classList.remove('reel-dimmed');
+                        }
+                    } 
+                    else if (game.navType === 'FIRST_TWO_CHOICE') {
+                        if (step === 1) {
+                            if (myOrder === 1 || myOrder === 2) {
+                                reelFrame.classList.remove('reel-dimmed');
+                                btn.classList.add('btn-blink');
+                            } else {
+                                reelFrame.classList.add('reel-dimmed');
+                            }
+                        } else {
+                            if (myOrder === step) {
+                                chanceArea.innerHTML = `<span class="nav-num">${myOrder}</span>`;
+                                btn.classList.add('btn-blink');
+                                reelFrame.classList.remove('reel-dimmed');
+                            } else {
+                                reelFrame.classList.add('reel-dimmed');
+                            }
+                        }
+                    } 
+                    else if (game.navType === 'SIX_CHOICE') {
+                        if (step === 1) {
+                            reelFrame.classList.remove('reel-dimmed');
+                            btn.classList.add('btn-blink');
+                        } else {
+                            if (myOrder === step) {
+                                chanceArea.innerHTML = `<span class="nav-num">${myOrder}</span>`;
+                                btn.classList.add('btn-blink');
+                                reelFrame.classList.remove('reel-dimmed');
+                            } else {
+                                reelFrame.classList.add('reel-dimmed');
+                            }
+                        }
+                    } 
+                    else {
+                        reelFrame.classList.remove('reel-dimmed');
+                    }
+                } else {
+                    chanceArea.innerHTML = "";
+                    reelFrame.classList.remove('reel-dimmed');
+                }
+            }
+        }
+
+        async function onLever() {
+            if (game.spinning.some(s => s) || game.isFreezing || game.isEndingBonus) return;
+            game.stopCount = 0;
+            game.isCorrected = true;
+            game.isMissed = false; // レバー時にミスフラグをリセット
+            document.getElementById('lever').disabled = true;
+            document.getElementById('top-msg-area').textContent = "";
+            document.getElementById('top-msg-area').className = "absolute -top-12 left-0 w-full h-10 flex items-center justify-center font-black italic";
+            
+            if (game.mode === 'READY' && game.endlessReady) {
+                game.isEndless = true; 
+                game.endlessReady = false; 
+                game.tapCount = 0;
+                game.level = 1;
+                startEndlessSequence(); 
+                return;
+            }
+
+            game.isBarCutin = false;
+            
+            if (game.mode === 'READY') {
+                game.counts.games++;
+                let selected = null;
+                const r = Math.random() * 100;
+                if (r < 0.1) selected = 'FREEZE_B';
+                else if (r < 1.0) selected = 'FREEZE_A';
+                else if (r < 21.0) selected = 'MIX';
+                else if (r < 51.0) selected = 'BAR';
+                else selected = '777';
+                
+                switch(selected) {
+                    case 'FREEZE_B': game.bonusSetType = 'FREEZE'; game.guarantee = 10; game.freezeType = 'B'; break;
+                    case 'FREEZE_A': game.bonusSetType = 'FREEZE'; game.guarantee = 9; game.freezeType = 'A'; break;
+                    case 'MIX': game.bonusSetType = 'MIX'; game.guarantee = Math.floor(Math.random() * 5) + 3; break;
+                    case 'BAR': game.bonusSetType = 'BAR'; game.guarantee = 3; break;
+                    default: game.bonusSetType = '777'; game.guarantee = 1; break;
+                }
+                game.navType = 'NORMAL'; 
+            } else {
+                const barProb = game.isEndless ? (1/13.5) : (1/32);
+                if (Math.random() < barProb) {
+                    game.isBarCutin = true;
+                    document.getElementById('top-msg-area').textContent = "BARが揃えば継続率アップ！？";
+                    document.getElementById('top-msg-area').className = "absolute -top-12 left-0 w-full h-10 flex items-center justify-center font-black italic text-purple-400 animate-pulse";
+                    
+                    const tr = Math.random() * 100;
+                    if (tr < 10) {
+                        game.cutinTaku = 'ANY';
+                        game.correctFirstReel = Math.floor(Math.random() * 3);
+                    } else if (tr < 50) {
+                        game.cutinTaku = '3TAKU';
+                        game.correctFirstReel = Math.floor(Math.random() * 3);
+                    } else {
+                        game.cutinTaku = '2TAKU';
+                        game.correctFirstReel = Math.random() < 0.5 ? 0 : 2; 
+                    }
+                    game.navType = 'SPECIAL'; 
+                } else {
+                    if (game.isEndless && game.guarantee <= 0) {
+                        const nr = Math.random() * 100;
+                        if (nr < 40) game.navType = 'SIX_CHOICE';
+                        else if (nr < 70) game.navType = 'TWO_CHOICE_X2';
+                        else if (nr < 85) game.navType = 'FIRST_TWO_CHOICE';
+                        else game.navType = 'PERFECT'; 
+
+                        if (game.navType !== 'PERFECT') {
+                            document.getElementById('top-msg-area').textContent = "ここでベルが揃えば継続！？";
+                            document.getElementById('top-msg-area').className = "absolute -top-12 left-0 w-full h-10 flex items-center justify-center font-black italic text-red-500 animate-bounce";
+                        }
+                    } else {
+                        game.navType = (game.guarantee > 0) ? 'PERFECT' : 'NORMAL';
+                    }
+                }
+            }
+
+            const orders = [[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]];
+            game.internalOrder = orders[Math.floor(Math.random() * orders.length)];
+
+            if (game.mode === 'READY' && game.freezeType) {
+                handleFreeze();
+            } else {
+                game.spinning = [true, true, true];
+                game.speeds = [NORMAL_SPEED, NORMAL_SPEED, NORMAL_SPEED];
+                for(let i=1; i<=3; i++) document.getElementById(`btn-${i}`).disabled = false;
+                
+                const msgEl = document.getElementById('msg');
+                if (game.isBarCutin) {
+                    msgEl.textContent = "BARを狙え！";
+                    msgEl.className = "mt-6 text-xl font-black h-8 text-center text-white";
+                } else {
+                    msgEl.textContent = game.mode === 'READY' ? "図柄を狙え！" : "ベルを狙え！";
+                    msgEl.className = "mt-6 text-xl font-black h-8 text-center drop-shadow-md text-white";
+                }
+                updateVisuals();
+            }
+        }
+
+        function stopReel(i) {
+            if (game.isFreezing || game.isEndlessStarting) return;
+            if (!game.spinning[i] || game.stopping[i]) return;
+            
+            game.stopCount++;
+            document.getElementById(`btn-${i+1}`).disabled = true;
+
+            let isCorrect = (game.internalOrder[i] === game.stopCount);
+
+            if (game.isBarCutin) {
+                if (game.stopCount === 1) {
+                    if (game.cutinTaku === 'ANY') {
+                        game.isCorrected = true;
+                    } else {
+                        game.isCorrected = (i === game.correctFirstReel);
+                    }
+                    // カットインで択を外した時、以降のナビ表示を行わないようにミスフラグを立てる
+                    if (!game.isCorrected) game.isMissed = true;
+                }
+                isCorrect = true; 
+            } else if (game.navType === 'FIRST_TWO_CHOICE' && game.stopCount === 1) {
+                if (game.internalOrder[i] === 1 || game.internalOrder[i] === 2) isCorrect = true;
+            } else if (game.navType === 'TWO_CHOICE_X2' && game.stopCount <= 2) {
+                if (game.internalOrder[i] === game.stopCount || game.internalOrder[i] === game.stopCount + 1) isCorrect = true;
+            }
+
+            if (!isCorrect) game.isMissed = true;
+
+            const strip = REEL_STRIPS[i];
+            const currentIdx = Math.round(game.pos[i] / SYMBOL_H);
+            let targetIdx = -1;
+
+            if (game.isBarCutin) {
+                if (game.stopCount <= 2) {
+                    for(let j=0; j<strip.length; j++) {
+                        let check = (currentIdx - j + strip.length) % strip.length;
+                        if(strip[check] === 'BAR') { targetIdx = check; break; }
+                    }
+                } else {
+                    if (game.isCorrected) {
+                        for(let j=0; j<strip.length; j++) {
+                            let check = (currentIdx - j + strip.length) % strip.length;
+                            if(strip[check] === 'BAR') { targetIdx = check; break; }
+                        }
+                    } else {
+                        for(let j=0; j<strip.length; j++) {
+                            let check = (currentIdx - j + strip.length) % strip.length;
+                            if(strip[check] !== 'BAR' && strip[(check+1)%strip.length] !== 'BAR' && strip[(check-1+strip.length)%strip.length] !== 'BAR') {
+                                targetIdx = check; break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 通常ベルやボーナス図柄狙い
+                // すでにミスしている場合は、揃わないシンボルを狙う
+                if (isCorrect && !game.isMissed) {
+                    let targetSymbol = (game.mode === 'READY') ? (game.bonusSetType === 'BAR' ? 'BAR' : (game.bonusSetType === 'MIX' && i===1 ? 'BAR' : '7')) : 'BEL';
+                    for(let j=0; j<strip.length; j++) {
+                        let check = (currentIdx - j + strip.length) % strip.length;
+                        if(strip[check] === targetSymbol) { targetIdx = check; break; }
+                    }
+                } else {
+                    for(let j=0; j<strip.length; j++) {
+                        let check = (currentIdx - j + strip.length) % strip.length;
+                        if(strip[check] !== 'BEL' && strip[check] !== '7' && strip[check] !== 'BAR') { targetIdx = check; break; }
+                    }
+                }
+            }
+            
+            if (targetIdx === -1) targetIdx = currentIdx;
+            game.targetPos[i] = (targetIdx - 1 + strip.length) % strip.length * SYMBOL_H;
+            game.stopping[i] = true; 
+        }
+
+        function checkResult() {
+            const lever = document.getElementById('lever');
+            const msgEl = document.getElementById('msg');
+
+            if (game.isBarCutin) {
+                if (game.isCorrected) {
+                    game.guarantee += 5;
+                    if (game.level < 5 && Math.random() < 0.45) game.level++;
+                    msgEl.textContent = "BAR揃い成功！STOCK+5";
+                    msgEl.className = "mt-6 text-xl font-black h-8 text-center text-white animate-bounce";
+                } else {
+                    msgEl.textContent = "不発...";
+                    msgEl.className = "mt-6 text-xl font-black h-8 text-center text-gray-500";
+                }
+                lever.disabled = false;
+            } else if (!game.isMissed) {
+                if (game.mode === 'READY') enterBonus();
+                else {
+                    game.bonusCount++;
+                    if (game.isEndless) {
+                        let p = [0.85, 0.75, 0.70, 0.55, 0.40][game.level-1];
+                        if (game.guarantee > 0) {
+                            if (Math.random() < p) game.guarantee--;
+                            else msgEl.textContent = "ナビ消費なし！";
+                        } else {
+                            let add = [2, 1, 1, 0][['SIX_CHOICE', 'TWO_CHOICE_X2', 'FIRST_TWO_CHOICE', 'PERFECT'].indexOf(game.navType)] + Math.floor(Math.random() * 3);
+                            game.guarantee += add;
+                            msgEl.textContent = `復活！STOCK +${add}`;
+                            msgEl.className = "mt-6 text-xl font-black h-8 text-center text-green-400 animate-pulse";
+                        }
+                    } else {
+                        if (game.guarantee > 0) game.guarantee--;
+                    }
+                    if (!msgEl.textContent.includes('復活')) {
+                        msgEl.textContent = "ベル揃い！継続";
+                        msgEl.className = "mt-6 text-xl font-black h-8 text-center text-yellow-400";
+                    }
+                    updateStats();
+                    if (!game.isEndless && game.bonusCount >= game.maxBonus) endBonus("完走！セット終了");
+                    else lever.disabled = false;
+                }
+            } else {
+                if (game.mode === 'READY') {
+                    msgEl.textContent = "失敗…";
+                    lever.disabled = false;
+                } else {
+                    endBonus(game.isEndless ? "エンドレス終了" : "ボーナス終了");
+                }
+            }
+            updateVisuals();
+            updateStats();
+        }
+
+        async function startEndlessSequence() {
+            game.isEndlessStarting = true;
+            document.getElementById('msg').textContent = "ENDLESS BIG BONUS READY";
+            document.getElementById('msg').className = "mt-6 text-xl font-black h-8 text-center text-purple-500 animate-pulse";
+            game.spinning = [true, true, true]; 
+            game.speeds = [NORMAL_SPEED, NORMAL_SPEED, NORMAL_SPEED];
+            await new Promise(r => setTimeout(r, 1200));
+            snapReel(0, 19); await new Promise(r => setTimeout(r, 600));
+            snapReel(1, 6); await new Promise(r => setTimeout(r, 600));
+            snapReel(2, 8); await new Promise(r => setTimeout(r, 800));
+            game.isEndlessStarting = false;
+            enterBonus();
+            document.getElementById('lever').disabled = false;
+        }
+
+        async function handleFreeze() {
+            game.isFreezing = true; 
+            document.getElementById('msg').textContent = "！？";
+            game.spinning = [true, true, true]; 
+            game.speeds = [NORMAL_SPEED, NORMAL_SPEED, NORMAL_SPEED];
+            for(let i=1; i<=3; i++) document.getElementById(`btn-${i}`).disabled = true;
+            await new Promise(r => setTimeout(r, 2000));
+            game.spinning = [false, false, false]; renderReels();
+            await new Promise(r => setTimeout(r, 1500));
+            game.spinning[0] = true; game.speeds[0] = 3;
+            await new Promise(r => setTimeout(r, 300));
+            game.spinning[2] = true; game.speeds[2] = 3;
+            await new Promise(r => setTimeout(r, 300));
+            game.spinning[1] = true; game.speeds[1] = -3;
+            await new Promise(r => setTimeout(r, 2000));
+            for(let s=0; s<30; s++) { game.speeds[0] *= 1.1; game.speeds[1] *= 1.1; game.speeds[2] *= 1.1; await new Promise(r => setTimeout(r, 100)); }
+            await new Promise(r => setTimeout(r, 1500));
+            await snapReelFreeze(0, 8); await new Promise(r => setTimeout(r, 600));
+            await snapReelFreeze(2, 0); await new Promise(r => setTimeout(r, 800));
+            await snapReelFreeze(1, game.freezeType === 'B' ? 6 : 16);
+            document.getElementById('freeze-fx').style.opacity = "1";
+            setTimeout(() => { 
+                document.getElementById('freeze-fx').style.opacity = "0"; 
+                game.isFreezing = false; enterBonus(); 
+                document.getElementById('lever').disabled = false; 
+            }, 1000);
+        }
+
+        async function snapReelFreeze(idx, target) {
+            const stripLen = REEL_STRIPS[idx].length;
+            game.pos[idx] = (target - 1 + stripLen) % stripLen * SYMBOL_H;
+            game.spinning[idx] = false;
+            renderReels();
+        }
+
+        function snapReel(idx, target) {
+            const stripLen = REEL_STRIPS[idx].length;
+            game.pos[idx] = (target - 1 + stripLen) % stripLen * SYMBOL_H;
+            game.spinning[idx] = false; game.stopping[idx] = false;
+            renderReels();
+        }
+
+        function enterBonus() {
+            game.mode = 'BONUS'; game.bonusCount = 0;
+            const header = document.getElementById('bonus-header');
+            const bg = document.getElementById('header-bg');
+            const label = document.getElementById('bonus-label');
+            const machine = document.getElementById('machine');
+            header.classList.remove('hidden');
+            if (game.isEndless) {
+                game.guarantee = 5;
+                machine.className = "bg-zinc-800 p-8 rounded-[40px] border-[10px] border-zinc-700 shadow-2xl relative endless-active-machine";
+                bg.className = "bg-gradient-to-r from-purple-900 to-indigo-900 border-2 border-purple-500 p-2 rounded-lg text-center";
+                label.className = "text-sm font-black italic mr-4 text-purple-200 uppercase";
+                label.textContent = "Endless Active";
+            } else {
+                machine.className = "bg-zinc-800 p-8 rounded-[40px] border-[10px] border-zinc-700 shadow-2xl relative bonus-active-machine";
+                bg.className = "bg-gradient-to-r from-red-900 to-yellow-900 border-2 border-yellow-500 p-2 rounded-lg text-center";
+                label.className = "text-sm font-black italic mr-4 text-yellow-200 uppercase";
+                label.textContent = "Bonus Active";
+                if (game.bonusSetType === 'FREEZE') game.counts.fbig++;
+                else if (game.bonusSetType === 'BAR') game.counts.bar++;
+                else if (game.bonusSetType === 'MIX') game.counts.sbig++;
+                else game.counts.big++;
+            }
+            updateStats(); 
+            document.getElementById('lever').disabled = false;
+            updateVisuals();
+        }
+
+        function endBonus(m) {
+            game.mode = 'READY'; game.isEndingBonus = true; game.isEndless = false;
+            game.level = 1;
+            document.getElementById('msg').textContent = m;
+            document.getElementById('msg').className = "mt-6 text-xl font-black h-8 text-center text-white";
+            setTimeout(() => {
+                document.getElementById('machine').className = "bg-zinc-800 p-8 rounded-[40px] border-[10px] border-zinc-700 shadow-2xl relative";
+                document.getElementById('bonus-header').classList.add('hidden');
+                game.isEndingBonus = false; document.getElementById('lever').disabled = false; 
+                updateVisuals();
+            }, 2000);
+        }
+
+        function updateStats() {
+            document.getElementById('cnt-big').textContent = game.counts.big;
+            document.getElementById('cnt-bar').textContent = game.counts.bar;
+            document.getElementById('cnt-sbig').textContent = game.counts.sbig;
+            document.getElementById('cnt-fbig').textContent = game.counts.fbig;
+            document.getElementById('cnt-games').textContent = game.counts.games;
+            document.getElementById('bonus-progress').textContent = game.isEndless ? `COUNT: ${game.bonusCount}` : `${game.bonusCount}/${game.maxBonus}`;
+        }
+
+        window.handleCounterTap = function(key) {
+            if (game.mode !== 'READY' || game.spinning.some(s=>s)) return;
+            if (game.lastTapKey === key) game.tapCount++;
+            else { game.lastTapKey = key; game.tapCount = 1; }
+            if (game.tapCount >= 4) {
+                game.endlessReady = true;
+                const msgEl = document.getElementById('msg');
+                msgEl.textContent = "ENDLESS MODE READY!"; 
+                msgEl.className = "mt-6 text-xl font-black h-8 text-center text-purple-400 animate-pulse";
+                game.tapCount = 0; 
+            }
+        };
+
+        document.getElementById('lever').onclick = onLever;
+        for(let i=0; i<3; i++) document.getElementById(`btn-${i+1}`).onclick = () => stopReel(i);
+
+        initReels(); animate(); document.getElementById('lever').disabled = false;
+    </script>
+</body>
+</html>

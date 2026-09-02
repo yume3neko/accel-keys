@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイミング・プレシジョン・チャレンジ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            touch-action: manipulation;
+        }
+        .digital-font {
+            font-family: 'Orbitron', monospace;
+            /* 数字の幅を完全に均一（等幅）にし、ガタつきを防止 */
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 relative">
+
+    <!-- ヘッダー -->
+    <header class="w-full max-w-md text-center py-4">
+        <h1 class="text-xl md:text-2xl font-black tracking-wider text-cyan-400 drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">PRECISION STOPWATCH</h1>
+        <p class="text-xs text-slate-400 mt-1">ピッタリ止めろ！誤差がそのままペナルティに</p>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="w-full max-w-md flex-1 flex flex-col items-center justify-center space-y-6">
+
+        <!-- モード選択画面 -->
+        <div id="menu-screen" class="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md space-y-3 relative">
+            <h2 class="text-lg font-bold text-center text-slate-200 mb-2">難易度を選択してください</h2>
+            
+            <button onclick="startGame('EASY')" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl transition shadow-lg shadow-emerald-900/30 flex justify-between items-center cursor-pointer">
+                <span>EASY</span>
+                <span class="text-sm bg-emerald-700 px-3 py-1 rounded-lg">持ち点: 7,000</span>
+            </button>
+            
+            <button onclick="startGame('NORMAL')" class="w-full py-3 px-4 bg-sky-600 hover:bg-sky-500 font-bold rounded-xl transition shadow-lg shadow-sky-900/30 flex justify-between items-center cursor-pointer">
+                <span>NORMAL</span>
+                <span class="text-sm bg-sky-700 px-3 py-1 rounded-lg">持ち点: 4,000</span>
+            </button>
+            
+            <!-- HARDボタン（長押し検知イベント付与） -->
+            <button id="btn-hard-mode" onclick="startGame('HARD')" class="w-full py-3 px-4 bg-amber-600 hover:bg-amber-500 font-bold rounded-xl transition shadow-lg shadow-amber-900/30 flex justify-between items-center cursor-pointer select-none">
+                <span>HARD</span>
+                <span class="text-sm bg-amber-700 px-3 py-1 rounded-lg">持ち点: 2,000</span>
+            </button>
+            
+            <!-- 高難度枠コンテナ -->
+            <div id="advanced-modes-container" class="space-y-3 hidden pt-1 border-t border-slate-800">
+                <!-- 裏・HARDボタン -->
+                <button id="btn-ultra-hard" onclick="handleLockedClick('ULTRA_HARD')" class="w-full py-3 px-4 font-bold rounded-xl transition flex justify-between items-center shadow-lg">
+                    <span class="flex items-center space-x-2">
+                        <span id="icon-ultra-lock">🔒</span>
+                        <span id="text-ultra-title">裏・HARD</span>
+                    </span>
+                    <span id="badge-ultra" class="text-sm px-3 py-1 rounded-lg">持ち点: 1,000</span>
+                </button>
+
+                <!-- 真・HARDボタン -->
+                <button id="btn-true-hard" onclick="handleLockedClick('TRUE_HARD')" class="w-full py-3 px-4 font-bold rounded-xl transition flex justify-between items-center shadow-lg">
+                    <span class="flex items-center space-x-2">
+                        <span id="icon-true-lock">🔒</span>
+                        <span id="text-true-title">真・HARD</span>
+                    </span>
+                    <span id="badge-true" class="text-sm px-3 py-1 rounded-lg">持ち点: 500</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="game-screen" class="w-full hidden flex-col items-center space-y-6">
+            
+            <!-- ステータス表示 -->
+            <div class="w-full grid grid-cols-2 gap-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                    <div class="text-xs text-slate-400">残りスコア / セット</div>
+                    <div class="flex justify-center items-baseline space-x-1">
+                        <div id="display-score" class="digital-font text-2xl font-black text-cyan-400">7000</div>
+                        <span class="text-xs text-slate-400">(<span id="display-round" class="text-white font-bold">1</span>R)</span>
+                    </div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                    <div class="text-xs text-slate-400">目標タイム</div>
+                    <div id="display-target" class="digital-font text-2xl font-black text-amber-400">00.000</div>
+                </div>
+            </div>
+
+            <!-- 詳細条件・ヒント -->
+            <div class="w-full bg-slate-900/50 border border-slate-800/80 rounded-xl p-3 text-xs flex justify-around text-slate-300">
+                <div>方向: <span id="display-direction" class="font-bold text-white">カウントアップ</span></div>
+                <div>速度: <span id="display-speed" class="font-bold text-white">x1.0</span></div>
+            </div>
+
+            <!-- ストップウォッチ本体 -->
+            <div class="w-full bg-slate-900 border-2 border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent pointer-events-none"></div>
+                <div class="text-xs text-slate-500 tracking-widest uppercase mb-1">STOPWATCH</div>
+                <div class="w-full text-center overflow-hidden my-2">
+                    <div id="display-timer" class="digital-font text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-wider inline-block">00.000</div>
+                </div>
+                <div id="feedback-msg" class="text-xs h-6 font-bold text-cyan-400 mt-2">準備中...</div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="w-full flex space-x-3">
+                <button id="action-btn" onclick="handleAction()" disabled class="flex-1 py-4 bg-slate-700 text-slate-400 font-black text-lg rounded-2xl shadow-lg transition opacity-50 cursor-not-allowed">
+                    まもなくスタート...
+                </button>
+                <button onclick="returnToMenu()" class="px-4 py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-2xl transition cursor-pointer">
+                    放棄
+                </button>
+            </div>
+        </div>
+
+        <!-- ラウンド結果画面（クリア時） -->
+        <div id="result-screen" class="w-full hidden flex-col items-center space-y-6 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl text-center">
+            <h2 id="result-title" class="text-2xl font-black text-cyan-400">結果発表</h2>
+            <div id="result-desc" class="text-sm text-slate-300 space-y-2">
+                <!-- 動的挿入 -->
+            </div>
+            <div class="w-full pt-4">
+                <button onclick="nextRound()" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl transition shadow-lg shadow-cyan-500/20 cursor-pointer">
+                    次のラウンドへ
+                </button>
+            </div>
+        </div>
+
+        <!-- ゲームオーバー画面 -->
+        <div id="gameover-screen" class="w-full hidden flex-col items-center space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <h2 class="text-2xl font-black text-rose-500 text-center">GAME OVER</h2>
+            <div id="gameover-unlock-notice" class="w-full hidden bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs p-2.5 rounded-xl text-center font-bold animate-pulse">
+                <!-- 動的通知 -->
+            </div>
+            <p class="text-xs text-slate-400 text-center">スコアが0以下になりました。全セットの戦績です：</p>
+            
+            <div id="history-container" class="w-full max-h-52 overflow-y-auto space-y-2 pr-1 text-xs">
+                <!-- 動的挿入 -->
+            </div>
+
+            <div class="w-full pt-2">
+                <button onclick="returnToMenu()" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl transition shadow-lg shadow-cyan-500/20 cursor-pointer">
+                    メニューに戻る
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 吹き出しポップアップ -->
+    <div id="unlock-tooltip" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-amber-500/50 text-amber-200 px-4 py-3 rounded-xl shadow-2xl text-xs font-bold transition-all duration-300 opacity-0 pointer-events-none z-50 text-center max-w-xs">
+        <!-- 動的テキスト -->
+    </div>
+
+    <!-- フッター -->
+    <footer class="text-center text-xs text-slate-600 py-2">
+        Precision Stopwatch Challenge
+    </footer>
+
+    <script>
+        let currentMode = '';
+        let score = 0;
+        let startPoint = 0;
+        let targetPoint = 0;
+        let currentTimer = 0;
+        let speed = 1.0;
+        let isCountUp = true;
+        let roundCount = 0;
+        let roundHistory = [];
+        
+        let gameState = 'MENU';
+        let animationId = null;
+        let lastTimestamp = 0;
+        let countdownTimerId = null;
+        let tooltipTimeout = null;
+
+        let clearedHardOnce = localStorage.getItem('cleared_hard_once') === 'true';
+        let unlockedUltraHard = localStorage.getItem('unlocked_ultra_hard') === 'true';
+        let unlockedTrueHard = localStorage.getItem('unlocked_true_hard') === 'true';
+
+        let longPressTimer = null;
+        let pressStartTime = 0;
+
+        function updateMenuButtons() {
+            const container = document.getElementById('advanced-modes-container');
+            const btnUltra = document.getElementById('btn-ultra-hard');
+            const btnTrue = document.getElementById('btn-true-hard');
+            const iconUltra = document.getElementById('icon-ultra-lock');
+            const iconTrue = document.getElementById('icon-true-lock');
+            const textUltra = document.getElementById('text-ultra-title');
+            const textTrue = document.getElementById('text-true-title');
+            const badgeUltra = document.getElementById('badge-ultra');
+            const badgeTrue = document.getElementById('badge-true');
+
+            if (!clearedHardOnce) {
+                container.classList.add('hidden');
+                return;
+            } else {
+                container.classList.remove('hidden');
+            }
+
+            if (unlockedUltraHard) {
+                btnUltra.className = "w-full py-3 px-4 bg-rose-600 hover:bg-rose-500 font-bold rounded-xl transition shadow-lg shadow-rose-900/30 flex justify-between items-center cursor-pointer";
+                iconUltra.textContent = "🔥";
+                textUltra.textContent = "裏・HARD";
+                badgeUltra.textContent = "持ち点: 1,000";
+                badgeUltra.className = "text-sm bg-rose-700 px-3 py-1 rounded-lg text-white";
+            } else {
+                btnUltra.className = "w-full py-3 px-4 bg-slate-800/50 border border-slate-700/50 font-bold rounded-xl transition flex justify-between items-center text-slate-500 cursor-not-allowed";
+                iconUltra.textContent = "🔒";
+                textUltra.textContent = "??? (未解放)";
+                badgeUltra.textContent = "???";
+                badgeUltra.className = "text-sm bg-slate-800 px-3 py-1 rounded-lg text-slate-500";
+            }
+
+            if (unlockedTrueHard) {
+                btnTrue.className = "w-full py-3 px-4 bg-purple-600 hover:bg-purple-500 font-bold rounded-xl transition shadow-lg shadow-purple-900/30 flex justify-between items-center cursor-pointer";
+                iconTrue.textContent = "👑";
+                textTrue.textContent = "真・HARD";
+                badgeTrue.textContent = "持ち点: 500";
+                badgeTrue.className = "text-sm bg-purple-700 px-3 py-1 rounded-lg text-white";
+            } else {
+                btnTrue.className = "w-full py-3 px-4 bg-slate-800/50 border border-slate-700/50 font-bold rounded-xl transition flex justify-between items-center text-slate-500 cursor-not-allowed";
+                iconTrue.textContent = "🔒";
+                textTrue.textContent = "??? (未解放)";
+                badgeTrue.textContent = "???";
+                badgeTrue.className = "text-sm bg-slate-800 px-3 py-1 rounded-lg text-slate-500";
+            }
+        }
+
+        updateMenuButtons();
+
+        const hardBtnEl = document.getElementById('btn-hard-mode');
+
+        function startLongPress(e) {
+            if (e.type === 'mousedown' && e.button !== 0) return;
+            
+            pressStartTime = Date.now();
+            hardBtnEl.classList.add('bg-amber-500', 'scale-[0.98]');
+
+            if (longPressTimer) clearTimeout(longPressTimer);
+
+            longPressTimer = setTimeout(() => {
+                clearedHardOnce = true;
+                unlockedUltraHard = true;
+                unlockedTrueHard = true;
+
+                localStorage.setItem('cleared_hard_once', 'true');
+                localStorage.setItem('unlocked_ultra_hard', 'true');
+                localStorage.setItem('unlocked_true_hard', 'true');
+
+                updateMenuButtons();
+                hardBtnEl.classList.remove('bg-amber-500', 'scale-[0.98]');
+                showTooltip("⚡ すべての高難度モードが強制解放されました！");
+            }, 10000);
+        }
+
+        function cancelLongPress() {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            hardBtnEl.classList.remove('bg-amber-500', 'scale-[0.98]');
+        }
+
+        hardBtnEl.addEventListener('mousedown', startLongPress);
+        hardBtnEl.addEventListener('mouseup', cancelLongPress);
+        hardBtnEl.addEventListener('mouseleave', cancelLongPress);
+        hardBtnEl.addEventListener('touchstart', startLongPress, { passive: true });
+        hardBtnEl.addEventListener('touchend', cancelLongPress);
+        hardBtnEl.addEventListener('touchcancel', cancelLongPress);
+
+        function handleLockedClick(mode) {
+            if (!clearedHardOnce) {
+                showTooltip("🔒 HARDモードでゲームオーバーになると高難度が現れます");
+                return;
+            }
+
+            if (mode === 'ULTRA_HARD' && !unlockedUltraHard) {
+                showTooltip("🔒 HARDモードで15セット継続で解放されます");
+            } else if (mode === 'TRUE_HARD' && !unlockedTrueHard) {
+                if (!unlockedUltraHard) {
+                    showTooltip("🔒 ひとつ前の難易度（裏・HARD）を解放してください");
+                } else {
+                    showTooltip("🔒 裏・HARDモードで10セット継続で解放されます");
+                }
+            } else {
+                startGame(mode);
+            }
+        }
+
+        function showTooltip(message) {
+            const tooltip = document.getElementById('unlock-tooltip');
+            tooltip.textContent = message;
+            tooltip.classList.remove('opacity-0', 'pointer-events-none');
+            tooltip.classList.add('opacity-100');
+
+            if (tooltipTimeout) clearTimeout(tooltipTimeout);
+
+            tooltipTimeout = setTimeout(() => {
+                tooltip.classList.remove('opacity-100');
+                tooltip.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        function startGame(mode) {
+            currentMode = mode;
+            roundCount = 0;
+            roundHistory = [];
+            
+            if (mode === 'EASY') score = 7000;
+            else if (mode === 'NORMAL') score = 4000;
+            else if (mode === 'HARD') score = 2000;
+            else if (mode === 'ULTRA_HARD') score = 1000;
+            else if (mode === 'TRUE_HARD') score = 500;
+
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+
+            setupNewRound();
+        }
+
+        function setupNewRound() {
+            roundCount++;
+            isCountUp = Math.random() >= 0.5;
+
+            if (isCountUp) {
+                startPoint = Math.floor(Math.random() * 5000) / 1000;
+                const minTarget = startPoint + 2.0;
+                targetPoint = Math.floor(Math.random() * (15000 - minTarget * 1000) + minTarget * 1000) / 1000;
+            } else {
+                startPoint = Math.floor(Math.random() * 7000 + 8000) / 1000;
+                const maxTarget = startPoint - 2.0;
+                targetPoint = Math.floor(Math.random() * ((maxTarget - 0.5) * 1000) + 500) / 1000;
+            }
+
+            if (currentMode === 'TRUE_HARD') {
+                speed = Math.floor((Math.random() * 13 + 13)) / 10;
+            } else {
+                speed = Math.floor((Math.random() * 12 + 9)) / 10;
+            }
+
+            currentTimer = startPoint;
+
+            updateUI();
+            document.getElementById('display-score').textContent = score;
+            document.getElementById('display-round').textContent = roundCount;
+            document.getElementById('display-target').textContent = targetPoint.toFixed(3);
+            document.getElementById('display-direction').textContent = isCountUp ? 'カウントアップ' : 'カウントダウン';
+            document.getElementById('display-speed').textContent = `x${speed.toFixed(1)}`;
+
+            startCountdown();
+        }
+
+        function startCountdown() {
+            gameState = 'COUNTDOWN';
+            let count = 3;
+
+            const btn = document.getElementById('action-btn');
+            btn.disabled = true;
+            btn.className = 'flex-1 py-4 bg-slate-700 text-slate-400 font-black text-lg rounded-2xl shadow-lg transition opacity-50 cursor-not-allowed';
+            btn.textContent = `まもなくスタート (${count})`;
+            document.getElementById('feedback-msg').textContent = `まもなく自動スタートします...`;
+
+            if (countdownTimerId) clearInterval(countdownTimerId);
+
+            countdownTimerId = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    btn.textContent = `まもなくスタート (${count})`;
+                } else {
+                    clearInterval(countdownTimerId);
+                    beginRunning();
+                }
+            }, 1000);
+        }
+
+        function beginRunning() {
+            gameState = 'RUNNING';
+            
+            const btn = document.getElementById('action-btn');
+            btn.disabled = false;
+            btn.textContent = 'ストップ！';
+            btn.className = 'flex-1 py-4 bg-rose-600 hover:bg-rose-500 text-white font-black text-lg rounded-2xl shadow-lg shadow-rose-600/25 transition active:scale-95 cursor-pointer';
+            document.getElementById('feedback-msg').textContent = 'タイミングを見極めて止めろ！';
+
+            lastTimestamp = performance.now();
+            animationId = requestAnimationFrame(updateLoop);
+        }
+
+        function handleAction() {
+            if (gameState === 'RUNNING') {
+                cancelAnimationFrame(animationId);
+                gameState = 'FINISHED';
+                evaluateResult();
+            }
+        }
+
+        function updateLoop(timestamp) {
+            const deltaTime = (timestamp - lastTimestamp) / 1000;
+            lastTimestamp = timestamp;
+
+            const change = deltaTime * speed;
+            if (isCountUp) {
+                currentTimer += change;
+            } else {
+                currentTimer -= change;
+                if (currentTimer < 0) currentTimer = 0;
+            }
+
+            updateUI();
+            animationId = requestAnimationFrame(updateLoop);
+        }
+
+        function updateUI() {
+            document.getElementById('display-timer').textContent = currentTimer.toFixed(3);
+        }
+
+        function evaluateResult() {
+            const diff = Math.abs(currentTimer - targetPoint);
+            const penalty = Math.round(diff * 1000);
+
+            let scoreChangeText = '';
+            let isHeal = false;
+
+            if (currentMode === 'ULTRA_HARD' && diff <= 0.01) {
+                score += 100;
+                scoreChangeText = '+100pt';
+                isHeal = true;
+            } else if (currentMode === 'TRUE_HARD' && diff <= 0.01) {
+                score += 200;
+                scoreChangeText = '+200pt';
+                isHeal = true;
+            } else {
+                score -= penalty;
+                scoreChangeText = `-${penalty}pt`;
+            }
+
+            roundHistory.push({
+                round: roundCount,
+                target: targetPoint,
+                result: currentTimer,
+                diff: diff,
+                scoreChange: scoreChangeText,
+                isHeal: isHeal
+            });
+
+            document.getElementById('display-score').textContent = score;
+
+            if (score <= 0) {
+                triggerGameOver();
+            } else {
+                showRoundResult(isHeal, diff, scoreChangeText);
+            }
+        }
+
+        function showRoundResult(isHeal, diff, scoreChangeText) {
+            const screen = document.getElementById('result-screen');
+            let roundMsg = '';
+            
+            if (isHeal) {
+                const healAmount = currentMode === 'TRUE_HARD' ? '200pt' : '100pt';
+                roundMsg = `<p class="text-emerald-400 font-bold">✨ 誤差0.01以内達成！ ${healAmount}回復！ ✨</p>`;
+            } else {
+                roundMsg = `<p class="text-slate-300">ペナルティ: <span class="text-rose-400 font-bold">${scoreChangeText}</span> (誤差: ${diff.toFixed(3)}秒)</p>`;
+            }
+            
+            document.getElementById('result-desc').innerHTML = `
+                <p>セット: <span class="font-bold text-cyan-400">${roundCount}R</span> 完了</p>
+                <p>停止タイム: <span class="font-bold text-white">${currentTimer.toFixed(3)}秒</span></p>
+                <p>目標タイム: <span class="font-bold text-amber-400">${targetPoint.toFixed(3)}秒</span></p>
+                ${roundMsg}
+                <p class="text-xs text-slate-400 mt-2">残りスコア: ${score}点</p>
+            `;
+
+            document.getElementById('game-screen').classList.add('hidden');
+            screen.classList.remove('hidden');
+        }
+
+        function nextRound() {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            setupNewRound();
+        }
+
+        function triggerGameOver() {
+            const noticeEl = document.getElementById('gameover-unlock-notice');
+            let unlockMessage = "";
+
+            if (currentMode === 'HARD') {
+                const wasNotClearedBefore = !clearedHardOnce;
+                if (wasNotClearedBefore) {
+                    clearedHardOnce = true;
+                    localStorage.setItem('cleared_hard_once', 'true');
+                    unlockMessage += "✨ 高難度モードの枠が新たに出現しました！\n";
+                }
+
+                if (roundCount >= 15 && !unlockedUltraHard) {
+                    unlockedUltraHard = true;
+                    localStorage.setItem('unlocked_ultra_hard', 'true');
+                    unlockMessage += "🎉 裏・HARD モードが解放されました！\n";
+                }
+            }
+
+            if (currentMode === 'ULTRA_HARD') {
+                if (roundCount >= 10 && !unlockedTrueHard) {
+                    unlockedTrueHard = true;
+                    localStorage.setItem('unlocked_true_hard', 'true');
+                    unlockMessage += "👑 最高難度「真・HARD」が解放されました！\n";
+                }
+            }
+
+            if (unlockMessage !== "") {
+                noticeEl.textContent = unlockMessage.trim();
+                noticeEl.classList.remove('hidden');
+            } else {
+                noticeEl.classList.add('hidden');
+            }
+
+            const historyContainer = document.getElementById('history-container');
+            historyContainer.innerHTML = '';
+
+            roundHistory.forEach((h) => {
+                const item = document.createElement('div');
+                item.className = 'bg-slate-800/80 border border-slate-700/60 rounded-xl p-2.5 space-y-1';
+                
+                const changeColor = h.isHeal ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
+
+                item.innerHTML = `
+                    <div class="flex justify-between font-bold text-slate-300 border-b border-slate-700 pb-1">
+                        <span>セット ${h.round}</span>
+                        <span class="${changeColor}">${h.scoreChange}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1 text-[11px] text-slate-400 pt-0.5">
+                        <div>目標: <span class="text-white">${h.target.toFixed(3)}</span></div>
+                        <div>結果: <span class="text-white">${h.result.toFixed(3)}</span></div>
+                        <div>誤差: <span class="text-amber-300">${h.diff.toFixed(3)}s</span></div>
+                    </div>
+                `;
+                historyContainer.appendChild(item);
+            });
+
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.remove('hidden');
+        }
+
+        function returnToMenu() {
+            if (animationId) cancelAnimationFrame(animationId);
+            if (countdownTimerId) clearInterval(countdownTimerId);
+            
+            updateMenuButtons();
+
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>連打シャトルラン - TITLES UPDATE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+        .font-digital { font-family: 'Orbitron', sans-serif; }
+        .tap-active { transform: scale(0.92); transition: transform 0.05s; }
+        .progress-bar { transition: width 0.1s linear; }
+        
+        @keyframes pulse-red {
+            0%, 100% { background-color: rgba(239, 68, 68, 1); }
+            50% { background-color: rgba(239, 68, 68, 0.4); }
+        }
+        .animate-danger { animation: pulse-red 0.4s infinite; }
+
+        /* --- グリッチ＆ノイズレイヤー --- */
+        #game-container { transition: filter 0.3s ease; position: relative; }
+        
+        .v-lines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.05) 40px, rgba(255,255,255,0.05) 42px);
+            pointer-events: none; z-index: 50; display: none;
+        }
+        
+        .block-noise {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 60; display: none;
+            background-image: 
+                linear-gradient(90deg, rgba(0,255,255,0.1) 10%, transparent 10%),
+                linear-gradient(rgba(255,0,255,0.1) 10%, transparent 10%);
+            background-size: 50px 50px;
+            animation: block-move 0.2s infinite steps(2);
+        }
+
+        @keyframes block-move {
+            0% { background-position: 0 0; transform: translate(2px, -2px); }
+            100% { background-position: 25px 10px; transform: translate(-2px, 2px); }
+        }
+
+        .glitch-level-1 { filter: brightness(1.1); animation: shake 0.5s infinite; }
+        .glitch-level-2 { filter: brightness(1.2) contrast(1.1); animation: shake 0.3s infinite; }
+        .glitch-level-3 { filter: contrast(1.2) hue-rotate(10deg); animation: shake 0.2s infinite; }
+        .glitch-level-3 .v-lines { display: block; }
+        .glitch-level-4 { filter: contrast(1.3) hue-rotate(20deg); animation: shake 0.1s infinite; }
+        .glitch-level-4 .v-lines { display: block; }
+        .glitch-level-4 .block-noise { display: block; }
+        .glitch-level-max { filter: contrast(1.5) hue-rotate(40deg); animation: shake 0.05s infinite; }
+        .glitch-level-max .v-lines { display: block; opacity: 1.5; }
+        .glitch-level-max .block-noise { display: block; opacity: 1.5; }
+
+        @keyframes shake {
+            0% { transform: translate(0,0); }
+            25% { transform: translate(1px, -1px); }
+            50% { transform: translate(-1px, 1px); }
+            75% { transform: translate(1px, 1px); }
+            100% { transform: translate(0,0); }
+        }
+
+        .scanline {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 3px 100%; pointer-events: none; z-index: 100; opacity: 0; transition: opacity 1s;
+        }
+        .scanline-active { opacity: 1; }
+
+        .difficulty-btn { transition: all 0.2s; position: relative; overflow: hidden; }
+        .ura-active { border-color: #ef4444 !important; background-color: rgba(127, 29, 29, 0.4) !important; }
+        
+        .glitch-text {
+            text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff;
+            animation: text-glitch 0.5s infinite linear alternate-reverse;
+        }
+        @keyframes text-glitch {
+            0% { text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff; transform: scale(1); }
+            50% { text-shadow: -3px 0 #ff00ff, 3px 0 #00ffff; transform: skewX(5deg); }
+            100% { text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff; transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-white min-h-screen flex flex-col items-center justify-center p-4 select-none touch-none overflow-hidden font-sans">
+
+    <div id="scanline" class="scanline"></div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="text-center max-w-sm w-full">
+        <h1 class="text-4xl font-black mb-1 tracking-tighter text-blue-500 italic">SHUTTLE RUN</h1>
+        
+        <!-- Record Display -->
+        <div class="mb-6 flex flex-col items-center">
+            <div class="bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-2xl inline-block min-w-[200px]">
+                <p class="text-[9px] text-blue-400 font-bold uppercase tracking-[0.2em] mb-1">Personal Best</p>
+                <div class="flex items-baseline gap-2 justify-center border-b border-blue-500/10 pb-1">
+                    <span id="best-laps" class="text-2xl font-digital text-white">0</span>
+                    <span class="text-[10px] text-gray-500 font-bold uppercase">Laps</span>
+                </div>
+                <p id="best-rank" class="text-[10px] font-black italic tracking-tighter text-gray-400 mt-2 uppercase py-0.5">No Data</p>
+            </div>
+        </div>
+        
+        <div class="bg-gray-900 p-5 rounded-2xl border border-gray-800 mb-4 text-left shadow-2xl">
+            <h2 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 border-b border-gray-800 pb-2">1. Start Level</h2>
+            <div class="flex items-center justify-between bg-gray-800 p-2 rounded-xl">
+                <button onclick="adjustLevel(-1)" class="w-12 h-12 flex items-center justify-center text-2xl font-bold bg-gray-700 rounded-lg active:bg-gray-600">-</button>
+                <div class="text-center w-32">
+                    <p id="start-level-display" class="text-3xl font-digital text-white">1</p>
+                    <p id="start-level-tag" class="text-[9px] text-blue-400 font-bold uppercase mt-1">Normal Mode</p>
+                </div>
+                <button onclick="adjustLevel(1)" class="w-12 h-12 flex items-center justify-center text-2xl font-bold bg-gray-700 rounded-lg active:bg-gray-600">+</button>
+            </div>
+            <p id="record-warning" class="text-[8px] text-blue-500/80 mt-2 italic text-center font-bold">Records will be saved</p>
+        </div>
+
+        <div class="bg-gray-900 p-5 rounded-2xl border border-gray-800 mb-6 text-left shadow-2xl">
+            <h2 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 border-b border-gray-800 pb-2 flex justify-between">
+                <span>2. Difficulty</span>
+            </h2>
+            <div id="difficulty-list" class="grid grid-cols-1 gap-2"></div>
+        </div>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container" class="hidden w-full max-w-md">
+        <div class="v-lines"></div>
+        <div class="block-noise"></div>
+
+        <div id="game-screen">
+            <div class="flex justify-between items-center mb-6 px-2">
+                <div>
+                    <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">LVL</p>
+                    <p id="current-level" class="text-3xl font-digital text-blue-500">1</p>
+                </div>
+                <div class="text-center">
+                    <div class="flex flex-col items-center">
+                        <p id="difficulty-badge" class="text-[10px] font-bold uppercase tracking-widest px-2 rounded bg-gray-800 mb-1">NORMAL</p>
+                        <p id="ura-badge" class="text-[9px] font-black text-red-500 tracking-tighter hidden">URA MODE (SINGLE TAP)</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <p id="current-laps-display" class="text-4xl font-digital leading-tight">0/7</p>
+                        <p id="laps-subtext" class="text-[9px] text-gray-500 font-bold tracking-widest uppercase">LAPS / NEXT LEVEL</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] text-red-500/50 font-bold uppercase tracking-widest">FAULT</p>
+                    <p id="miss-count" class="text-3xl font-digital text-red-500">0/2</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-900 rounded-3xl p-6 mb-8 border border-gray-800 shadow-inner relative overflow-hidden text-center">
+                <div id="timer-bar" class="absolute top-0 left-0 h-1 bg-blue-500 progress-bar"></div>
+                <p id="timer-display" class="text-7xl font-digital text-white tabular-nums tracking-tighter">9.00</p>
+            </div>
+
+            <div id="tap-zone" class="relative aspect-square w-full max-w-[320px] mx-auto bg-gray-900 rounded-[3rem] border-4 border-gray-800 flex flex-col items-center justify-center cursor-pointer transition-colors shadow-2xl">
+                <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="6" fill="transparent" class="text-gray-800"></circle>
+                    <circle id="progress-circle" cx="50" cy="50" r="40" stroke="currentColor" stroke-width="8" fill="transparent" stroke-dasharray="251.32" stroke-dashoffset="251.32" stroke-linecap="round" class="text-blue-500 transition-all duration-75"></circle>
+                </svg>
+                <div class="z-10 text-center">
+                    <p id="tap-label" class="text-[10px] text-gray-500 font-bold mb-1 tracking-widest uppercase italic">Target</p>
+                    <p id="tap-count" class="text-7xl font-black">--</p>
+                    <p id="tap-sub" class="text-xs text-blue-400 font-bold mt-2 animate-pulse tracking-widest">TAP!</p>
+                </div>
+                <div id="message-overlay" class="absolute inset-0 z-20 flex items-center justify-center bg-gray-950/90 rounded-[3rem] hidden text-center px-4">
+                    <p id="overlay-text" class="text-4xl font-black italic tracking-tighter text-white transform -skew-x-12"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Screen -->
+    <div id="result-screen" class="hidden text-center w-full max-w-xs">
+        <h2 class="text-5xl font-black mb-8 italic tracking-tighter">GAME OVER</h2>
+        <div class="bg-gray-900 rounded-3xl p-8 mb-8 border border-gray-800">
+            <p id="result-diff" class="text-[10px] font-bold uppercase tracking-widest mb-1">NORMAL</p>
+            <p id="final-laps" class="text-8xl font-digital text-white mb-2">0</p>
+            <div class="mt-4 pt-4 border-t border-gray-800">
+                <p id="final-rank" class="text-xl font-black italic tracking-tighter"></p>
+                <p id="new-record-msg" class="text-[10px] text-blue-400 font-bold uppercase mt-2 hidden animate-bounce">New Record!</p>
+            </div>
+        </div>
+        <button id="restart-btn" class="w-full bg-gray-800 hover:bg-gray-700 py-4 rounded-2xl font-bold tracking-widest">RETRY</button>
+    </div>
+
+    <script>
+        const officialSpeedData = [
+            [1, 7, 9.00], [2, 8, 8.47], [3, 8, 8.00], [4, 9, 7.58],
+            [5, 9, 7.20], [6, 10, 6.86], [7, 10, 6.55], [8, 11, 6.26],
+            [9, 11, 6.00], [10, 11, 5.76], [11, 12, 5.54], [12, 12, 5.33],
+            [13, 13, 5.14], [14, 13, 4.97], [15, 13, 4.80], [16, 14, 4.65],
+            [17, 14, 4.50], [18, 15, 4.36], [19, 15, 4.24], [20, 16, 4.11],
+            [21, 16, 4.00], [22, 17, 3.89]
+        ];
+
+        const difficultySettings = [
+            { id: 'easy', label: 'EASY', taps: 30, color: 'text-green-400', ura: false },
+            { id: 'normal', label: 'NORMAL', taps: 50, color: 'text-blue-400', ura: false },
+            { id: 'hard', label: 'HARD', taps: 70, color: 'text-orange-400', ura: false },
+            { id: 'extreme', label: 'EXTREME', taps: 100, color: 'text-red-500', ura: false }
+        ];
+
+        let startLevel = 1;
+        let activeDiff = null;
+        let currentLaps = 0;
+        let lastSuccessLap = 0;
+        let currentLevel = 1;
+        let tapsLeft = 0;
+        let missStreak = 0;
+        let isGameOver = false;
+        let timer = 0;
+        let maxTime = 0;
+        let timerId = null;
+        let isWaitingNext = false;
+        let isIntroLap = false;
+        let isInCountdown = false;
+        
+        let endlessStartTime = 0;
+        let endlessLevelTime = 3.5;
+        let isLevelUpPending = false;
+        const ENDLESS_LEVEL_DURATION = 60000;
+        const ENDLESS_START_LAP_THRESHOLD = 264; 
+
+        let activeTouches = 0;
+        let hasTouchRelease = true;
+
+        const startLevelDisplay = document.getElementById('start-level-display');
+        const startLevelTag = document.getElementById('start-level-tag');
+        const startScreen = document.getElementById('start-screen');
+        const gameContainer = document.getElementById('game-container');
+        const resultScreen = document.getElementById('result-screen');
+        const tapZone = document.getElementById('tap-zone');
+        const progressCircle = document.getElementById('progress-circle');
+        const tapCountEl = document.getElementById('tap-count');
+        const tapLabelEl = document.getElementById('tap-label');
+        const tapSubEl = document.getElementById('tap-sub');
+        const timerDisplay = document.getElementById('timer-display');
+        const timerBar = document.getElementById('timer-bar');
+        const lapsDisplayEl = document.getElementById('current-laps-display');
+        const lapsSubtextEl = document.getElementById('laps-subtext');
+        const levelEl = document.getElementById('current-level');
+        const missEl = document.getElementById('miss-count');
+        const diffBadge = document.getElementById('difficulty-badge');
+        const uraBadge = document.getElementById('ura-badge');
+        const finalLapsEl = document.getElementById('final-laps');
+        const finalRankEl = document.getElementById('final-rank');
+        const messageOverlay = document.getElementById('message-overlay');
+        const overlayText = document.getElementById('overlay-text');
+        const diffList = document.getElementById('difficulty-list');
+        const scanline = document.getElementById('scanline');
+        const recordWarning = document.getElementById('record-warning');
+        
+        const bestLapsEl = document.getElementById('best-laps');
+        const bestRankEl = document.getElementById('best-rank');
+        const newRecordMsg = document.getElementById('new-record-msg');
+
+        function getRank(laps) {
+            if (laps >= 264) return "The Infinite Glitch";
+            if (laps >= 201) return "Untouchable God";
+            if (laps >= 151) return "Infinite Stamina";
+            if (laps >= 121) return "Elite Athlete";
+            if (laps >= 91) return "Speed Demon";
+            if (laps >= 61) return "Advanced Runner";
+            if (laps >= 31) return "Active Citizen";
+            return "Beginner Runner";
+        }
+
+        function loadBestRecord() {
+            const savedLaps = localStorage.getItem('shuttle_run_best_laps') || 0;
+            const lapsInt = parseInt(savedLaps);
+            bestLapsEl.innerText = savedLaps;
+            
+            const rankStr = getRank(lapsInt);
+            bestRankEl.innerText = rankStr;
+            bestRankEl.className = "text-[10px] font-black italic tracking-tighter uppercase py-0.5";
+
+            if (lapsInt >= 264) {
+                bestRankEl.classList.add('glitch-text', 'text-purple-400');
+            } else if (lapsInt >= 31) {
+                bestRankEl.classList.add('text-blue-400');
+            } else {
+                bestRankEl.classList.add('text-gray-400');
+            }
+        }
+
+        function saveBestRecord(laps) {
+            const currentBest = parseInt(localStorage.getItem('shuttle_run_best_laps') || 0);
+            if (laps > currentBest) {
+                localStorage.setItem('shuttle_run_best_laps', laps);
+                newRecordMsg.classList.remove('hidden');
+                loadBestRecord();
+            }
+        }
+
+        function showMessage(text, colorClass) {
+            overlayText.innerText = text;
+            overlayText.className = `text-4xl font-black italic tracking-tighter transform -skew-x-12 ${colorClass}`;
+            messageOverlay.classList.remove('hidden');
+        }
+
+        function renderDifficultyButtons() {
+            diffList.innerHTML = '';
+            difficultySettings.forEach((d) => {
+                const btn = document.createElement('button');
+                btn.className = `difficulty-btn bg-gray-900 border border-gray-800 p-4 rounded-xl flex justify-between items-center group ${d.ura ? 'ura-active' : ''}`;
+                btn.innerHTML = `
+                    <div class="flex flex-col items-start">
+                        <span class="font-black tracking-widest text-sm ura-label">${d.ura ? 'URA ' : ''}${d.label}</span>
+                        ${d.ura ? '<span class="text-[8px] font-bold text-red-500 uppercase">Single Tap Only</span>' : ''}
+                    </div>
+                    <span class="text-xs font-digital text-gray-500">${d.taps} TAPS</span>
+                    <div class="long-press-progress" id="progress-${d.id}"></div>
+                `;
+
+                let pressTimer;
+                let isLongPress = false;
+                let pressStartTime = 0;
+
+                const onStart = (e) => {
+                    if (e.type === 'touchstart') e.preventDefault();
+                    isLongPress = false;
+                    pressStartTime = Date.now();
+                    let progress = 0;
+                    const progressBar = document.getElementById(`progress-${d.id}`);
+                    pressTimer = setInterval(() => {
+                        progress += 5;
+                        if(progressBar) progressBar.style.width = progress + '%';
+                        if (progress >= 100) {
+                            clearInterval(pressTimer);
+                            isLongPress = true;
+                            d.ura = !d.ura;
+                            renderDifficultyButtons();
+                        }
+                    }, 50);
+                };
+
+                const onEnd = (e) => {
+                    clearInterval(pressTimer);
+                    const progressBar = document.getElementById(`progress-${d.id}`);
+                    if(progressBar) progressBar.style.width = '0%';
+                    const duration = Date.now() - pressStartTime;
+                    if (!isLongPress && duration < 800) {
+                        prepareGame(d);
+                    }
+                };
+
+                btn.addEventListener('touchstart', onStart, { passive: false });
+                btn.addEventListener('touchend', onEnd, { passive: false });
+                btn.addEventListener('mousedown', onStart);
+                btn.addEventListener('mouseup', onEnd);
+                btn.addEventListener('mouseleave', () => clearInterval(pressTimer));
+                diffList.appendChild(btn);
+            });
+        }
+
+        window.adjustLevel = function(val) {
+            startLevel = Math.max(1, Math.min(23, startLevel + val));
+            startLevelDisplay.innerText = startLevel;
+            
+            if (startLevel === 1) {
+                recordWarning.innerText = "Records will be saved";
+                recordWarning.className = "text-[8px] text-blue-500/80 mt-2 italic text-center font-bold";
+            } else {
+                recordWarning.innerText = "Records only saved from Level 1";
+                recordWarning.className = "text-[8px] text-gray-500 mt-2 italic text-center";
+            }
+
+            if (startLevel === 23) {
+                startLevelTag.innerText = "ENDLESS MODE";
+                startLevelTag.className = "text-[9px] text-purple-400 font-black uppercase mt-1 glitch-text";
+            } else {
+                startLevelTag.innerText = "NORMAL MODE";
+                startLevelTag.className = "text-[9px] text-blue-400 font-bold uppercase mt-1";
+            }
+        };
+
+        function getCumulativeLaps(lvl) {
+            let cumulative = 0;
+            for (let i = 0; i < lvl - 1; i++) {
+                if (officialSpeedData[i]) cumulative += officialSpeedData[i][1];
+            }
+            return cumulative;
+        }
+
+        window.prepareGame = function(diff) {
+            activeDiff = diff;
+            missStreak = 0;
+            isGameOver = false;
+            isWaitingNext = false;
+            isInCountdown = false;
+            activeTouches = 0;
+            hasTouchRelease = true;
+            endlessStartTime = 0;
+            endlessLevelTime = 3.5;
+            isLevelUpPending = false;
+            newRecordMsg.classList.add('hidden');
+            
+            gameContainer.className = "hidden w-full max-w-md"; 
+            scanline.classList.remove('scanline-active');
+
+            diffBadge.innerText = diff.label;
+            diffBadge.className = `text-[10px] font-bold uppercase px-2 rounded bg-gray-800 ${diff.color}`;
+            uraBadge.classList.toggle('hidden', !diff.ura);
+            
+            startScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            gameContainer.classList.remove('hidden');
+
+            if (startLevel === 23) {
+                const totalAt22 = getCumulativeLaps(23);
+                currentLaps = totalAt22 - 1;
+                lastSuccessLap = currentLaps;
+                currentLevel = 22;
+                isIntroLap = true;
+            } else {
+                currentLaps = getCumulativeLaps(startLevel);
+                if (startLevel > 1) currentLaps -= 1;
+                lastSuccessLap = currentLaps;
+                currentLevel = startLevel;
+                isIntroLap = (startLevel > 1);
+            }
+            startNextLap();
+        };
+
+        function startNextLap() {
+            if (isGameOver || isInCountdown) return;
+            if (timerId) clearInterval(timerId);
+            
+            isWaitingNext = false;
+            messageOverlay.classList.add('hidden');
+
+            if (isLevelUpPending) {
+                currentLevel++;
+                endlessLevelTime = Math.max(0.4, endlessLevelTime - 0.1);
+                isLevelUpPending = false;
+            }
+            
+            if (isIntroLap) {
+                tapsLeft = 0;
+                tapLabelEl.innerText = "WAITING";
+                tapSubEl.innerText = "STAND BY...";
+                showMessage('READY', 'text-yellow-500');
+            } else {
+                tapsLeft = activeDiff.taps;
+                tapLabelEl.innerText = "TARGET";
+                tapSubEl.innerText = "TAP!";
+            }
+            
+            maxTime = (currentLevel < 23) ? officialSpeedData[currentLevel-1][2] : endlessLevelTime;
+            timer = maxTime;
+            updateUI();
+            
+            timerId = setInterval(() => {
+                if (!isWaitingNext) {
+                    timer -= 0.01;
+                    if (timer <= 0) {
+                        timer = 0;
+                        clearInterval(timerId);
+                        handleCycleComplete();
+                    }
+                }
+                
+                if (currentLevel >= 23 && !isIntroLap) {
+                    monitorEndlessTimer();
+                }
+                updateTimerUI();
+            }, 10);
+        }
+
+        async function startEndlessCountdown() {
+            isInCountdown = true;
+            isWaitingNext = true;
+            if (timerId) clearInterval(timerId);
+            
+            const countdowns = [
+                { text: 'ENDLESS MODE', color: 'text-purple-600 font-black glitch-text' },
+                { text: '3', color: 'text-red-500' },
+                { text: '2', color: 'text-orange-500' },
+                { text: '1', color: 'text-yellow-500' }
+            ];
+
+            for (let item of countdowns) {
+                showMessage(item.text, item.color + ' text-6xl');
+                await new Promise(r => setTimeout(r, 800));
+            }
+            
+            isInCountdown = false;
+            endlessStartTime = Date.now();
+            endlessLevelTime = 3.5;
+            isLevelUpPending = false;
+            startNextLap();
+        }
+
+        function monitorEndlessTimer() {
+            if (!endlessStartTime) endlessStartTime = Date.now();
+            const elapsed = Date.now() - endlessStartTime;
+            if (elapsed >= ENDLESS_LEVEL_DURATION) {
+                isLevelUpPending = true;
+                endlessStartTime += ENDLESS_LEVEL_DURATION;
+            }
+            updateUI();
+        }
+
+        function handleCycleComplete() {
+            if (isIntroLap) {
+                isIntroLap = false;
+                currentLaps++;
+                lastSuccessLap = currentLaps;
+                const transition = checkOfficialLevel();
+                
+                if (transition === 'to-endless') {
+                    startEndlessCountdown();
+                } else {
+                    showMessage('GO!', 'text-green-400 font-bold');
+                    isWaitingNext = true;
+                    setTimeout(startNextLap, 1000);
+                }
+                return;
+            }
+
+            if (tapsLeft > 0) {
+                missStreak++;
+                currentLaps++; 
+                checkOfficialLevel();
+                if (missStreak >= 2) {
+                    showMessage('OUT', 'text-red-600');
+                    setTimeout(endGame, 1000);
+                } else {
+                    showMessage('FAULT 1', 'text-red-400');
+                    isWaitingNext = true;
+                    setTimeout(startNextLap, 800);
+                }
+            } else {
+                missStreak = 0; 
+                currentLaps++;
+                lastSuccessLap = currentLaps;
+                const transition = checkOfficialLevel();
+                
+                if (transition === 'to-endless') {
+                    startEndlessCountdown();
+                } else {
+                    if (isLevelUpPending) {
+                        showMessage('LVL UP!', 'text-blue-500 font-bold');
+                    } else {
+                        showMessage('OK', 'text-blue-400');
+                    }
+                    isWaitingNext = true;
+                    setTimeout(startNextLap, 800);
+                }
+            }
+        }
+
+        function checkOfficialLevel() {
+            if (currentLevel >= 23) return 'stay-endless';
+            
+            let cumulative = 0;
+            for (let i = 0; i < officialSpeedData.length; i++) {
+                cumulative += officialSpeedData[i][1];
+                if (currentLaps < cumulative) {
+                    const oldLvl = currentLevel;
+                    currentLevel = officialSpeedData[i][0];
+                    return (oldLvl !== currentLevel) ? 'level-up' : 'normal';
+                }
+            }
+            currentLevel = 23;
+            return 'to-endless';
+        }
+
+        function handleTap() {
+            if (isGameOver || isWaitingNext || timer <= 0 || isIntroLap || isInCountdown) return;
+            if (activeDiff.ura && !hasTouchRelease) return;
+
+            if (tapsLeft > 0) {
+                tapsLeft--;
+                hasTouchRelease = false;
+                tapZone.classList.add('tap-active');
+                setTimeout(() => tapZone.classList.remove('tap-active'), 50);
+                if (tapsLeft === 0) showMessage('OK', 'text-green-400');
+                updateUI();
+            }
+        }
+
+        function updateUI() {
+            tapCountEl.innerText = (isIntroLap || isInCountdown) ? "--" : tapsLeft;
+            levelEl.innerText = currentLevel;
+            missEl.innerText = `${missStreak}/2`;
+            
+            const remainingToEndless = ENDLESS_START_LAP_THRESHOLD - currentLaps;
+            let glitchClass = "";
+
+            if (currentLevel >= 23) {
+                glitchClass = "glitch-level-max";
+                scanline.classList.add('scanline-active');
+            } else if (remainingToEndless <= 5) {
+                scanline.classList.add('scanline-active');
+                if (remainingToEndless === 5) glitchClass = "glitch-level-1";
+                else if (remainingToEndless === 4) glitchClass = "glitch-level-2";
+                else if (remainingToEndless === 3) glitchClass = "glitch-level-3";
+                else if (remainingToEndless <= 2) glitchClass = "glitch-level-4";
+            } else {
+                scanline.classList.remove('scanline-active');
+            }
+
+            gameContainer.className = `w-full max-w-md ${glitchClass}`;
+            
+            if (currentLevel < 23) {
+                let cumulative = 0;
+                let target = 7;
+                for (let i = 0; i < officialSpeedData.length; i++) {
+                    cumulative += officialSpeedData[i][1];
+                    if (currentLaps < cumulative) {
+                        target = cumulative;
+                        break;
+                    }
+                }
+                lapsDisplayEl.innerText = `${currentLaps}/${target}`;
+                lapsSubtextEl.innerText = "LAPS / NEXT LEVEL";
+                levelEl.className = "text-3xl font-digital text-blue-500";
+            } else {
+                lapsDisplayEl.innerText = `${currentLaps}`;
+                lapsSubtextEl.innerText = "TOTAL LAPS (ENDLESS)";
+                levelEl.className = "text-3xl font-digital text-purple-400 glitch-text";
+            }
+            
+            const circumference = 2 * Math.PI * 40;
+            const progress = (isIntroLap || isInCountdown) ? 0 : ((activeDiff.taps - tapsLeft) / activeDiff.taps);
+            progressCircle.style.strokeDasharray = `${circumference}`;
+            progressCircle.style.strokeDashoffset = circumference - progress * circumference;
+            progressCircle.className = (currentLevel >= 23) ? "text-purple-500 transition-all duration-75" : "text-blue-500 transition-all duration-75";
+        }
+
+        function updateTimerUI() {
+            timerDisplay.innerText = timer.toFixed(2);
+            timerBar.style.width = (timer / maxTime) * 100 + '%';
+            if (timer < 1.2) timerBar.classList.add('animate-danger');
+            else timerBar.classList.remove('animate-danger');
+            timerBar.style.backgroundColor = (currentLevel >= 23) ? '#a855f7' : '#3b82f6';
+        }
+
+        function endGame() {
+            isGameOver = true;
+            if (timerId) clearInterval(timerId);
+            gameContainer.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            finalLapsEl.innerText = lastSuccessLap;
+            
+            const rank = getRank(lastSuccessLap);
+            finalRankEl.innerText = rank;
+            
+            if (lastSuccessLap >= 264) {
+                finalRankEl.className = "text-xl font-black italic glitch-text text-purple-400";
+            } else if (lastSuccessLap >= 31) {
+                finalRankEl.className = "text-xl font-black italic text-blue-400";
+            } else {
+                finalRankEl.className = "text-xl font-black italic text-gray-400";
+            }
+
+            if (startLevel === 1) {
+                saveBestRecord(lastSuccessLap);
+            }
+        }
+
+        tapZone.addEventListener('touchstart', (e) => { e.preventDefault(); activeTouches++; handleTap(); }, {passive: false});
+        tapZone.addEventListener('touchend', (e) => { e.preventDefault(); activeTouches--; if (activeTouches <= 0) hasTouchRelease = true; }, {passive: false});
+        tapZone.addEventListener('mousedown', (e) => handleTap());
+        window.addEventListener('mouseup', () => hasTouchRelease = true);
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            resultScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            renderDifficultyButtons();
+            loadBestRecord();
+        });
+
+        loadBestRecord();
+        renderDifficultyButtons();
+    </script>
+</body>
+</html>

@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スライドパズル</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* フォント設定 */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; 
+        }
+        /* パズルボードのグリッド設定 */
+        #puzzle-board {
+            display: grid;
+            /* JavaScriptで設定される --size (3, 4, or 5) を使用 */
+            grid-template-columns: repeat(var(--size), 1fr);
+            aspect-ratio: 1 / 1; /* 正方形を維持 */
+            width: 100%;
+            max-width: 400px; /* 全体スケール80%相当 */
+            margin: 0 auto;
+            gap: 3px; 
+            padding: 3px;
+            border-radius: 0.75rem; /* rounded-xl */
+            background-color: #1f2937; /* gray-800 */
+            box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.1), 0 3px 5px -2px rgba(0, 0, 0, 0.05); 
+        }
+
+        /* タイルの共通スタイル */
+        .tile {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 700; /* font-bold */
+            /* レスポンシブなフォントサイズ */
+            font-size: clamp(0.9rem, 3.5vw, 1.8rem); /* 5x5でも対応できるように微調整 */
+            border-radius: 0.5rem; /* rounded-lg */
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.15s ease-out, background-color 0.3s ease-in-out, box-shadow 0.15s ease-out;
+            box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.1); 
+        }
+
+        /* 通常のタイルの色 */
+        .default-tile {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+        }
+
+        /* 正しい位置にあるタイルの色 */
+        .correct-tile {
+            background-color: #facc15; /* yellow-400 */
+            color: #1f2937; /* gray-800 */
+            box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        /* 空のタイル (0) のスタイル */
+        .empty-tile {
+            background-color: transparent !important;
+            color: transparent !important;
+            cursor: default !important;
+            opacity: 0;
+            box-shadow: none !important;
+            transform: scale(0.95);
+        }
+
+        .tile:active:not(.empty-tile) {
+            transform: scale(0.95);
+        }
+        
+        /* オートモードボタンのスタイル (ONの場合) */
+        .auto-mode-on {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+        }
+        /* オートモードボタンのスタイル (OFFの場合) */
+        .auto-mode-off {
+            background-color: #f3f4f6; /* gray-100 */
+            color: #4b5563; /* gray-600 */
+        }
+        .auto-mode-off:hover {
+            background-color: #e5e7eb; /* gray-200 */
+        }
+        
+        /* タイマーコンテナの初期状態スタイル */
+        .timer-start {
+             background-color: #3b82f6; /* blue-500 */
+             border-color: #2563eb; /* blue-700 */
+             color: white;
+        }
+        .timer-start:hover {
+             background-color: #2563eb; 
+        }
+
+        /* カウントダウン中のアニメーション */
+        @keyframes scale-down {
+            0% { transform: scale(1.0); opacity: 1; }
+            50% { transform: scale(0.9); opacity: 0.8; }
+            100% { transform: scale(1.0); opacity: 1; }
+        }
+        .countdown-animation {
+            animation: scale-down 1s ease-in-out infinite;
+        }
+
+    </style>
+</head>
+<body class="p-4 flex flex-col items-center min-h-screen">
+
+    <!-- メインコンテンツコンテナ -->
+    <div class="w-full max-w-lg">
+        <h1 class="text-2xl font-extrabold text-gray-900 mb-2 text-center">
+            スライドパズル
+        </h1>
+        
+
+        <!-- コントロールパネル -->
+        <div id="control-panel" class="flex flex-row justify-center items-center space-x-4 mb-3 p-3 bg-white rounded-xl shadow-lg">
+            
+            <!-- サイズ選択 -->
+            <div class="flex items-center space-x-2">
+                <label for="size-select" class="text-gray-700 font-medium whitespace-nowrap text-sm">サイズ:</label>
+                <select id="size-select" class="px-3 py-1 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white text-sm">
+                    <option value="3" selected>3x3</option>
+                    <option value="4">4x4</option>
+                    <option value="5">5x5 (高速探索)</option>
+                </select>
+            </div>
+
+            <!-- オートモードボタン -->
+            <button id="auto-mode-button" class="px-4 py-1.5 font-bold rounded-lg shadow-md transition duration-150 ease-in-out text-sm auto-mode-off" aria-label="オートモードステータス">
+                オートモード OFF
+            </button>
+        </div>
+
+        <!-- パリティチェック結果表示エリア -->
+        <div id="solvability-status" class="mb-4 p-2 w-full max-w-lg text-center rounded-lg font-bold shadow-md transition-colors duration-300 cursor-pointer">
+            <!-- パリティチェックの結果が表示されます -->
+        </div>
+
+    </div>
+
+    <!-- パズルボード -->
+    <div id="puzzle-board" class="w-full max-w-[400px]">
+        <!-- タイルはJavaScriptによってここに挿入されます -->
+    </div>
+
+    <!-- タイマー表示エリア (クリックでスタート/オートモードトグル) -->
+    <div id="timer-container" class="mt-6 w-full max-w-[400px] text-center cursor-pointer">
+        <div id="timer-box" class="text-3xl font-mono font-extrabold p-3 rounded-xl shadow-lg border-b-4 transition duration-150 ease-in-out timer-start">
+            <span id="timer-display">タップしてスタート</span>
+        </div>
+    </div>
+
+    <!-- ステータスメッセージ -->
+    <div id="status-message" class="mt-4 p-3 w-full max-w-lg text-center text-base font-semibold min-h-[3rem]">
+        <!-- メッセージが表示されます -->
+    </div>
+
+    <!-- Winモーダル (非表示) -->
+    <div id="win-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center p-4 z-50 transition-opacity duration-300" aria-modal="true" role="dialog">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-xs w-full transform transition-all duration-300 scale-95 opacity-0" id="modal-content">
+            <h2 class="text-3xl font-extrabold text-blue-600 mb-3 text-center">🎉 クリア！ 🎉</h2>
+            <p class="text-gray-700 text-base mb-3 text-center">
+                クリアタイム: <span id="final-time" class="font-mono font-bold text-xl text-red-500">00:00.00</span>
+            </p>
+            <p class="text-gray-700 text-sm mb-4 text-center">
+                おめでとうございます！新しいパズルで最速記録に挑戦しましょう。
+            </p>
+            <button onclick="document.getElementById('win-modal').classList.add('hidden'); initGame();" class="w-full py-2.5 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 transition duration-150 ease-in-out text-sm">
+                新しいパズルを準備
+            </button>
+        </div>
+    </div>
+    
+    <!-- Parity Detail Modal (非表示) -->
+    <div id="parity-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center p-4 z-50 transition-opacity duration-300" aria-modal="true" role="dialog">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-xs w-full transform transition-all duration-300 scale-95 opacity-0" id="parity-modal-content">
+            <h2 class="text-xl font-extrabold text-gray-800 mb-3 text-center border-b pb-2">完成可能性チェック詳細</h2>
+            <div id="parity-details-text" class="text-sm text-gray-700 space-y-3 pt-2">
+                <!-- 詳細がJSで挿入されます -->
+            </div>
+            <button onclick="document.getElementById('parity-modal').classList.add('hidden');" class="mt-6 w-full py-2 bg-gray-300 text-gray-800 font-bold rounded-lg hover:bg-gray-400 transition duration-150 ease-in-out text-sm">
+                閉じる
+            </button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        const boardElement = document.getElementById('puzzle-board');
+        const sizeSelect = document.getElementById('size-select');
+        const autoModeButton = document.getElementById('auto-mode-button');
+        const statusMessage = document.getElementById('status-message');
+        const timerDisplay = document.getElementById('timer-display');
+        const solvabilityStatus = document.getElementById('solvability-status');
+        const winModal = document.getElementById('win-modal');
+        const modalContent = document.getElementById('modal-content');
+        const finalTimeDisplay = document.getElementById('final-time');
+        const parityModal = document.getElementById('parity-modal');
+        const parityDetailsText = document.getElementById('parity-details-text');
+        const timerContainer = document.getElementById('timer-container'); 
+        const timerBox = document.getElementById('timer-box'); 
+
+        let size = parseInt(sizeSelect.value); 
+        let tiles = []; 
+        let emptyIndex = -1; 
+
+        let startTime = 0;
+        let elapsedTime = 0; 
+        let timerId = null;
+        const INTERVAL_MS = 10; 
+
+        let isGameRunning = false;
+        let isCountdown = false; 
+        let isAutoMode = false; // 初期状態はOFF
+        let autoMoveIntervalId = null; 
+        let isSolving = false; 
+        
+        let searchWeight = 1.0; // 重み付きA*の重み。デフォルトは1.0 (標準A*)
+        let algorithmName = 'A*探索 (最短経路)';
+
+        // --- タイマー表示の更新 (MM:SS.ss形式) ---
+        function updateTimerDisplay() {
+            const totalSeconds = elapsedTime / 1000;
+            const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, '0');
+            const centiseconds = Math.floor((totalSeconds * 100) % 100).toString().padStart(2, '0');
+            
+            timerDisplay.textContent = `${minutes}:${seconds}.${centiseconds}`;
+        }
+
+        // --- カウントアップタイマー開始 ---
+        function startTimer() {
+            stopTimer();
+            startTime = performance.now() - elapsedTime; 
+            
+            timerId = setInterval(() => {
+                elapsedTime = performance.now() - startTime;
+                updateTimerDisplay();
+            }, INTERVAL_MS);
+            
+            isGameRunning = true;
+            statusMessage.innerHTML = `<span class="text-green-600">手動でパズルを解きましょう！</span>`;
+            timerBox.classList.remove('timer-start', 'countdown-animation');
+            timerBox.classList.remove('text-white');
+            timerBox.classList.add('bg-yellow-300', 'text-gray-800');
+            
+            renderBoard();
+            
+            // オートモードがONなら自動実行を開始
+            if (isAutoMode) {
+                startAutoModeExecution();
+            }
+        }
+
+        // --- タイマー停止 ---
+        function stopTimer() {
+            if (timerId) {
+                clearInterval(timerId);
+                timerId = null;
+            }
+            if (isSolving) {
+                stopAutoModeExecution();
+            }
+            isGameRunning = false;
+        }
+
+        // --- ゲーム開始前の3秒カウントダウン ---
+        function startGameCountdown() {
+            if (isCountdown || isSolving) return;
+            isCountdown = true;
+            stopTimer(); 
+            
+            elapsedTime = 0;
+            updateTimerDisplay(); // 00:00.00にするため
+
+            renderBoard(); 
+            
+            timerBox.classList.remove('timer-start');
+            timerBox.classList.add('bg-red-500', 'text-white', 'countdown-animation');
+            
+            let countdown = 3;
+            timerDisplay.textContent = `START: ${countdown}`;
+            statusMessage.innerHTML = `<span class="text-xl font-extrabold text-red-600 animate-pulse">パズルを解く準備...</span>`;
+
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    timerDisplay.textContent = `START: ${countdown}`;
+                } else {
+                    clearInterval(countdownInterval);
+                    isCountdown = false;
+                    
+                    startTimer(); 
+                }
+            }, 1000);
+        }
+
+        // --- ゲームの初期化とリセット ---
+        function initGame() {
+            size = parseInt(sizeSelect.value);
+            const totalTiles = size * size;
+
+            // 探索重みの設定とアルゴリズム名の決定
+            if (size === 3) {
+                searchWeight = 1.0;
+                algorithmName = 'A*探索 (最短経路)';
+            } else if (size === 4) {
+                searchWeight = 3.0;
+                algorithmName = `重み付きA*探索 (w=${searchWeight})`;
+            } else {
+                searchWeight = 6.0;
+                algorithmName = `重み付きA*探索 (w=${searchWeight})`;
+            }
+
+            document.documentElement.style.setProperty('--size', size);
+
+            // 解決済みの状態の配列を作成 (1, 2, 3, ..., N*N-1, 0)
+            tiles = Array.from({ length: totalTiles }, (_, i) => (i + 1) % totalTiles);
+            emptyIndex = totalTiles - 1;
+
+            stopTimer(); 
+            elapsedTime = 0; 
+            updateTimerDisplay(); 
+            isGameRunning = false;
+            isCountdown = false;
+            isSolving = false;
+            
+            // オートモードボタンの表示とスタイルの制御
+            autoModeButton.textContent = isAutoMode ? 'オートモード ON' : 'オートモード OFF';
+            autoModeButton.classList.toggle('auto-mode-on', isAutoMode);
+            autoModeButton.classList.toggle('auto-mode-off', !isAutoMode);
+            
+            // タイマー表示を初期状態に戻す
+            timerDisplay.textContent = 'タップしてスタート';
+            timerBox.classList.add('timer-start');
+            timerBox.classList.remove('bg-red-500', 'text-white', 'countdown-animation', 'bg-yellow-300', 'text-gray-800');
+            
+            renderBoard(); 
+            updateSolvabilityDisplay();
+            
+            if (isAutoMode) {
+                statusMessage.innerHTML = `<span class="text-blue-600">オートモード ON。タイマーをタップで自動実行を開始します。</span>`;
+            } else {
+                statusMessage.innerHTML = `<span class="text-gray-600">サイズ ${size}x${size}。タイマーをタップして開始してください。</span>`;
+            }
+
+            winModal.classList.add('hidden');
+        }
+
+        // --- 解決可能性の判定ヘルパー関数 (N x N) ---
+        // 倒立数 (Inversion Count) を計算
+        function getInversionCount(currentTiles) {
+            let inversionCount = 0;
+            const tilesWithoutZero = currentTiles.filter(t => t !== 0);
+            const N = tilesWithoutZero.length;
+
+            for (let i = 0; i < N; i++) {
+                for (let j = i + 1; j < N; j++) {
+                    if (tilesWithoutZero[i] > tilesWithoutZero[j]) {
+                        inversionCount++;
+                    }
+                }
+            }
+            return inversionCount;
+        }
+
+        // 空きマス (0) の行を取得 (bottom-up: 1, 2, 3, 4行目, etc.)
+        function getEmptyRowFromBottom(emptyIndex, currentSize) {
+            const row = Math.floor(emptyIndex / currentSize); 
+            // 0から始まる行インデックスを、底から数える行番号に変換 (N行 - 0行目 = N行目, N行 - (N-1)行目 = 1行目)
+            return currentSize - row; 
+        }
+
+        // パズルが解けるか判定と詳細の取得
+        function getSolvabilityDetails(currentTiles, currentSize) {
+            const inversionCount = getInversionCount(currentTiles);
+            const emptyIndex = currentTiles.indexOf(0);
+            const emptyRowFromBottom = getEmptyRowFromBottom(emptyIndex, currentSize);
+            let solvable = false;
+            let logic = '';
+
+            if (currentSize % 2 !== 0) {
+                // Nが奇数 (例: 3x3, 5x5)
+                solvable = inversionCount % 2 === 0;
+                logic = `N=${currentSize} (奇数) の場合: [倒立数 (${inversionCount}) が偶数] であれば解ける。`;
+            } else {
+                // Nが偶数 (例: 4x4)
+                const isInvEven = inversionCount % 2 === 0;
+                const isRowOdd = emptyRowFromBottom % 2 !== 0; 
+                
+                // (Row is Odd AND Inv is Even) OR (Row is Even AND Inv is Odd)
+                solvable = (isRowOdd && isInvEven) || (!isRowOdd && !isInvEven);
+                logic = `N=${currentSize} (偶数) の場合:\n(空きマス行 (${emptyRowFromBottom}) が奇数 AND 倒立数 (${inversionCount}) が偶数) または\n(空きマス行 (${emptyRowFromBottom}) が偶数 AND 倒立数 (${inversionCount}) が奇数) であれば解ける。`;
+            }
+            
+            return {
+                inversionCount,
+                emptyRowFromBottom,
+                solvable,
+                logic
+            };
+        }
+
+        function isSolvable(currentTiles, currentSize) {
+            return getSolvabilityDetails(currentTiles, currentSize).solvable;
+        }
+
+
+        // --- パリティチェック結果の表示更新 ---
+        function updateSolvabilityDisplay() {
+            const details = getSolvabilityDetails(tiles, size);
+            
+            if (details.solvable) {
+                solvabilityStatus.innerHTML = `✅ <span class="text-green-700">完成可能です</span> (タップで詳細)`;
+                solvabilityStatus.classList.remove('bg-red-100');
+                solvabilityStatus.classList.add('bg-green-100');
+            } else {
+                solvabilityStatus.innerHTML = `❌ <span class="text-red-700">完成不可能です</span> (タップで詳細)`;
+                solvabilityStatus.classList.remove('bg-green-100');
+                solvabilityStatus.classList.add('bg-red-100');
+            }
+        }
+
+        // --- パリティチェック詳細モーダルの表示 ---
+        function showParityDetails() {
+            const details = getSolvabilityDetails(tiles, size);
+            
+            let resultText = details.solvable 
+                ? `<span class="text-green-600 font-extrabold">完成可能です</span>`
+                : `<span class="text-red-600 font-extrabold">完成不可能です</span>`;
+
+            let displayDetails = `
+                <div class="border-b pb-2">
+                    <p class="font-bold text-base">現在の盤面 (${size}x${size})</p>
+                    <p>結論: ${resultText}</p>
+                </div>
+                <p>
+                    <span class="font-semibold">倒立数 (Inversion Count):</span> 
+                    <span class="font-mono text-lg">${details.inversionCount}</span> (${details.inversionCount % 2 === 0 ? '偶数' : '奇数'})
+                </p>
+                ${size % 2 === 0 ? `
+                    <p>
+                        <span class="font-semibold">空きマス(0)の行 (底から):</span> 
+                        <span class="font-mono text-lg">${details.emptyRowFromBottom}</span> (${details.emptyRowFromBottom % 2 !== 0 ? '奇数' : '偶数'})
+                    </p>
+                ` : ''}
+                <div class="bg-gray-100 p-3 rounded-lg text-xs break-words whitespace-pre-wrap">
+                    <p class="font-semibold text-gray-600">【判定ロジック】</p>
+                    ${details.logic}
+                </div>
+            `;
+            
+            parityDetailsText.innerHTML = displayDetails;
+            parityModal.classList.remove('hidden');
+            setTimeout(() => {
+                parityModalContent.classList.remove('scale-95', 'opacity-0');
+                parityModalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        // --- パズルボードの描画 ---
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            const totalTiles = size * size;
+
+            tiles.forEach((value, index) => {
+                const tileDiv = document.createElement('div');
+                tileDiv.classList.add('tile');
+
+                if (value === 0) {
+                    tileDiv.classList.add('empty-tile');
+                    tileDiv.textContent = '';
+                } else {
+                    tileDiv.textContent = value;
+                    tileDiv.dataset.value = value;
+                    tileDiv.dataset.index = index;
+                    
+                    // オートモード中や解決中は手動での移動を禁止
+                    if (!isAutoMode && !isSolving && isGameRunning) {
+                        tileDiv.addEventListener('click', () => moveTile(index));
+                    }
+                    
+                    const correctValue = (index + 1) % totalTiles;
+                    const isCorrect = (value === correctValue);
+
+                    // 1. 色の制御 (タイル背景色)
+                    if (isGameRunning && isCorrect) {
+                        tileDiv.classList.add('correct-tile');
+                        tileDiv.classList.remove('default-tile');
+                    } else {
+                        tileDiv.classList.add('default-tile');
+                        tileDiv.classList.remove('correct-tile');
+                    }
+                }
+                
+                boardElement.appendChild(tileDiv);
+            });
+        }
+
+        // --- タイルの移動処理 ---
+        function moveTile(tileIndex) {
+            // isGameRunningのチェックは moveTile 呼び出し元 (renderBoard) で行う
+            if (isCountdown || isAutoMode || isSolving) {
+                // 安全策。renderBoardでリスナーは削除されているはずだが、念のため
+                return; 
+            }
+
+            if (isAdjacent(tileIndex, emptyIndex)) {
+                // 配列内での入れ替え
+                [tiles[tileIndex], tiles[emptyIndex]] = [tiles[emptyIndex], tiles[tileIndex]];
+                emptyIndex = tileIndex; 
+
+                renderBoard(); 
+
+                // 勝利判定
+                if (checkWin()) {
+                    stopTimer();
+                    showWinModal();
+                }
+            }
+        }
+
+        // --- 隣接判定ヘルパー ---
+        function isAdjacent(index1, index2) {
+            const row1 = Math.floor(index1 / size);
+            const col1 = index1 % size;
+            const row2 = Math.floor(index2 / size);
+            const col2 = index2 % size;
+
+            const rowDiff = Math.abs(row1 - row2);
+            const colDiff = Math.abs(col1 - col2);
+
+            return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+        }
+
+        // --- パズルのシャッフル (解ける状態を保証) ---
+        function shuffleTilesLogic() {
+            const totalTiles = size * size;
+            let currentTiles = [];
+            let currentEmptyIndex = -1;
+
+            do {
+                // 1. 完全なランダム配列を生成
+                currentTiles = Array.from({ length: totalTiles }, (_, i) => i);
+                for (let i = totalTiles - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [currentTiles[i], currentTiles[j]] = [currentTiles[j], currentTiles[i]];
+                }
+                currentEmptyIndex = currentTiles.indexOf(0);
+
+                // 2. 解ける状態かチェック
+            } while (!isSolvable(currentTiles, size));
+
+            tiles = currentTiles;
+            emptyIndex = currentEmptyIndex;
+            updateSolvabilityDisplay();
+        }
+
+        // --- シャッフルから開始 ---
+        function handleShuffleStart() {
+            shuffleTilesLogic(); 
+            renderBoard(); 
+            startGameCountdown(); 
+        }
+
+        // --- 勝利判定 ---
+        function checkWin() {
+            const totalTiles = size * size;
+            for (let i = 0; i < totalTiles - 1; i++) {
+                if (tiles[i] !== i + 1) {
+                    return false;
+                }
+            }
+            return tiles[totalTiles - 1] === 0;
+        }
+
+        // --- 勝利モーダル表示 ---
+        function showWinModal() {
+            stopTimer(); 
+            
+            finalTimeDisplay.textContent = timerDisplay.textContent;
+
+            winModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10); 
+            
+            // プレイが完了したため、オートモードをOFFに戻す
+            isAutoMode = false;
+            autoModeButton.textContent = 'オートモード OFF';
+            autoModeButton.classList.remove('auto-mode-on');
+            autoModeButton.classList.add('auto-mode-off');
+
+            renderBoard();
+        }
+
+        // --- 探索アルゴリズム共通のヘルパー (manhattanDistance, State) ---
+        
+        // マンハッタン距離を計算するヒューリスティック関数
+        function manhattanDistance(currentTiles, currentSize) {
+            let distance = 0;
+            const N = currentSize;
+            const totalTiles = N * N;
+
+            for (let i = 0; i < totalTiles; i++) {
+                const value = currentTiles[i];
+                if (value === 0) continue; 
+
+                const targetIndex = value - 1;
+                
+                const currentRow = Math.floor(i / N);
+                const currentCol = i % N;
+
+                const targetRow = Math.floor(targetIndex / N);
+                const targetCol = targetIndex % N;
+                
+                const rowDiff = Math.abs(currentRow - targetRow);
+                const colDiff = Math.abs(currentCol - targetCol);
+
+                distance += rowDiff + colDiff;
+            }
+            return distance;
+        }
+
+        // --- 状態クラス (A*/重み付きA*用) ---
+        class State {
+            constructor(tiles, emptyIndex, g, h, parent = null, moveValue = -1, weight = 1.0) {
+                this.tiles = tiles;
+                this.emptyIndex = emptyIndex;
+                this.g = g; 
+                this.h = h; 
+                this.f = g + weight * h; // 重み付きF値: f = g + w * h
+                this.parent = parent;
+                this.moveValue = moveValue; // この状態に到達するために動かした「タイルの値」(1, 2, ...)
+                this.key = tiles.join(','); 
+            }
+        }
+
+        // --- 重み付きA*探索 (Weighted A* / 貪欲A*互換) ---
+        function solveWeightedAStar(initialTiles, currentSize, setExplorationStepsCallback, weight) {
+            const goalTiles = Array.from({ length: currentSize * currentSize }, (_, i) => (i + 1) % (currentSize * currentSize));
+            const initialEmptyIndex = initialTiles.indexOf(0);
+
+            // Open Set (最小f値のノードを高速で取り出すためのMap)
+            const openSet = new Map(); 
+            // Closed Set (既に評価済みのノードのキーを保持)
+            const closedSet = new Set(); 
+            
+            const initialH = manhattanDistance(initialTiles, currentSize);
+            const initialState = new State(initialTiles, initialEmptyIndex, 0, initialH, null, -1, weight);
+            openSet.set(initialState.key, initialState);
+            
+            let attempts = 0;
+            // 5x5は非常に広大で、重み付きA*でも探索ノード数が膨大になる可能性があるため、最大試行回数を設定
+            const MAX_ATTEMPTS = (currentSize === 5) ? 1000000 : 500000; 
+
+            while (openSet.size > 0 && attempts < MAX_ATTEMPTS) {
+                attempts++;
+                
+                // Open Setから最小F値を持つノードを選択
+                let current = null;
+                let minF = Infinity;
+                
+                // JavaScriptのMap/Setはヒープではないため、線形探索が必要
+                for (const state of openSet.values()) {
+                    if (state.f < minF) {
+                        minF = state.f;
+                        current = state;
+                    }
+                }
+                
+                if (!current) break;
+
+                // ゴール判定
+                if (current.tiles.join(',') === goalTiles.join(',')) {
+                    setExplorationStepsCallback(attempts);
+                    const solutionPath = [];
+                    let temp = current;
+                    while (temp.parent !== null) {
+                        solutionPath.push(temp.moveValue); // 動かしたタイルの値を記録
+                        temp = temp.parent;
+                    }
+                    return solutionPath.reverse(); 
+                }
+
+                openSet.delete(current.key);
+                closedSet.add(current.key);
+
+                const totalTiles = currentSize * currentSize;
+                const emptyIndex = current.emptyIndex;
+
+                // 隣接ノードの生成
+                const neighbors = [
+                    emptyIndex - currentSize, emptyIndex + currentSize, 
+                    emptyIndex - 1, emptyIndex + 1     
+                ].filter(index => index >= 0 && index < totalTiles && isAdjacent(index, emptyIndex));
+
+                for (const tileIndexToMove of neighbors) {
+                    const nextTiles = [...current.tiles];
+                    
+                    // 【重要な修正点】: 移動するタイルの値 (1, 2, 3...) を取得
+                    const tileValueMoved = current.tiles[tileIndexToMove];
+                    
+                    // タイルと空きマスを入れ替え (nextTilesの状態を作る)
+                    [nextTiles[tileIndexToMove], nextTiles[emptyIndex]] = [nextTiles[emptyIndex], nextTiles[tileIndexToMove]];
+                    const nextKey = nextTiles.join(',');
+
+                    if (closedSet.has(nextKey)) continue;
+
+                    const nextG = current.g + 1;
+                    const nextH = manhattanDistance(nextTiles, currentSize);
+
+                    const existingState = openSet.get(nextKey);
+                    
+                    // 既にOpen Setに存在するが、今回の経路の方が短い (G値が小さい) 場合に更新
+                    if (!existingState || nextG < existingState.g) {
+                        // nextStateのemptyIndexは、新しい空きマスの位置 (元の動かすタイルがあった場所)
+                        const nextState = new State(nextTiles, tileIndexToMove, nextG, nextH, current, tileValueMoved, weight);
+                        openSet.set(nextKey, nextState);
+                    }
+                }
+            }
+            setExplorationStepsCallback(attempts); 
+            return null; 
+        }
+        
+        // --- 解法の実行 ---
+        function applySolution(solution, interval, totalSteps) {
+            let step = 0;
+            autoMoveIntervalId = setInterval(() => {
+                if (step >= solution.length || checkWin()) {
+                    clearInterval(autoMoveIntervalId);
+                    autoMoveIntervalId = null;
+                    isSolving = false; 
+                    if (checkWin()) {
+                        showWinModal();
+                    } else if (isGameRunning) {
+                        statusMessage.innerHTML = `<span class="text-green-600">自動実行が完了しました。手動で続行するか、新しいパズルを開始してください。</span>`;
+                        // 完了後、手動操作のためにリスナーを再設定
+                        renderBoard(); 
+                    }
+                    return;
+                }
+                
+                const tileValueToMove = solution[step]; // 動かすタイルの値 (1, 2, ...)
+                const tileIndexToMove = tiles.indexOf(tileValueToMove); // そのタイルの現在のインデックス
+                
+                if (tileIndexToMove !== -1) {
+                    // 入れ替え処理
+                    [tiles[tileIndexToMove], tiles[emptyIndex]] = [tiles[emptyIndex], tiles[tileIndexToMove]];
+                    emptyIndex = tileIndexToMove; // 新しい空きマスは、元のタイルがあった場所
+                    renderBoard();
+                }
+                step++;
+                
+                statusMessage.innerHTML = `<span class="text-green-600">実行中... (${size}x${size} | ${algorithmName} | 探索総数: ${totalSteps.toLocaleString()} | 実行 ${step}/${solution.length}手)</span>`;
+
+            }, interval); 
+        }
+
+        // --- オートモードの実行制御 ---
+        
+        async function startAutoModeExecution() {
+            if (!isAutoMode || !isGameRunning) return; 
+            if (autoMoveIntervalId) stopAutoModeExecution();
+            if (isSolving) return;
+            
+            if (!isSolvable(tiles, size)) {
+                 statusMessage.innerHTML = `<span class="text-red-500">❌ このパズルは完成不可能です。新しいパズルを開始してください。</span>`;
+                 return;
+            }
+
+            isSolving = true;
+            // 手動クリックリスナーを削除
+            boardElement.querySelectorAll('.tile').forEach(tile => tile.removeEventListener('click', moveTile));
+            
+            let result = { solution: null, attempts: 0 };
+            const interval = 100; // 実行速度
+            
+            statusMessage.innerHTML = `<span class="text-blue-600">${algorithmName}: 解法を計算中...</span>`;
+            
+            // 非同期で実行を遅延させる（UIをブロックしないため）
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            let finalAttempts = 0;
+            const stepsCallback = (steps) => { finalAttempts = steps; };
+            const solution = solveWeightedAStar(tiles, size, stepsCallback, searchWeight);
+
+            result = { solution, attempts: finalAttempts };
+
+            if (result.solution) {
+                statusMessage.innerHTML = `<span class="text-blue-600">${algorithmName}: 解法発見 (探索ステップ: ${result.attempts.toLocaleString()} | 全${result.solution.length}手)。自動実行中...</span>`;
+                applySolution(result.solution, interval, result.attempts); 
+            } else {
+                statusMessage.innerHTML = `<span class="text-red-500">${algorithmName}: 解法が見つかりませんでした。新しいパズルを開始してください。</span>`;
+                stopAutoModeExecution();
+            }
+        }
+
+        // オートモード停止 (実行のみ停止。isAutoModeの状態は維持)
+        function stopAutoModeExecution() {
+            if (autoMoveIntervalId) {
+                clearInterval(autoMoveIntervalId);
+                autoMoveIntervalId = null;
+            }
+            isSolving = false;
+            
+            // 手動操作のためにリスナーを再設定
+            renderBoard(); 
+        }
+
+        // --- オートモードボタンのトグル処理 ---
+        async function handleAutoModeToggle() {
+            isAutoMode = !isAutoMode;
+
+            autoModeButton.textContent = isAutoMode ? 'オートモード ON' : 'オートモード OFF';
+            autoModeButton.classList.toggle('auto-mode-on', isAutoMode);
+            autoModeButton.classList.toggle('auto-mode-off', !isAutoMode);
+
+            if (isAutoMode) {
+                if (isGameRunning && !isSolving) {
+                     statusMessage.innerHTML = `<span class="text-blue-600">オートモード ON。自動実行を開始します...</span>`;
+                     if (isSolvable(tiles, size)) {
+                        await startAutoModeExecution();
+                    } else {
+                        statusMessage.innerHTML = `<span class="text-red-500">❌ オートモードON。この盤面は完成不可能です。</span>`;
+                    }
+                } else if (!isGameRunning) {
+                    statusMessage.innerHTML = `<span class="text-blue-600">オートモード ON。タイマーをタップでパズルを開始してください。</span>`;
+                }
+            } else {
+                statusMessage.innerHTML = `<span class="text-gray-600">オートモード OFF。手動でパズルを解いてください。</span>`;
+                stopAutoModeExecution();
+            }
+        }
+
+        
+        // --- タイマーコンテナクリックハンドラー (スタートと強制停止を兼ねる) ---
+        async function handleTimerClick() {
+            // A. ゲーム非実行時のスタート処理 (シャッフル -> カウントダウン -> ゲームスタート)
+            if (!isGameRunning && !isCountdown && !isSolving) {
+                handleShuffleStart(); 
+                return; 
+            }
+
+            // B. カウントダウン中は無視
+            if (isCountdown) return;
+
+            // C. 自動実行中の場合は停止 (強制停止)
+            if (isSolving) {
+                stopAutoModeExecution();
+                statusMessage.innerHTML = `<span class="text-red-600 font-bold">自動実行を強制停止しました。手動で続行できます。</span>`;
+                return;
+            }
+            
+            // D. ゲーム実行中 (手動プレイ中) の場合は、オートモードONなら自動実行を再開
+            if (isGameRunning && isAutoMode) {
+                 statusMessage.innerHTML = `<span class="text-blue-600">オートモード ON。自動実行を再開します...</span>`;
+                 if (isSolvable(tiles, size)) {
+                    await startAutoModeExecution();
+                } else {
+                    statusMessage.innerHTML = `<span class="text-red-500">❌ オートモードON。この盤面は完成不可能です。</span>`;
+                }
+            }
+        }
+
+
+        // --- イベントリスナー設定 ---
+        sizeSelect.addEventListener('change', initGame);
+        timerContainer.addEventListener('click', handleTimerClick);
+        solvabilityStatus.addEventListener('click', showParityDetails);
+        // オートモードボタンにトグル機能を追加
+        autoModeButton.addEventListener('click', handleAutoModeToggle);
+
+
+        // ウィンドウ読み込み時にゲームを開始
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>

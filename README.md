@@ -1,6 +1,6 @@
 # ACCEL KEYS — Cloudflare Pages版
 
-静的ゲーム画面は `public/index.html`、全プレイヤーランキングAPIは `functions/api/scores.js`、スコア保存先はCloudflare D1です。自己ベストは各ブラウザのlocalStorageにも保存されます。
+トップページのゲーム一覧は `public/index.html`、加速鍵盤ゲームは `public/accel-keys/index.html`、全プレイヤーランキングAPIは `functions/api/scores.js`、スコア保存先はCloudflare D1です。自己ベストは各ブラウザのlocalStorageにも保存されます。加速鍵盤ゲームは4レーンをノーツが上から降下する方式で、PERFECT・GREAT・GOOD・MISSの判定に対応しています。
 
 ## 初回セットアップ
 
@@ -11,6 +11,14 @@
 5. Pagesプロジェクトの「Settings → Bindings」でD1を追加し、変数名を必ず `DB` にして同じデータベースを選択してから再デプロイします。
 
 Wranglerで直接公開する場合は `npm install` の後、`npm run deploy` を実行します。
+
+## 管理者メニュー
+
+Cloudflare Pagesの「設定 → 変数とシークレット」で、暗号化されたシークレット `ADMIN_TOKEN` を追加し、十分に長い管理者キーを値に設定してください。再デプロイ後、`https://あなたのサイト/admin/`から管理者キーでログインできます。
+
+管理画面では最新500件の登録履歴・詳細確認、記録の個別削除、ランキングの全件削除ができます。`ADMIN_TOKEN`の値はGitHubやソースコードへ記載しないでください。
+
+加速鍵盤ゲームのURLは `/accel-keys/`、管理画面は `/admin/` です。従来のゲームと素材は `public` 直下に統合済みです。
 
 ## 補足
 

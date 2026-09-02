@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>リズム感テスト</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            overscroll-behavior: none;
+        }
+        .pulse {
+            animation: pulse-animation 0.5s cubic-bezier(0.4, 0, 0.6, 1);
+        }
+        @keyframes pulse-animation {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .8; transform: scale(0.95); }
+        }
+        .hit-effect {
+            animation: hit-animation 0.2s ease-out forwards;
+        }
+        @keyframes hit-animation {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            100% { transform: scale(1.1); box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
+        }
+        /* Tap Area Feedback */
+        #tap-area:active {
+            background-color: #4b5563; /* gray-600 */
+        }
+        .feedback-text-animation {
+            animation: feedback-pop 0.3s ease-out forwards;
+        }
+        @keyframes feedback-pop {
+            0% { opacity: 0; transform: translateY(20px) scale(0.8); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .modal-bg {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen w-full flex flex-col overflow-hidden font-sans">
+
+    <!-- Header -->
+    <header class="p-4 flex justify-between items-center bg-gray-800 shadow-md z-10">
+        <h1 class="text-xl font-bold text-yellow-400" id="mode-title">リズム感テスト (BPM 120)</h1>
+        <div id="status-display" class="text-sm font-mono text-gray-300">待機中...</div>
+    </header>
+
+    <!-- Main Game Area -->
+    <!-- 縦方向のスペース配分を調整し、要素が中央に集まるように変更 -->
+    <main class="flex-grow flex flex-col items-center justify-center relative w-full h-full p-4">
+        
+        <!-- Center Visualizer -->
+        <div id="visualizer" class="w-32 h-32 rounded-full border-4 border-gray-600 flex items-center justify-center mb-8 transition-colors duration-200">
+            <span id="beat-counter" class="text-4xl font-bold text-gray-500">READY</span>
+        </div>
+
+        <!-- Feedback Text -->
+        <div id="feedback-text" class="h-8 text-2xl font-bold text-center mb-4 transition-all duration-100"></div>
+
+        <!-- Progress Indicator (1-8拍プログレスバー) -->
+        <!-- absoluteからrelativeな配置に変更し、Tap Areaの直上に移動 -->
+        <div class="w-full max-w-md px-4 flex flex-col items-center mb-4">
+            <!-- Labels -->
+            <div class="flex w-full justify-between mb-1 text-sm font-semibold">
+                <span class="text-yellow-400">お手本パート (1〜4拍目)</span>
+                <span class="text-green-400">入力パート (5〜8拍目)</span>
+            </div>
+            
+            <!-- Progress Dots Container -->
+            <div id="rhythm-progress" class="w-full h-8 flex justify-center items-center space-x-2 text-3xl font-mono tracking-widest">
+                <!-- Progress dots will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Tap Area (Large Button) -->
+        <button id="tap-area" class="w-64 h-64 rounded-2xl bg-gray-700 border-b-8 border-gray-900 shadow-lg flex flex-col items-center justify-center transition-all active:border-b-0 active:translate-y-2 focus:outline-none">
+            <span class="text-3xl font-bold pointer-events-none select-none">TAP!</span>
+            <span class="text-xs mt-2 text-gray-400 pointer-events-none select-none">(スペースキー / クリック / タッチ)</span>
+        </button>
+    </main>
+
+    <!-- Result Modal (変更なし) -->
+    <div id="result-modal" class="fixed inset-0 modal-bg flex items-center justify-center z-50 hidden overflow-y-auto p-4">
+        <div class="bg-gray-800 p-8 rounded-lg max-w-md w-full text-center border border-gray-600 shadow-2xl my-auto">
+            <h2 class="text-3xl font-bold mb-2 text-yellow-400" id="result-title">結果</h2>
+            
+            <div class="text-6xl font-black my-6" id="total-score">0.00</div>
+            <div class="text-lg font-bold mb-4" id="score-unit">/ 101.00 点</div>
+            
+            <!-- 標準モードの結果表示 -->
+            <div id="standard-mode-results" class="space-y-2 text-sm text-left bg-gray-900 p-4 rounded mb-6 font-mono">
+                <div class="flex justify-between"><span>SET 1:</span> <span id="score-set-1" class="text-yellow-200">0.00 pts</span></div>
+                <div class="flex justify-between"><span>SET 2:</span> <span id="score-set-2" class="text-yellow-200">0.00 pts</span></div>
+                <div class="flex justify-between"><span>SET 3:</span> <span id="score-set-3" class="text-yellow-200">0.00 pts</span></div>
+                <div class="flex justify-between"><span>SET 4:</span> <span id="score-set-4" class="text-yellow-200">0.00 pts</span></div>
+                 <!-- 判定詳細ボタンをここに挿入 -->
+            </div>
+
+            <!-- ステップアップモードの結果表示 -->
+             <div id="step-up-mode-results" class="text-left bg-gray-900 p-4 rounded mb-6 hidden">
+                <p class="text-xl font-bold mb-2" id="final-level-text">最終到達レベル: 10</p>
+                <div id="step-up-score-list" class="space-y-1 mt-4">
+                    <!-- スコア詳細挿入 -->
+                </div>
+            </div>
+
+            <div class="mb-6 text-xs text-gray-400 text-left">
+                判定基準 (ms):<br>
+                ±16: 101% (PERFECT+) | ±48: 100% (PERFECT) | ±95: 75% (GREAT) | ±110: 50% (GOOD) | ±150: 25% (BAD) | >±150: MISS (0%)
+            </div>
+
+            <button onclick="resetGame()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded font-bold text-white transition-colors">
+                モード選択に戻る
+            </button>
+        </div>
+    </div>
+
+    <!-- Detail Modal (変更なし) -->
+    <div id="detail-modal" class="fixed inset-0 modal-bg flex items-center justify-center z-[60] hidden overflow-y-auto p-4">
+        <div class="bg-gray-700 p-6 rounded-lg max-w-sm w-full text-center border border-gray-600 shadow-2xl my-auto">
+            <h3 class="text-2xl font-bold mb-4 text-yellow-300" id="detail-level-title">レベルX 詳細</h3>
+            <div id="detail-content" class="text-left space-y-3">
+                <!-- 判定詳細挿入 -->
+            </div>
+            <button onclick="document.getElementById('detail-modal').style.display='none';" class="mt-6 w-full py-2 bg-gray-800 hover:bg-gray-600 rounded font-bold text-white transition-colors">
+                閉じる
+            </button>
+        </div>
+    </div>
+
+    <!-- Start Overlay (変更なし) -->
+    <div id="start-overlay" class="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-40 p-4">
+        <h1 class="text-4xl font-bold text-yellow-400 mb-8 tracking-widest" id="start-title">RHYTHM TEST</h1>
+        
+        <!-- Setting Controls -->
+        <div class="bg-gray-800 p-6 rounded-lg w-full max-w-sm mb-8 space-y-4 shadow-xl">
+            <!-- BPM Selector -->
+            <div>
+                <label for="bpm-selector" class="block text-sm font-medium text-gray-300 mb-2">BPM (テンポ)</label>
+                <select id="bpm-selector" class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-lg text-white focus:ring-yellow-500 focus:border-yellow-500">
+                    <option value="60">60</option>
+                    <option value="120" selected>120</option>
+                    <option value="180">180</option>
+                    <option value="240">240</option>
+                </select>
+            </div>
+
+            <!-- Offset Adjustment -->
+            <div>
+                <label for="timing-offset" class="block text-sm font-medium text-gray-300 mb-2">判定タイミング調整 (ms)</label>
+                <div class="flex items-center space-x-3">
+                    <button onclick="adjustOffset(-10)" class="p-2 bg-gray-600 hover:bg-gray-500 rounded-full text-xl leading-none transition-colors">-10</button>
+                    <input type="number" id="timing-offset" value="0" min="-500" max="500" step="1" class="flex-grow p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-lg text-white text-center [appearance:textfield] focus:ring-yellow-500 focus:border-yellow-500">
+                    <button onclick="adjustOffset(10)" class="p-2 bg-gray-600 hover:bg-gray-500 rounded-full text-xl leading-none transition-colors">+10</button>
+                </div>
+                <p class="text-xs text-gray-400 mt-1 text-center">タップが早すぎる場合はマイナス, 遅すぎる場合はプラスに調整</p>
+            </div>
+        </div>
+
+        <!-- Mode Selection Buttons -->
+        <div class="flex flex-col space-y-4 w-64 max-w-full">
+            <button id="start-standard-btn" class="py-3 bg-green-600 hover:bg-green-500 text-xl font-bold rounded shadow-lg transition-transform hover:scale-[1.02]">
+                標準モード (4セット)
+            </button>
+            <button id="start-stepup-v2-btn" class="py-3 bg-yellow-600 hover:bg-yellow-500 text-xl font-bold rounded shadow-lg transition-transform hover:scale-[1.02]">
+                ステップアップモード (Ver.2 - 難易度調整版)
+            </button>
+            <button id="start-stepup-v1-btn" class="py-3 bg-red-600 hover:bg-red-500 text-xl font-bold rounded shadow-lg transition-transform hover:scale-[1.02]">
+                ステップアップモード (Ver.1 - 旧仕様)
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript (変更なし) -->
+    <script>
+        // --- Game Parameters (Dynamic) ---
+        let currentBPM = 120;
+        let SECONDS_PER_BEAT = 60 / currentBPM; 
+        let timingOffsetMs = 0; // 手動調整オフセット (ms)
+        let timingOffsetSeconds = 0; // 手動調整オフセット (seconds)
+        
+        // --- Configuration (Static) ---
+        const INTRO_BEATS_COUNTIN = 4; 
+        const BEATS_PER_SET = 8; 
+        
+        // 音量設定 (最大ゲイン 0.17 = 170% 相当)
+        const MAX_GAIN = 0.17; 
+
+        // 判定閾値 (ms)
+        const JUDGMENT_THRESHOLDS = {
+            PERFECT_PLUS: 16,
+            PERFECT: 48,
+            GREAT: 95,
+            GOOD: 110,
+            BAD: 150,
+            MISS: 150
+        };
+
+        // --- STEP UP LEVEL DEFINITIONS ---
+        // (省略 - 定義内容は前バージョンから変更なし)
+        const STEP_UP_LEVELS_V2 = [
+            { level: 1, divisions: [4], requiredAccuracy: 20, restProb: 0, title: "レベル1: 4分音符 (基礎)" },
+            { level: 2, divisions: [8], requiredAccuracy: 25, restProb: 0, title: "レベル2: 8分音符 (基礎)" },
+            { level: 3, divisions: [12], requiredAccuracy: 30, restProb: 0, title: "レベル3: 12分音符 (3連符)" },
+            { level: 4, divisions: [16], requiredAccuracy: 40, restProb: 0, title: "レベル4: 16分音符" },
+            { level: 5, divisions: [4, 8], requiredAccuracy: 50, restProb: 0, title: "レベル5: 4分・8分混合 (休符なし)" },
+            { level: 6, divisions: [4, 8], requiredAccuracy: 55, restProb: 10, title: "レベル6: 4分・8分混合 (休符あり)" },
+            { level: 7, divisions: [4, 8, 12], requiredAccuracy: 60, restProb: 5, title: "レベル7: 3種類混合 (中速主体)" },
+            { level: 8, divisions: [8, 12], requiredAccuracy: 65, restProb: 5, title: "レベル8: 8分・12分混合 (低休符)" },
+            { level: 9, divisions: [8, 12], requiredAccuracy: 70, restProb: 15, title: "レベル9: 8分・12分混合 (高休符)" },
+            { level: 10, divisions: [12, 16], requiredAccuracy: 75, restProb: 0, title: "レベル10: 12分・16分混合 (高密度)" },
+            { level: 11, divisions: [8, 12, 16], requiredAccuracy: 75, restProb: 5, title: "レベル11: 8分〜16分混合" },
+            { level: 12, divisions: [16, 24], requiredAccuracy: 80, restProb: 0, title: "レベル12: 16分・24分混合 (超高密度)" },
+            { level: 13, divisions: [4, 8, 12, 16, 24], requiredAccuracy: 85, restProb: 5, title: "レベル13: 全音符混合 (低難度重視)" },
+            { level: 14, divisions: [4, 8, 12, 16, 24], requiredAccuracy: 85, restProb: 10, title: "レベル14: 全音符混合 (休符10%)" },
+            { level: 15, divisions: [4, 8, 12, 16, 24], requiredAccuracy: 90, restProb: 20, title: "レベル15: 全音符混合 (休符20%, 最高難度)" }
+        ];
+
+        const STEP_UP_LEVELS_V1 = [
+            { level: 1, divisions: [4], requiredAccuracy: 40, restProb: 0, title: "レベル1: 4分音符のみ" },
+            { level: 2, divisions: [8], requiredAccuracy: 50, restProb: 0, title: "レベル2: 8分音符のみ" },
+            { level: 3, divisions: [12], requiredAccuracy: 55, restProb: 0, title: "レベル3: 3連符のみ" },
+            { level: 4, divisions: [16], requiredAccuracy: 60, restProb: 0, title: "レベル4: 16分音符のみ" },
+            { level: 5, divisions: [4, 8], requiredAccuracy: 65, restProb: 0, title: "レベル5: 4分・8分混合" },
+            { level: 6, divisions: [8, 12], requiredAccuracy: 70, restProb: 0, title: "レベル6: 8分・3連符混合" },
+            { level: 7, divisions: [12, 16], requiredAccuracy: 75, restProb: 0, title: "レベル7: 3連符・16分混合" },
+            { level: 8, divisions: [4, 8, 16], requiredAccuracy: 75, restProb: 5, title: "レベル8: 4/8/16分混合 (低休符)" },
+            { level: 9, divisions: [8, 12, 16], requiredAccuracy: 80, restProb: 10, title: "レベル9: 8/12/16分混合 (中休符)" },
+            { level: 10, divisions: [4, 8, 12, 16], requiredAccuracy: 85, restProb: 15, title: "レベル10: 全音符混合 (高休符)" },
+        ];
+
+
+        // 標準モードのリズム構成比率
+        const TOTAL_SETS_STANDARD = 4;
+        const STANDARD_RHYTHM_CONFIG = [
+            { 4: 80, 8: 20, 12: 0, 16: 0, 24: 0 },
+            { 4: 0, 8: 60, 12: 40, 16: 0, 24: 0 },
+            { 4: 20, 8: 30, 12: 0, 16: 50, 24: 0 },
+            { 4: 15, 8: 20, 12: 15, 16: 20, 24: 30 }
+        ];
+        
+        // リズムパターンの定義 (タイミングは動的に計算される)
+        const RHYTHM_PATTERNS = {
+            // Key: 音符の種類 (分母) - timing/beatCountは変わらないが、SECONDS_PER_BEATを使うため再計算が必要
+            4: { timing: [[0, 1]], beatCount: 1 }, 
+            8: { timing: [[0, 1], [0.5, 1]], beatCount: 2 }, 
+            12: { timing: [[0, 1], [1/3, 1], [2/3, 1]], beatCount: 3 }, 
+            16: { timing: [[0, 1], [0.25, 1], [0.5, 1], [0.75, 1]], beatCount: 4 }, 
+            24: { timing: [[0, 1], [1/6, 1], [2/6, 1], [3/6, 1], [4/6, 1], [5/6, 1]], beatCount: 6 }
+        };
+
+        const JUDGMENT_MAP = {
+            'PERFECT+': { color: 'text-red-400', score: 101 }, 
+            'PERFECT': { color: 'text-yellow-400', score: 100 }, 
+            'GREAT': { color: 'text-green-400', score: 75 }, 
+            'GOOD': { color: 'text-blue-400', score: 50 }, 
+            'BAD': { color: 'text-gray-400', score: 25 }, 
+            'UNHIT': { color: 'text-gray-500', score: 0 } 
+        };
+
+        // --- Game State ---
+        let audioCtx;
+        let isPlaying = false;
+        let startTime = 0; 
+        let animationFrameId;
+        
+        let gameMode = 'standard'; 
+        let currentLevel = 0; 
+        let totalSetsToPlay = TOTAL_SETS_STANDARD; 
+        let SETS = []; 
+        let CURRENT_LEVEL_DEFINITIONS = []; 
+
+        let currentSetJudgments = []; 
+        let currentSetInvalidInputs = []; 
+        let setResults = []; 
+        let processedTargets = new Set(); 
+        let scheduledNotes = new Set(); 
+        
+        let globalSetStartTime = 0; 
+
+        // DOM Elements
+        const visualizer = document.getElementById('visualizer');
+        const beatCounter = document.getElementById('beat-counter');
+        const feedbackText = document.getElementById('feedback-text');
+        const startOverlay = document.getElementById('start-overlay');
+        const tapArea = document.getElementById('tap-area');
+        const statusDisplay = document.getElementById('status-display');
+        const totalScoreDisplay = document.getElementById('total-score');
+        const rhythmProgress = document.getElementById('rhythm-progress');
+        const bpmSelector = document.getElementById('bpm-selector');
+        const timingOffsetInput = document.getElementById('timing-offset');
+
+        /**
+         * BPMとオフセットに基づいて、ゲームの主要な時間パラメータを更新する
+         */
+        function updateTimingParameters() {
+            currentBPM = parseInt(bpmSelector.value, 10);
+            SECONDS_PER_BEAT = 60 / currentBPM; 
+            
+            timingOffsetMs = parseInt(timingOffsetInput.value, 10);
+            timingOffsetSeconds = timingOffsetMs / 1000;
+        }
+
+        function adjustOffset(delta) {
+            let current = parseInt(timingOffsetInput.value, 10);
+            timingOffsetInput.value = Math.max(-500, Math.min(500, current + delta));
+        }
+        window.adjustOffset = adjustOffset; // HTMLからアクセスできるようにグローバル化
+
+        // --- Utility Functions ---
+
+        function chooseDivisionWeighted(config) {
+            const divisions = Object.keys(config).map(d => parseInt(d, 10)).filter(d => config[d] > 0);
+            const totalWeight = divisions.reduce((sum, d) => sum + config[d], 0);
+            
+            if (totalWeight === 0) return 4; 
+
+            let random = Math.random() * totalWeight;
+            
+            for (const division of divisions) {
+                const weight = config[division] || 0;
+                if (random < weight) {
+                    return division;
+                }
+                random -= weight;
+            }
+            return divisions[0] || 4; 
+        }
+
+        /**
+         * 難易度設定に基づき、4拍のリズムパターンを生成する (教師ノートと入力ターゲットの両方)
+         * @param {object} levelConfig - レベルごとの設定 (divisions, restProbなど)
+         * @param {number} setIndex - 標準モードのセットインデックス (ステップアップモードでは0)
+         */
+        function generateSetRhythm(levelConfig, setIndex = 0) {
+            const allowedDivisions = levelConfig.divisions;
+            const restProbability = (levelConfig.restProb || 0) / 100; // 休符確率 (0.0 to 1.0)
+            
+            const set = {
+                id: gameMode === 'standard' ? setIndex + 1 : levelConfig.level, 
+                divisionPattern: [], 
+                teacherNotes: [], 
+                playerTargets: [], 
+                totalTargetCount: 0,
+                restProbability: restProbability * 100 
+            };
+
+            // SECONDS_PER_BEAT が更新されていることを前提に、相対時間を計算する
+            const beatDuration = SECONDS_PER_BEAT;
+
+            for (let beat = 0; beat < 4; beat++) {
+                let divisionKey = 0; 
+                
+                // 1. 休符判定
+                if (Math.random() < restProbability) {
+                    divisionKey = 0; 
+                } else {
+                    // 2. 音符の種類を決定
+                    if (gameMode === 'standard') {
+                        const config = STANDARD_RHYTHM_CONFIG[setIndex];
+                        divisionKey = chooseDivisionWeighted(config);
+                    } else {
+                        // ステップアップモード
+                        divisionKey = allowedDivisions[Math.floor(Math.random() * allowedDivisions.length)];
+                    }
+                }
+
+                set.divisionPattern.push(divisionKey);
+
+                // 3. ノートの生成
+                if (divisionKey !== 0) {
+                    const pattern = RHYTHM_PATTERNS[divisionKey];
+                    
+                    if (!pattern) {
+                        console.error("Pattern not found for key:", divisionKey);
+                        continue;
+                    }
+
+                    // RHYTHM_PATTERNSのtimingは beatDuration * (分数) で計算する
+                    const timings = pattern.timing.map(note => [note[0] * beatDuration, note[1]]);
+                    
+                    // 教師パート (0~4拍目)
+                    const teacherBeatStartTime = beat * beatDuration;
+                    timings.forEach(note => {
+                        const [timeOffset] = note;
+                        set.teacherNotes.push(teacherBeatStartTime + timeOffset);
+                    });
+
+                    // プレイヤーパート (4~8拍目)
+                    const playerBeatStartTime = (4 + beat) * beatDuration;
+                    timings.forEach(note => {
+                        const [timeOffset] = note;
+                        set.playerTargets.push(playerBeatStartTime + timeOffset);
+                        set.totalTargetCount++;
+                    });
+                }
+            }
+            
+            return set;
+        }
+
+        // --- Audio Engine ---
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playToneAt(time, freq, type, maxGain = MAX_GAIN) {
+            if (!audioCtx || audioCtx.state !== 'running') return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            
+            gain.gain.setValueAtTime(0, time);
+            gain.gain.linearRampToValueAtTime(maxGain, time + 0.005); 
+            gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.1); 
+            
+            osc.frequency.setValueAtTime(freq, time);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(time);
+            osc.stop(time + 0.1);
+        }
+
+        function playPlayerSound() {
+            if(audioCtx && audioCtx.state === 'running') {
+                playToneAt(audioCtx.currentTime, 1000, 'sine');
+            }
+        }
+
+        function visualPulse(color) {
+            visualizer.style.borderColor = color === 'yellow' ? '#facc15' : (color === 'blue' ? '#3b82f6' : (color === 'green' ? '#10b981' : (color === 'red' ? '#dc2626' : '#4b5563')));
+            visualizer.classList.remove('pulse');
+            void visualizer.offsetWidth; 
+            visualizer.classList.add('pulse');
+        }
+
+        function showFeedback(text, colorClass, msDiff) {
+            feedbackText.classList.remove('feedback-text-animation');
+            void feedbackText.offsetWidth; 
+            feedbackText.classList.add('feedback-text-animation');
+
+            feedbackText.className = `h-8 text-2xl font-bold text-center mb-4 transition-all duration-100 ${colorClass}`;
+            const msText = msDiff === Infinity ? '無視' : (msDiff > 0 ? `+${Math.floor(msDiff)}` : (msDiff < 0 ? `${Math.floor(msDiff)}` : '±0'));
+            const diffText = msDiff === Infinity ? '' : ` (${msText}ms)`;
+            feedbackText.innerText = `${text}${diffText}`;
+        }
+
+        // --- Game Flow ---
+
+        document.getElementById('start-standard-btn').addEventListener('click', () => {
+            startMode('standard');
+        });
+        document.getElementById('start-stepup-v2-btn').addEventListener('click', () => {
+            startMode('stepup_v2');
+        });
+        document.getElementById('start-stepup-v1-btn').addEventListener('click', () => {
+            startMode('stepup_v1');
+        });
+
+        async function startMode(mode) {
+            updateTimingParameters(); // BPMとオフセットの値を確定させる
+
+            initAudio(); 
+
+            statusDisplay.textContent = "音声準備中...";
+            visualPulse('yellow');
+
+            if (audioCtx.state === 'suspended') {
+                try {
+                    await audioCtx.resume();
+                } catch (e) {
+                    console.error("AudioContext resume failed:", e);
+                    beatCounter.innerText = "音声エラー";
+                    statusDisplay.textContent = "音声エラー：ブラウザ設定を確認してください";
+                    visualPulse('red');
+                    return; 
+                }
+            }
+            
+            if (audioCtx.state !== 'running') {
+                 console.error("AudioContext state is not running after resume:", audioCtx.state);
+                 beatCounter.innerText = "音声エラー";
+                 statusDisplay.textContent = "音声エラー：再開に失敗しました";
+                 visualPulse('red');
+                 return;
+            }
+            
+            gameMode = mode;
+            startGame();
+        }
+
+        function getCurrentLevelDefinitions() {
+            if (gameMode === 'stepup_v1') return STEP_UP_LEVELS_V1;
+            if (gameMode === 'stepup_v2') return STEP_UP_LEVELS_V2;
+            return []; // 標準モード
+        }
+        
+        function getModeTitle(mode) {
+             switch(mode) {
+                case 'standard': return '標準モード';
+                case 'stepup_v1': return 'ステップアップモード (Ver.1)';
+                case 'stepup_v2': return 'ステップアップモード (Ver.2)';
+                default: return 'リズム感テスト';
+            }
+        }
+        
+        function startGame() {
+            startOverlay.style.display = 'none';
+            document.getElementById('result-modal').style.display = 'none';
+            
+            isPlaying = true;
+            currentLevel = 0; 
+            setResults = []; 
+            currentSetJudgments = []; 
+            currentSetInvalidInputs = []; 
+            processedTargets = new Set();
+            scheduledNotes = new Set();
+            
+            const countInBeats = INTRO_BEATS_COUNTIN;
+            
+            if (gameMode === 'standard') {
+                totalSetsToPlay = TOTAL_SETS_STANDARD;
+                SETS = [];
+                for(let i=0; i<TOTAL_SETS_STANDARD; i++) {
+                    // SECONDS_PER_BEAT が更新された状態でリズムパターンを生成
+                    SETS.push(generateSetRhythm({ divisions: [], restProb: 0 }, i)); 
+                }
+            } else {
+                CURRENT_LEVEL_DEFINITIONS = getCurrentLevelDefinitions();
+                totalSetsToPlay = CURRENT_LEVEL_DEFINITIONS.length; 
+                currentLevel = 1; 
+                // SECONDS_PER_BEAT が更新された状態でリズムパターンを生成
+                SETS = [generateSetRhythm(CURRENT_LEVEL_DEFINITIONS[currentLevel - 1], 0)]; 
+            }
+            
+            // ヘッダータイトルの更新
+            document.getElementById('mode-title').textContent = `${getModeTitle(gameMode)} (BPM ${currentBPM} / 調整 ${timingOffsetMs}ms)`;
+            
+            startTime = audioCtx.currentTime + 0.1; 
+            globalSetStartTime = startTime + (countInBeats * SECONDS_PER_BEAT); 
+            
+            beatCounter.innerText = "COUNT";
+            runGameLoop();
+        }
+        
+        function generateNextStepUpSet(nextLevel) {
+            if (nextLevel > CURRENT_LEVEL_DEFINITIONS.length) return;
+            
+            // 新しいBPMで再計算された SECONDS_PER_BEAT を使用する
+            updateTimingParameters(); 
+
+            currentLevel = nextLevel;
+            const levelConfig = CURRENT_LEVEL_DEFINITIONS[currentLevel - 1];
+            
+            // 新しいBPMでリズムパターンを再生成
+            SETS[0] = generateSetRhythm(levelConfig, 0); 
+            document.getElementById('mode-title').textContent = `${getModeTitle(gameMode)} | ${levelConfig.title} (BPM ${currentBPM} / 調整 ${timingOffsetMs}ms)`;
+            
+            currentSetJudgments = [];
+            currentSetInvalidInputs = [];
+            processedTargets = new Set();
+            scheduledNotes = new Set();
+        }
+        
+        function runGameLoop() {
+            if (!isPlaying) return;
+
+            const update = () => {
+                if (!isPlaying) return;
+
+                if (!audioCtx || audioCtx.state !== 'running') {
+                    isPlaying = false;
+                    return;
+                }
+
+                const currentTime = audioCtx.currentTime;
+                const currentSetDuration = BEATS_PER_SET * SECONDS_PER_BEAT;
+                const setIndex = setResults.length; 
+
+                let currentSetStartGlobalTime;
+                
+                if (gameMode === 'standard') {
+                    currentSetStartGlobalTime = globalSetStartTime + setIndex * currentSetDuration;
+                } else {
+                    currentSetStartGlobalTime = globalSetStartTime; 
+                }
+                
+                const totalElapsedTime = currentTime - startTime; 
+                const setElapsedTime = currentTime - currentSetStartGlobalTime; 
+                
+                updateUI(totalElapsedTime / SECONDS_PER_BEAT, currentSetStartGlobalTime); 
+                scheduleSounds(currentTime, currentSetStartGlobalTime, setElapsedTime); 
+                
+                const currentSetEndGlobalTime = currentSetStartGlobalTime + currentSetDuration; 
+
+                // セット終了判定
+                if (currentTime >= currentSetEndGlobalTime - 0.001) {
+                    
+                    if (gameMode === 'standard') {
+                        if (setIndex < totalSetsToPlay) {
+                            finalizeSet(setIndex); 
+                            if (setIndex + 1 >= totalSetsToPlay) {
+                                endGame(false); 
+                            }
+                        }
+                    } else if (gameMode.startsWith('stepup')) {
+                        
+                        if (setIndex < currentLevel) { 
+                            const result = finalizeSet(currentLevel - 1); 
+                            const levelConfig = CURRENT_LEVEL_DEFINITIONS[currentLevel - 1];
+
+                            if (result.accuracy >= levelConfig.requiredAccuracy) {
+                                if (currentLevel < CURRENT_LEVEL_DEFINITIONS.length) {
+                                    // ステップアップ時は、次のレベルの準備ができた後、
+                                    // 次のセット開始時間を現在のセットの終了時間として更新する
+                                    globalSetStartTime = currentSetEndGlobalTime; 
+                                    generateNextStepUpSet(currentLevel + 1); 
+                                    executeVisual('level-up', `レベル ${currentLevel - 1} クリア! 次はレベル ${currentLevel}...`); 
+                                } else {
+                                    endGame(false);
+                                }
+                            } else {
+                                endGame(true);
+                            }
+                        }
+                    }
+                }
+                
+                animationFrameId = requestAnimationFrame(update);
+            };
+            animationFrameId = requestAnimationFrame(update);
+        }
+        
+        function scheduleSounds(currentTime, currentSetStartGlobalTime, setElapsedTime) {
+            const lookAheadTime = 0.1; 
+            const LATE_TOLERANCE = -0.05; 
+            
+            const countInBeats = INTRO_BEATS_COUNTIN;
+            const countInPhaseDuration = countInBeats * SECONDS_PER_BEAT;
+
+            if (setElapsedTime < 0) {
+                // カウントイン
+                for (let beat = 0; beat < countInBeats; beat++) {
+                    const absoluteTime = currentSetStartGlobalTime - countInPhaseDuration + (beat * SECONDS_PER_BEAT);
+                    const timeDifference = absoluteTime - currentTime;
+
+                    if (timeDifference > LATE_TOLERANCE && timeDifference <= lookAheadTime) {
+                        const key = absoluteTime.toFixed(4);
+                        if (!scheduledNotes.has(key)) {
+                            scheduleVisual(absoluteTime, 'countin', beat + 1);
+                            playToneAt(absoluteTime, 880, 'square'); // カウントインの音を高く
+                            scheduledNotes.add(key);
+                        }
+                    }
+                }
+                return false; 
+            } 
+            
+            const currentSetIndex = gameMode === 'standard' ? setResults.length : 0;
+            const currentSet = SETS[currentSetIndex]; 
+
+            if (currentSet) {
+                currentSet.teacherNotes.forEach(relativeTime => {
+                    const absoluteTime = currentSetStartGlobalTime + relativeTime;
+                    const timeDifference = absoluteTime - currentTime;
+
+                    if (timeDifference > LATE_TOLERANCE && timeDifference <= lookAheadTime) { 
+                        const key = absoluteTime.toFixed(4);
+                        if (!scheduledNotes.has(key)) {
+                            playToneAt(absoluteTime, 440, 'square'); 
+                            scheduleVisual(absoluteTime, 'teacher', null);
+                            scheduledNotes.add(key);
+                        }
+                    }
+                });
+
+                const UNLOCK_LEAD_TIME = 0.5; 
+                const playerStartRelativeTime = (4 * SECONDS_PER_BEAT) - UNLOCK_LEAD_TIME;
+                const playerStartAbsoluteTime = currentSetStartGlobalTime + playerStartRelativeTime;
+                const timeDifferenceToPlayerStart = playerStartAbsoluteTime - currentTime;
+
+                if (timeDifferenceToPlayerStart > -0.01 && timeDifferenceToPlayerStart <= lookAheadTime) {
+                     const key = playerStartAbsoluteTime.toFixed(4);
+                     if (!scheduledNotes.has(key)) {
+                        scheduleVisual(playerStartAbsoluteTime, 'player-start', null);
+                        scheduledNotes.add(key);
+                    }
+                }
+            }
+            return false;
+        }
+
+        function scheduleVisual(time, type, label) {
+            const delay = (time - audioCtx.currentTime) * 1000;
+            if (delay < -15) return;
+            if (delay < 0) {
+                executeVisual(type, label);
+                return;
+            }
+            setTimeout(() => {
+                if (!isPlaying) return;
+                executeVisual(type, label);
+            }, delay);
+        }
+        
+        function getSetOrLevelTitle() {
+            if (gameMode.startsWith('stepup')) {
+                const levelIndex = currentLevel - 1;
+                const levelConfig = CURRENT_LEVEL_DEFINITIONS[levelIndex];
+                return levelConfig ? levelConfig.title : 'レベル準備中';
+            } else {
+                return `SET ${setResults.length + 1}/${totalSetsToPlay}`;
+            }
+        }
+
+        function executeVisual(type, label) {
+            const modeTitle = getSetOrLevelTitle();
+            if (type === 'countin') {
+                statusDisplay.textContent = `${modeTitle} | カウントイン: ${label} (BPM: ${currentBPM})`; 
+                visualPulse('yellow');
+                beatCounter.innerText = label;
+            } else if (type === 'teacher') {
+                statusDisplay.textContent = `${modeTitle} | お手本 (BPM: ${currentBPM})`;
+                visualPulse('blue');
+                beatCounter.innerText = ''; 
+            } else if (type === 'player-start') {
+                statusDisplay.textContent = `${modeTitle} | 回答パート (BPM: ${currentBPM})`; 
+                visualPulse('gray');
+            } else if (type === 'level-up') {
+                statusDisplay.textContent = label;
+                visualPulse('green'); 
+            }
+        }
+
+        function handleInput(e) {
+            if (e) {
+                e.preventDefault(); 
+                if (e.type === 'touchstart') tapArea.removeEventListener('mousedown', handleInput); 
+            }
+
+            if (!isPlaying || !audioCtx) return;
+            playPlayerSound();
+
+            tapArea.classList.add('hit-effect');
+            setTimeout(() => tapArea.classList.remove('hit-effect'), 100);
+
+            evaluateHit();
+        }
+
+        function evaluateHit(inputTime = audioCtx.currentTime) {
+            const currentTime = inputTime;
+            const currentSetDuration = BEATS_PER_SET * SECONDS_PER_BEAT;
+            
+            let currentSetStartGlobalTime;
+            const setIndex = setResults.length; 
+            
+            if (gameMode === 'standard') {
+                currentSetStartGlobalTime = globalSetStartTime + setIndex * currentSetDuration;
+            } else {
+                currentSetStartGlobalTime = globalSetStartTime; 
+            }
+
+            const setElapsedTime = currentTime - currentSetStartGlobalTime;
+            
+            const INPUT_WINDOW_MS = JUDGMENT_THRESHOLDS.MISS; 
+            const INPUT_WINDOW_SECONDS = INPUT_WINDOW_MS / 1000;
+            const inputWindowStart = (4 * SECONDS_PER_BEAT) - INPUT_WINDOW_SECONDS; 
+            const inputWindowEnd = (8 * SECONDS_PER_BEAT) + INPUT_WINDOW_SECONDS; 
+
+            if (setElapsedTime < inputWindowStart || setElapsedTime >= inputWindowEnd) {
+                let feedbackType = 'OUT_OF_WINDOW_MISS';
+                let feedbackColor = "text-gray-600";
+                let feedbackTextValue = "MISS (タイミング外)";
+
+                if (setElapsedTime < (4 * SECONDS_PER_BEAT)) {
+                    feedbackType = 'LISTEN_PHASE';
+                    feedbackColor = "text-gray-500";
+                    feedbackTextValue = "入力無視";
+                }
+                
+                showFeedback(feedbackTextValue, feedbackColor, Infinity);
+                currentSetInvalidInputs.push({ type: feedbackType, diff: Infinity });
+                return;
+            }
+
+            const currentSetIndex = gameMode === 'standard' ? setIndex : 0;
+            const currentSet = SETS[currentSetIndex]; 
+            if (!currentSet) return;
+
+            let bestDiff = Infinity; // milliseconds
+            let bestTargetTime = -1; 
+            const maxJudgeMs = JUDGMENT_THRESHOLDS.MISS;
+
+            currentSet.playerTargets.forEach(relativeTime => {
+                // targetTimestamp: 目標時刻 (秒)
+                // targetTimestamp + timingOffsetSeconds: ユーザーの入力調整を適用した目標時刻
+                const targetTimestamp = currentSetStartGlobalTime + relativeTime;
+                const adjustedTargetTimestamp = targetTimestamp + timingOffsetSeconds;
+
+                // diff: ユーザー入力と調整済み目標時刻の差 (秒)
+                const diffSeconds = currentTime - adjustedTargetTimestamp;
+                const diffMs = diffSeconds * 1000; 
+                const absDiffMs = Math.abs(diffMs);
+
+                if (absDiffMs <= maxJudgeMs) { 
+                    if (absDiffMs < Math.abs(bestDiff)) {
+                        bestDiff = diffMs;
+                        bestTargetTime = targetTimestamp; // 記録するのは調整前の目標時刻
+                    }
+                }
+            });
+
+            if (bestTargetTime !== -1) {
+                const targetKey = bestTargetTime.toFixed(4);
+                
+                if (processedTargets.has(targetKey)) {
+                    showFeedback("重複入力", "text-gray-500", bestDiff);
+                    currentSetInvalidInputs.push({ type: 'DUPLICATE', diff: bestDiff });
+                    return;
+                }
+
+                processedTargets.add(targetKey);
+                
+                const absDiff = Math.abs(bestDiff);
+                let score = 0; 
+                let text = ""; // Base type: 'PERFECT', 'GREAT', etc.
+                let color = "";
+                let judgmentKey; // Detailed key: 'PERFECT+', 'PERFECT_FAST', 'GREAT_LATE', etc.
+
+                if (absDiff <= JUDGMENT_THRESHOLDS.PERFECT_PLUS) {
+                    score = JUDGMENT_MAP['PERFECT+'].score;
+                    text = "PERFECT+";
+                    color = JUDGMENT_MAP['PERFECT+'].color;
+                    judgmentKey = 'PERFECT+';
+                } else {
+                    // Determine base type
+                    if (absDiff <= JUDGMENT_THRESHOLDS.PERFECT) {
+                        score = JUDGMENT_MAP['PERFECT'].score;
+                        text = "PERFECT";
+                        color = JUDGMENT_MAP['PERFECT'].color;
+                    } else if (absDiff <= JUDGMENT_THRESHOLDS.GREAT) {
+                        score = JUDGMENT_MAP['GREAT'].score;
+                        text = "GREAT";
+                        color = JUDGMENT_MAP['GREAT'].color;
+                    } else if (absDiff <= JUDGMENT_THRESHOLDS.GOOD) {
+                        score = JUDGMENT_MAP['GOOD'].score;
+                        text = "GOOD";
+                        color = JUDGMENT_MAP['GOOD'].color;
+                    } else if (absDiff <= JUDGMENT_THRESHOLDS.BAD) {
+                        score = JUDGMENT_MAP['BAD'].score;
+                        text = "BAD";
+                        color = JUDGMENT_MAP['BAD'].color;
+                    } else { 
+                        score = 0; 
+                        text = "MISS";
+                        color = "text-gray-600";
+                        currentSetInvalidInputs.push({ type: 'MISS', diff: bestDiff });
+                        return;
+                    }
+
+                    // Determine direction and key for non-PERFECT+
+                    const direction = bestDiff < 0 ? 'FAST' : 'LATE'; // Negative diff (bestDiff < 0) means input was EARLY (Fast)
+                    judgmentKey = `${text}_${direction}`;
+                }
+
+                currentSetJudgments.push({ 
+                    key: judgmentKey, 
+                    score: score, 
+                    diff: bestDiff 
+                }); 
+                showFeedback(text, color, bestDiff);
+                
+            } else {
+                showFeedback("MISS", "text-gray-600", Infinity);
+                currentSetInvalidInputs.push({ type: 'OUT_OF_WINDOW_MISS', diff: Infinity });
+            }
+        }
+
+        function finalizeSet(index) {
+            const currentSetIndex = gameMode === 'standard' ? index : 0;
+            const currentSet = SETS[currentSetIndex]; 
+            const totalTargetCount = currentSet.totalTargetCount;
+            
+            // Define all possible detailed categories
+            let judgmentsMap = {
+                'PERFECT+': 0, 'PERFECT_FAST': 0, 'PERFECT_LATE': 0, 
+                'GREAT_FAST': 0, 'GREAT_LATE': 0, 'GOOD_FAST': 0, 
+                'GOOD_LATE': 0, 'BAD_FAST': 0, 'BAD_LATE': 0,
+                'UNHIT': 0, 
+            };
+
+
+            let hitSum = 0; 
+            currentSetJudgments.forEach(j => {
+                // j.key is the detailed key: 'PERFECT+', 'PERFECT_FAST', etc.
+                if (judgmentsMap.hasOwnProperty(j.key)) {
+                    judgmentsMap[j.key]++;
+                }
+                hitSum += j.score;
+            });
+            
+            const unhitCount = totalTargetCount - processedTargets.size;
+            judgmentsMap['UNHIT'] = unhitCount;
+
+            const totalScoreReceived = hitSum; 
+            const maxScorePossible = totalTargetCount * 101;
+            
+            let averageAccuracy = 0; 
+            if (totalTargetCount > 0) {
+                averageAccuracy = (totalScoreReceived / maxScorePossible) * 101;
+            } else {
+                averageAccuracy = 101; 
+            }
+            
+            const currentLevelId = gameMode === 'standard' ? index + 1 : currentLevel;
+            
+            let levelConfig = null;
+            if (gameMode.startsWith('stepup')) {
+                levelConfig = CURRENT_LEVEL_DEFINITIONS[currentLevelId - 1];
+            } else {
+                levelConfig = { requiredAccuracy: 0, title: `SET ${index + 1}` };
+            }
+
+
+            const result = {
+                accuracy: averageAccuracy, 
+                requiredAccuracy: levelConfig.requiredAccuracy,
+                judgments: judgmentsMap, 
+                levelTitle: levelConfig.title,
+                totalTargetCount: totalTargetCount,
+                id: currentLevelId 
+            };
+            
+            setResults.push(result);
+            
+            const setPoints = averageAccuracy * (25.25 / 101); 
+            
+            if (gameMode === 'standard') {
+                document.getElementById(`score-set-${index + 1}`).innerText = setPoints.toFixed(2) + " pts";
+            } 
+
+            currentSetJudgments = [];
+            currentSetInvalidInputs = [];
+            processedTargets = new Set();
+            scheduledNotes = new Set(); 
+            
+            return result;
+        }
+
+        /**
+         * 標準モードの全セットの結果を集計する
+         */
+        function getAggregatedStandardResults() {
+            let aggregatedJudgments = {
+                'PERFECT+': 0, 'PERFECT_FAST': 0, 'PERFECT_LATE': 0, 
+                'GREAT_FAST': 0, 'GREAT_LATE': 0, 'GOOD_FAST': 0, 
+                'GOOD_LATE': 0, 'BAD_FAST': 0, 'BAD_LATE': 0,
+                'UNHIT': 0, 
+            };
+            let totalTargetCount = 0;
+
+            setResults.forEach(setResult => {
+                totalTargetCount += setResult.totalTargetCount;
+                Object.keys(setResult.judgments).forEach(key => {
+                    if (aggregatedJudgments.hasOwnProperty(key)) {
+                        aggregatedJudgments[key] += setResult.judgments[key];
+                    }
+                });
+            });
+
+            return {
+                totalTargetCount: totalTargetCount,
+                judgments: aggregatedJudgments,
+                levelTitle: "全セット合計"
+            };
+        }
+
+
+        function endGame(isFailed = false) {
+            if (!isPlaying) return;
+            isPlaying = false;
+            cancelAnimationFrame(animationFrameId);
+            
+            statusDisplay.textContent = "ゲーム終了";
+            
+            const standardResultsDiv = document.getElementById('standard-mode-results');
+            const stepUpResults = document.getElementById('step-up-mode-results');
+            const finalLevelText = document.getElementById('final-level-text');
+            const resultTitle = document.getElementById('result-title');
+            const scoreUnit = document.getElementById('score-unit');
+            const stepUpScoreList = document.getElementById('step-up-score-list');
+            
+            if (gameMode === 'standard') {
+                
+                const totalScore = setResults.reduce((sum, res) => sum + res.accuracy, 0) * (25.25 / 101); 
+                totalScoreDisplay.innerText = totalScore.toFixed(2);
+                
+                resultTitle.textContent = "標準モード 結果";
+                scoreUnit.textContent = "/ 101.00 点";
+                standardResultsDiv.classList.remove('hidden');
+                stepUpResults.classList.add('hidden');
+                
+                // 標準モードの合計結果を取得し、詳細表示関数を定義
+                const aggregatedResults = getAggregatedStandardResults();
+                const aggregatedResultForDisplay = {
+                    id: 0, // 0は集計データを示す
+                    totalTargetCount: aggregatedResults.totalTargetCount,
+                    judgments: aggregatedResults.judgments,
+                    levelTitle: "全セット合計 判定詳細",
+                };
+                window.showStandardDetails = () => showLevelDetails(0, aggregatedResultForDisplay);
+                
+                // 詳細ボタンを挿入
+                standardResultsDiv.innerHTML += `
+                    <button onclick="showStandardDetails()" class="mt-4 w-full py-2 bg-gray-600 hover:bg-gray-500 rounded font-bold text-white transition-colors">
+                        全セット判定詳細を見る
+                    </button>
+                `;
+
+            } else {
+                
+                const totalAccuracySum = setResults.reduce((sum, res) => sum + res.accuracy, 0);
+                const reachedLevels = setResults.length;
+                let averageAccuracy = 0;
+                
+                if (reachedLevels > 0) {
+                    const rawAverage = totalAccuracySum / reachedLevels; 
+                    averageAccuracy = (rawAverage / 101) * 100; 
+                }
+                
+                totalScoreDisplay.innerText = averageAccuracy.toFixed(2);
+                resultTitle.textContent = `${getModeTitle(gameMode)} 結果`;
+                scoreUnit.textContent = `/ 100.00 % (到達レベル平均)`;
+                standardResultsDiv.classList.add('hidden');
+                stepUpResults.classList.remove('hidden');
+                
+                let actualFinalLevel = reachedLevels;
+                if (isFailed) {
+                     finalLevelText.textContent = `レベル ${actualFinalLevel} で失敗`;
+                     finalLevelText.classList.remove('text-green-400');
+                     finalLevelText.classList.add('text-red-400');
+                } else {
+                    finalLevelText.textContent = `最終到達レベル: ${CURRENT_LEVEL_DEFINITIONS.length} (全レベルクリア!)`;
+                    finalLevelText.classList.remove('text-red-400');
+                    finalLevelText.classList.add('text-green-400');
+                }
+                
+                stepUpScoreList.innerHTML = `<p class="font-bold text-gray-300 mb-2">レベル別スコア (タップで判定詳細)</p>`;
+                
+                CURRENT_LEVEL_DEFINITIONS.forEach((levelConfig, index) => {
+                    const result = setResults.find(r => r.id === index + 1); 
+                    const levelNumber = index + 1;
+                    
+                    let statusHtml = '';
+                    let accuracyText = 'N/A';
+                    let onClickAction = '';
+                    let backgroundColor = '';
+
+                    if (result) {
+                        const isCleared = result.accuracy >= levelConfig.requiredAccuracy;
+                        statusHtml = isCleared ? 
+                            '<span class="text-green-400">CLEAR</span>' : 
+                            '<span class="text-red-400">FAILED</span>';
+                        accuracyText = `${result.accuracy.toFixed(2)}%`;
+                        // ステップアップモードでは、個別の結果オブジェクトを渡す必要はない
+                        onClickAction = `showLevelDetails(${levelNumber})`; 
+                        backgroundColor = 'cursor-pointer hover:bg-gray-800 transition-colors';
+                    } else {
+                        statusHtml = '<span class="text-gray-500">未到達</span>';
+                        backgroundColor = '';
+                    }
+
+                    stepUpScoreList.innerHTML += `
+                        <div class="flex justify-between items-center py-1 border-b border-gray-700 last:border-b-0 ${backgroundColor}" ${onClickAction ? `onclick="${onClickAction}"` : ''}>
+                            <span class="text-sm font-mono">${levelNumber}. ${levelConfig.title} (目標 ${levelConfig.requiredAccuracy}%)</span>
+                            <span class="text-lg font-bold flex items-center space-x-2">
+                                <span class="${!result ? 'text-gray-500' : ''}">${accuracyText}</span> ${statusHtml}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+            
+            setTimeout(() => {
+                document.getElementById('result-modal').style.display = 'flex';
+            }, 50); 
+        }
+
+        /**
+         * レベルまたは集計結果の詳細モーダルを表示
+         * @param {number} levelNumber - レベルID (標準モード集計の場合は0)
+         * @param {object | null} aggregatedData - levelNumber=0の場合に集計データを提供する
+         */
+        function showLevelDetails(levelNumber, aggregatedData = null) {
+            let result;
+            let titleText;
+
+            if (levelNumber === 0 && aggregatedData) {
+                // 標準モード集計結果
+                result = aggregatedData;
+                titleText = aggregatedData.levelTitle;
+            } else {
+                // ステップアップモードまたは標準モードの個別セットの結果
+                result = setResults.find(r => r.id === levelNumber); 
+                if (!result) return;
+                
+                const levelConfig = gameMode.startsWith('stepup') ? CURRENT_LEVEL_DEFINITIONS[levelNumber - 1] : null;
+                titleText = levelConfig ? levelConfig.title + " 詳細" : `SET ${levelNumber} 詳細`;
+            }
+
+            document.getElementById('detail-level-title').textContent = titleText;
+            const detailContent = document.getElementById('detail-content');
+            
+            let html = `<p class="text-sm text-gray-400 mb-4">総ターゲット数: ${result.totalTargetCount}</p>`;
+            
+            // 判定グループの定義
+            const judgmentGroups = [
+                { base: 'PERFECT+', keys: ['PERFECT+'], label: 'PERFECT+' },
+                { base: 'PERFECT', keys: ['PERFECT_FAST', 'PERFECT_LATE'], label: 'PERFECT (100%)' },
+                { base: 'GREAT', keys: ['GREAT_FAST', 'GREAT_LATE'], label: 'GREAT (75%)' },
+                { base: 'GOOD', keys: ['GOOD_FAST', 'GOOD_LATE'], label: 'GOOD (50%)' },
+                { base: 'BAD', keys: ['BAD_FAST', 'BAD_LATE'], label: 'BAD (25%)' },
+                { base: 'UNHIT', keys: ['UNHIT'], label: 'MISS (未入力)' },
+            ];
+
+            const renderJudgmentRow = (type, count, color) => `
+                <div class="flex justify-between items-center border-b border-gray-600 pb-1 last:border-b-0">
+                    <span class="font-semibold ${color}">${type}</span>
+                    <span class="text-xl font-bold">${count}</span>
+                </div>
+            `;
+
+            judgmentGroups.forEach(group => {
+                const totalInGroup = group.keys.reduce((sum, key) => sum + (result.judgments[key] || 0), 0);
+                const baseKey = group.base.split('_')[0] || group.base; 
+                const baseColor = JUDGMENT_MAP[baseKey]?.color || JUDGMENT_MAP['UNHIT'].color;
+                
+                if (group.base === 'PERFECT+') {
+                    // PERFECT+ の合計を表示
+                    html += renderJudgmentRow(group.label, totalInGroup, baseColor);
+                } else if (group.base === 'UNHIT') {
+                    // MISS (未入力) の合計を表示
+                    html += `<div class="mt-4 border-t border-gray-500 pt-2"></div>`;
+                    html += renderJudgmentRow(group.label, totalInGroup, baseColor);
+                } else {
+                    // PERFECT, GREAT, GOOD, BAD の内訳を表示
+                    const fastCount = result.judgments[`${group.base}_FAST`] || 0;
+                    const lateCount = result.judgments[`${group.base}_LATE`] || 0;
+                    
+                    if (totalInGroup > 0) {
+                        // グループ合計 (PERFECT/GREAT/GOOD/BAD)
+                        html += `<div class="mt-4 border-t border-gray-500 pt-2"><span class="text-lg font-bold ${baseColor}">${group.label} (合計: ${totalInGroup})</span></div>`;
+
+                        // Fast Breakdown (早すぎ: マイナス差分) - 赤っぽく
+                        html += renderJudgmentRow(`&nbsp;&nbsp; - Fast (早すぎ)`, fastCount, 'text-red-300'); 
+                        
+                        // Late Breakdown (遅すぎ: プラス差分) - 青っぽく
+                        html += renderJudgmentRow(`&nbsp;&nbsp; + Late (遅すぎ)`, lateCount, 'text-blue-300'); 
+                    }
+                }
+            });
+
+            detailContent.innerHTML = html;
+            document.getElementById('detail-modal').style.display = 'flex';
+        }
+
+        function resetGame() {
+            document.getElementById('result-modal').style.display = 'none';
+            statusDisplay.textContent = "待機中...";
+            beatCounter.innerText = "READY";
+            rhythmProgress.textContent = ""; 
+            feedbackText.innerText = "";
+            
+            // Standard Mode Results Areaを初期状態に戻す
+            const standardResultsDiv = document.getElementById('standard-mode-results');
+            standardResultsDiv.innerHTML = `
+                <div class="flex justify-between"><span>SET 1:</span> <span id="score-set-1" class="text-yellow-200">0.00 pts</span></div>
+                <div class="flex justify-between"><span>SET 2:</span> <span id="score-set-2" class="text-yellow-200">0.00 pts</span></div>
+                <div class="flex justify-between"><span>SET 3:</span> <span id="score-set-3" class="text-yellow-200">0.00 pts</span></div>
+                <div class="flex justify-between"><span>SET 4:</span> <span id="score-set-4" class="text-yellow-200">0.00 pts</span></div>
+            `;
+            
+            updateTimingParameters(); // BPM/Offsetを現在のUI値で更新
+            document.getElementById('mode-title').textContent = `リズム感テスト (BPM ${currentBPM} / 調整 ${timingOffsetMs}ms)`;
+            
+            startOverlay.style.display = 'flex';
+            visualPulse('gray');
+        }
+
+        function updateUI(totalCurrentBeat, currentSetStartGlobalTime) {
+            const setElapsedTime = audioCtx.currentTime - currentSetStartGlobalTime;
+            const setBeat = setElapsedTime / SECONDS_PER_BEAT; 
+            const beatIndex = Math.floor(setBeat); 
+
+            let html = '';
+            const totalBeatsInSet = BEATS_PER_SET; 
+
+            for(let i = 0; i < totalBeatsInSet; i++) {
+                const isCurrentBeat = (i === beatIndex);
+                const icon = isCurrentBeat ? '●' : '〇';
+                
+                let colorClass;
+                // Beats 0-3 (1-4拍目) are Yellow (Teacher Part)
+                if (i < 4) {
+                    colorClass = 'text-yellow-500'; 
+                // Beats 4-7 (5-8拍目) are Green (Input Part)
+                } else {
+                    colorClass = 'text-green-500';
+                }
+
+                if (isCurrentBeat) {
+                    colorClass += ' font-bold';
+                } else {
+                    colorClass += ' opacity-50';
+                }
+
+                html += `<span class="${colorClass} transition-opacity duration-100">${icon}</span>`;
+            }
+
+            if (beatIndex >= 0 && beatIndex < totalBeatsInSet) {
+                rhythmProgress.innerHTML = html;
+            } else {
+                rhythmProgress.textContent = ''; 
+            }
+        }
+
+        // --- Initialization ---
+
+        // 入力ハンドラ
+        tapArea.addEventListener('mousedown', handleInput);
+        tapArea.addEventListener('touchstart', handleInput, {passive: false});
+        
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && isPlaying) {
+                e.preventDefault(); 
+                handleInput();
+            }
+        });
+
+        // ページロード時の初期タイトル設定
+        document.addEventListener('DOMContentLoaded', () => {
+             updateTimingParameters(); // 初期BPM/オフセットを反映
+             document.getElementById('mode-title').textContent = `リズム感テスト (BPM ${currentBPM} / 調整 ${timingOffsetMs}ms)`;
+        });
+
+    </script>
+</body>
+</html>

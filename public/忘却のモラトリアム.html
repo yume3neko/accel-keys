@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>忘却のモラトリアム</title>
+<style>
+:root{--ink:#f4f1eb;--muted:#b8b2aa;--line:rgba(255,255,255,.13);--glass:rgba(9,10,17,.84);--accent:#e8cfa6;--danger:#d09a9a;--shadow:0 18px 60px rgba(0,0,0,.5)}
+*{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;background:#080910;color:var(--ink);font-family:"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;overflow:hidden}
+button{font:inherit;color:inherit} .hidden{display:none!important}
+#app{position:relative;width:100%;height:100%;isolation:isolate;background:#12131c}
+#bg{position:absolute;inset:0;transition:filter .8s,transform 1.2s,opacity .8s;transform:scale(1.02);z-index:-5}
+#bg::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(4,5,10,.08),rgba(4,5,10,.36) 55%,rgba(4,5,10,.75));}
+.bg-sunset{background:radial-gradient(circle at 74% 22%,#c28762 0 7%,transparent 20%),linear-gradient(150deg,#5e4158,#342d49 48%,#191a29)}
+.bg-street{background:linear-gradient(160deg,#65485f,#3e354c 48%,#191a29);}
+.bg-tower,.bg-tower_inside{background:radial-gradient(circle at 50% 15%,rgba(219,191,146,.17),transparent 23%),repeating-linear-gradient(90deg,transparent 0 13%,rgba(255,255,255,.025) 13.2% 13.4%),linear-gradient(#242333,#0c0e15)}
+.bg-library,.bg-archive,.bg-library_echo{background:repeating-linear-gradient(90deg,rgba(232,207,166,.05) 0 1px,transparent 1px 86px),repeating-linear-gradient(0deg,rgba(232,207,166,.035) 0 1px,transparent 1px 64px),radial-gradient(circle at 50% 30%,#303044,#101119 68%)}
+.bg-school,.bg-classroom,.bg-clubroom{background:linear-gradient(150deg,#53605f,#313945 45%,#161820)}
+.bg-bookshop{background:repeating-linear-gradient(90deg,rgba(230,196,144,.06) 0 2px,transparent 2px 110px),linear-gradient(145deg,#4b342d,#201b20 58%,#0d0e13)}
+.bg-rain,.bg-mio_room,.bg-hall{background:repeating-linear-gradient(100deg,rgba(255,255,255,.06) 0 1px,transparent 1px 19px),linear-gradient(160deg,#33425b,#1d2230 55%,#0d0f15)}
+.bg-night,.bg-home,.bg-gray,.bg-park{background:radial-gradient(circle at 70% 20%,rgba(206,207,225,.12),transparent 25%),linear-gradient(145deg,#313646,#161925 60%,#0b0d13)}
+.bg-void,.bg-collapse{background:radial-gradient(circle at 50% 48%,#383044 0, #11121a 34%, #05060a 70%)}
+/* Complete-scenario additional backgrounds */
+.bg-hospital{background:
+  linear-gradient(90deg,transparent 0 13%,rgba(255,255,255,.08) 13.2% 13.5%,transparent 13.7% 86%,rgba(255,255,255,.06) 86.2% 86.5%,transparent 86.7%),
+  repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 72px),
+  radial-gradient(ellipse at 50% 5%,rgba(236,247,250,.26),transparent 30%),
+  linear-gradient(155deg,#6c7c80,#37464f 48%,#172029)}
+.bg-cityhall{background:
+  repeating-linear-gradient(90deg,rgba(255,245,218,.055) 0 2px,transparent 2px 118px),
+  linear-gradient(0deg,rgba(32,27,23,.55) 0 18%,transparent 18%),
+  radial-gradient(ellipse at 58% 18%,rgba(239,218,174,.20),transparent 28%),
+  linear-gradient(150deg,#6b6256,#3c3b3b 52%,#17191e)}
+.bg-closed_stacks{background:
+  repeating-linear-gradient(90deg,rgba(10,6,9,.94) 0 9%,rgba(117,83,68,.16) 9.3% 9.8%,rgba(8,7,11,.96) 10% 19%),
+  repeating-linear-gradient(0deg,transparent 0 54px,rgba(211,178,128,.07) 55px 57px,transparent 58px 112px),
+  radial-gradient(circle at 50% 38%,rgba(117,64,59,.28),transparent 31%),
+  linear-gradient(#21171d,#07080c)}
+.bg-memory{background:
+  radial-gradient(circle at 24% 34%,rgba(248,218,170,.24),transparent 16%),
+  radial-gradient(circle at 76% 62%,rgba(181,204,224,.16),transparent 19%),
+  repeating-radial-gradient(circle at 50% 50%,rgba(255,255,255,.025) 0 2px,transparent 3px 34px),
+  linear-gradient(145deg,#715c57,#3a3340 48%,#171923)}
+.bg-between{background:
+  repeating-linear-gradient(90deg,rgba(230,196,144,.075) 0 2px,transparent 2px 82px),
+  linear-gradient(90deg,rgba(65,52,64,.86) 0 47%,rgba(197,177,146,.12) 49%,rgba(26,34,45,.82) 53% 100%),
+  radial-gradient(circle at 50% 45%,rgba(225,205,169,.22),transparent 22%),
+  linear-gradient(145deg,#372c39,#11141c)}
+.bg-room{background:
+  linear-gradient(90deg,transparent 0 69%,rgba(156,183,205,.12) 69.5% 88%,transparent 88.5%),
+  linear-gradient(0deg,rgba(10,12,17,.72) 0 25%,transparent 25%),
+  radial-gradient(circle at 21% 30%,rgba(226,184,122,.18),transparent 20%),
+  linear-gradient(150deg,#3c3b46,#222633 52%,#0f1219)}
+.bg-train{background:
+  repeating-linear-gradient(90deg,rgba(220,232,238,.08) 0 1px,transparent 1px 145px),
+  linear-gradient(0deg,rgba(8,12,18,.74) 0 24%,transparent 24% 74%,rgba(8,12,18,.55) 74% 100%),
+  repeating-linear-gradient(6deg,transparent 0 24px,rgba(182,207,222,.055) 25px 27px,transparent 28px 55px),
+  linear-gradient(150deg,#52636d,#2e3c48 48%,#131923)}
+.bg-white{background:
+  radial-gradient(circle at 50% 42%,rgba(255,255,255,.98) 0 18%,rgba(239,237,232,.94) 45%,rgba(192,196,204,.84) 78%,#777b86 120%),
+  repeating-linear-gradient(90deg,rgba(110,112,120,.035) 0 1px,transparent 1px 96px)}
+#vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,transparent 32%,rgba(0,0,0,.45) 100%);z-index:-2}
+#grain{position:absolute;inset:0;pointer-events:none;opacity:.12;z-index:9;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E")}
+.topbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:18px clamp(16px,3vw,42px);z-index:5;gap:10px}
+.brand{letter-spacing:.2em;font-size:12px;color:rgba(255,255,255,.7)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.tool{border:1px solid var(--line);background:rgba(8,9,15,.46);padding:8px 11px;border-radius:999px;font-size:12px;cursor:pointer;backdrop-filter:blur(10px)}.tool:hover{background:rgba(255,255,255,.08)}
+#chapterCard{position:absolute;left:clamp(18px,6vw,88px);top:18%;max-width:620px;opacity:0;transform:translateY(14px);pointer-events:none;transition:.5s;z-index:2}#chapterCard.show{opacity:1;transform:none}.chapterNo{font-size:12px;letter-spacing:.28em;color:var(--accent);margin-bottom:10px}.chapterTitle{font-size:clamp(28px,5vw,54px);letter-spacing:.08em;text-shadow:0 5px 30px #000}
+#dialogueWrap{position:absolute;left:0;right:0;bottom:0;padding:0 clamp(12px,5vw,74px) clamp(14px,4vw,44px);z-index:4}
+#dialogue{max-width:1180px;margin:auto;min-height:210px;background:linear-gradient(180deg,rgba(9,10,16,.72),rgba(9,10,16,.94));border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(13px);padding:34px clamp(24px,5vw,62px) 28px;position:relative;cursor:pointer}
+#speaker{position:absolute;left:28px;top:-18px;background:#14151d;border:1px solid var(--line);padding:7px 18px;min-width:138px;text-align:center;letter-spacing:.12em;color:var(--accent);font-weight:700;box-shadow:0 8px 20px rgba(0,0,0,.28)}
+#text{white-space:pre-wrap;font-size:clamp(16px,2vw,20px);line-height:2;letter-spacing:.035em;min-height:110px;text-shadow:0 2px 6px #000}
+#advance{position:absolute;right:28px;bottom:16px;font-size:15px;color:var(--accent);animation:blink 1.4s infinite}@keyframes blink{50%{opacity:.25}}
+#choices{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;padding:90px 16px 270px;pointer-events:none}
+.choiceBox{width:min(860px,94vw);display:grid;gap:10px;pointer-events:auto}.choice{position:relative;width:100%;border:1px solid rgba(255,255,255,.17);background:rgba(10,11,18,.88);backdrop-filter:blur(10px);padding:15px 20px;cursor:pointer;text-align:left;line-height:1.6;box-shadow:0 10px 24px rgba(0,0,0,.24)}.choice.debugAnnotated{padding-bottom:36px}.choice:hover{transform:translateX(4px);background:rgba(32,31,40,.95);border-color:rgba(232,207,166,.5)}.choice.visited{background:linear-gradient(90deg,rgba(119,91,58,.92),rgba(52,43,39,.92));border-color:rgba(232,207,166,.68);box-shadow:inset 3px 0 0 var(--accent),0 10px 24px rgba(0,0,0,.24)}.choice.visited:hover{background:linear-gradient(90deg,rgba(139,106,66,.96),rgba(62,50,44,.96))}.choice.specialUnlocked{border-color:rgba(232,207,166,.9);box-shadow:inset 3px 0 0 var(--accent),0 0 24px rgba(232,207,166,.12),0 10px 24px rgba(0,0,0,.24)}.choice.locked{opacity:.38;cursor:not-allowed}.choice.locked::after{content:" 〔条件未達〕";color:#aaa;font-size:12px}.choiceDebugMeta{position:absolute;right:12px;bottom:7px;max-width:calc(100% - 24px);font-size:10px;line-height:1.35;letter-spacing:.025em;color:#c9c2b6;text-align:right;white-space:normal;pointer-events:none}.choiceDebugMeta.condition{color:#e0c28f}.choiceDebugMeta.ending{color:#e7b7b7}.choiceDebugMeta .debugPrefix{color:#918d86;margin-right:4px}
+.modal{position:absolute;inset:0;z-index:40;background:rgba(4,5,9,.86);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:20px}.panel{width:min(980px,96vw);max-height:88vh;overflow:auto;background:#11131b;border:1px solid var(--line);box-shadow:var(--shadow);padding:28px}.panel h2{margin:0 0 18px;letter-spacing:.12em}.close{float:right;background:transparent;border:1px solid var(--line);padding:7px 11px;cursor:pointer}
+#titleScreen{position:absolute;inset:0;z-index:30;background:radial-gradient(circle at 70% 25%,rgba(218,179,129,.16),transparent 24%),repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 90px),linear-gradient(145deg,#302d3a,#11131d 55%,#07080d);display:flex;align-items:center;justify-content:center;padding:24px}.titleBox{width:min(900px,100%);text-align:center}.gameTitle{font-size:clamp(42px,9vw,88px);letter-spacing:.13em;margin:0;text-shadow:0 12px 50px #000;font-weight:500}.subtitle{font-size:13px;letter-spacing:.35em;color:var(--muted);margin:18px 0 44px}.menu{display:grid;gap:10px;width:min(430px,90%);margin:auto}.menu button{padding:14px 18px;border:1px solid var(--line);background:rgba(255,255,255,.035);cursor:pointer;letter-spacing:.12em}.menu button:hover{background:rgba(232,207,166,.1);border-color:rgba(232,207,166,.4)}.smallnote{margin-top:24px;color:#8f8d92;font-size:12px;line-height:1.7}.debugTitleToggle{position:absolute;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:999px;padding:8px 10px 8px 14px;background:rgba(8,9,15,.58);backdrop-filter:blur(10px);cursor:pointer;color:#aaa;font-size:11px;letter-spacing:.12em}.debugTitleToggle .toggleTrack{position:relative;width:38px;height:20px;border-radius:999px;background:#31333c;border:1px solid rgba(255,255,255,.12);transition:.2s}.debugTitleToggle .toggleKnob{position:absolute;width:14px;height:14px;border-radius:50%;left:2px;top:2px;background:#8c8e96;transition:.2s}.debugTitleToggle.active{color:var(--accent);border-color:rgba(232,207,166,.4)}.debugTitleToggle.active .toggleTrack{background:rgba(154,119,72,.55);border-color:rgba(232,207,166,.5)}.debugTitleToggle.active .toggleKnob{left:20px;background:var(--accent)}
+@media(max-width:650px){.debugTitleToggle{font-size:10px;padding:7px 8px 7px 10px}.debugTitleToggle .toggleTrack{width:34px;height:18px}.debugTitleToggle .toggleKnob{width:12px;height:12px}.debugTitleToggle.active .toggleKnob{left:18px}}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.stat{border:1px solid var(--line);padding:12px}.bar{height:5px;background:#2a2b31;margin-top:8px}.fill{height:100%;background:currentColor}.stat b{display:flex;justify-content:space-between;font-size:13px}.subtle{color:var(--muted);font-size:12px}.endingGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}.endingCard{border:1px solid var(--line);padding:14px;min-height:106px}.endingCard.locked{filter:saturate(.2);color:#6d6e76}.endingCard .kind{font-size:10px;letter-spacing:.16em;color:var(--accent);margin-bottom:7px}.endingCard h3{margin:0 0 8px;font-size:15px}.endingCard p{margin:0;color:var(--muted);font-size:12px;line-height:1.65}.endingCard .achievementCondition{margin-top:2px;color:#c9c2b6}.endingCard .achievementCondition strong{color:var(--accent);font-weight:600;letter-spacing:.04em}.canonicalBadge{font-size:10px;padding:2px 6px;border:1px solid var(--line);margin-left:5px}.endingCounter{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin:14px 0 18px;padding:11px 14px;border:1px solid var(--line);background:rgba(255,255,255,.025)}.endingCounter .counterLabel{font-size:11px;letter-spacing:.16em;color:var(--muted)}.endingCounter .counterValue{font-size:20px;letter-spacing:.08em;color:var(--accent);font-variant-numeric:tabular-nums}.titleEndingCounter{margin:12px auto 0;font-size:12px;letter-spacing:.16em;color:var(--accent);font-variant-numeric:tabular-nums}
+.saveToolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}.saveDeleteMode{padding:8px 12px;border:1px solid var(--line);background:transparent;cursor:pointer}.saveDeleteMode.active{border-color:rgba(208,154,154,.65);background:rgba(125,51,51,.22);color:#efb2b2}.savegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.saveSlot{border:1px solid var(--line);padding:15px;background:#151720;transition:.18s}.saveSlot button{margin-top:10px;margin-right:6px;padding:7px 10px;background:transparent;border:1px solid var(--line);cursor:pointer}.saveSlot h4{margin:0 0 6px}.saveSlot.deleteReady{cursor:pointer;border-color:rgba(208,154,154,.48);background:rgba(77,30,35,.24)}.saveSlot.deleteReady:hover{border-color:rgba(229,168,168,.85);background:rgba(103,39,45,.34);transform:translateY(-1px)}.saveSlot.deleteEmpty{opacity:.5}.deletePrompt{margin-top:12px;color:#e2a8a8;font-size:12px;letter-spacing:.04em}
+#endScreen{position:absolute;inset:0;z-index:25;background:radial-gradient(circle at 50% 30%,#24222e,#090a10 67%);display:flex;align-items:center;justify-content:center;padding:24px}.endBox{width:min(850px,94vw);max-height:90vh;overflow:auto;text-align:center}.endKind{letter-spacing:.3em;color:var(--accent);font-size:12px}.endTitle{font-size:clamp(34px,7vw,64px);font-weight:500;letter-spacing:.1em;margin:16px 0 28px}.endText{white-space:pre-wrap;text-align:left;line-height:2;letter-spacing:.04em;color:#e8e5df}.endBtns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:30px}.endBtns button{padding:12px 17px;border:1px solid var(--line);background:rgba(255,255,255,.04);cursor:pointer}
+.debugRow{display:grid;grid-template-columns:170px 1fr 60px;gap:10px;align-items:center;margin:9px 0}.debugRow input[type=range]{width:100%}.flaggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:6px 14px}.danger{color:var(--danger)}
+.debugEndingGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-top:10px}.debugEndJump{border:1px solid var(--line);background:#171923;padding:11px 13px;cursor:pointer;text-align:left;line-height:1.45}.debugEndJump:hover{background:rgba(232,207,166,.09);border-color:rgba(232,207,166,.4)}.debugEndJump b{display:block;font-size:12px;color:var(--accent);letter-spacing:.08em}.debugEndJump span{display:block;font-size:12px;margin-top:3px}.debugEndJump .condition{margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.08);color:var(--muted);font-size:10.5px;line-height:1.6}.debugEndJump .condition strong{display:inline;color:#cfc6b8;font-size:10px;letter-spacing:.08em}.debugDivider{border:0;border-top:1px solid var(--line);margin:22px 0}
+/* DEBUG時は注釈ぶん選択肢が高くなるため、上部ツールバー／下部会話欄の実測高さを避けて表示する */
+.debugModeOn #choices{align-items:flex-start;padding:var(--choice-top-safe,90px) 12px var(--choice-bottom-safe,270px);overflow:hidden}
+.debugModeOn #choices .choiceBox{gap:6px;max-height:calc(100vh - var(--choice-top-safe,90px) - var(--choice-bottom-safe,270px));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:2px 5px 6px}
+.debugModeOn .choice{padding:9px 14px;line-height:1.42}
+.debugModeOn .choice.debugAnnotated{padding-bottom:9px}
+.debugModeOn .choiceDebugMeta{position:static;display:block;max-width:none;margin-top:3px;font-size:9px;line-height:1.22;text-align:right}
+@media(max-width:650px){#dialogueWrap{padding-bottom:10px}#dialogue{min-height:240px;padding:30px 20px 28px}#speaker{left:18px}#text{font-size:16px;line-height:1.85}.topbar{padding:10px}.brand{display:none}.tool{padding:7px 9px}.tools{gap:5px}#choices{padding:70px 10px 280px}.choice{padding:12px 14px}.panel{padding:20px}.gameTitle{letter-spacing:.06em}.debugModeOn #choices{padding-left:8px;padding-right:8px}.debugModeOn .choice{padding:8px 11px;font-size:14px}.debugModeOn .choiceDebugMeta{font-size:8.5px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bg" class="bg-sunset"></div><div id="vignette"></div><div id="grain"></div>
+  <div class="topbar"><div class="brand">FORGOTTEN MORATORIUM</div><div class="tools">
+    <button class="tool" data-open="status">STATUS</button><button class="tool" data-open="backlog">LOG</button><button class="tool" data-open="save">SAVE / LOAD</button><button class="tool" id="autoBtn">AUTO</button><button class="tool" id="skipBtn">SKIP</button><button class="tool hidden" id="debugTool" data-open="debug">DEBUG</button><button class="tool" id="titleBtn">TITLE</button>
+  </div></div>
+  <div id="chapterCard"><div class="chapterNo"></div><div class="chapterTitle"></div></div>
+  <div id="choices" class="hidden"><div class="choiceBox"></div></div>
+  <div id="dialogueWrap"><div id="dialogue"><div id="speaker">鳴海 覚</div><div id="text"></div><div id="advance">◆</div></div></div>
+
+  <div id="titleScreen"><div class="titleBox"><h1 class="gameTitle">忘却の<br>モラトリアム</h1><div class="subtitle">THE LIBRARY AT TWILIGHT</div><div class="menu"><button id="newGame">NEW GAME</button><button id="continueGame">CONTINUE</button><button id="endingListTitle">ENDING LIST</button></div><div id="titleEndingCounter" class="titleEndingCounter">ENDINGS 0/21</div><div class="smallnote">セーブデータ・エンディング回収状況はこのブラウザに保存されます。</div></div><button id="debugStartToggle" class="debugTitleToggle" type="button" aria-pressed="false"><span>DEBUG MODE</span><span class="toggleTrack"><span class="toggleKnob"></span></span></button></div>
+  <div id="endScreen" class="hidden"><div class="endBox"><div class="endKind"></div><div class="endTitle"></div><div class="endText"></div><div class="endBtns"><button id="retryChoice">直前の選択へ</button><button id="endingsFromEnd">エンディング一覧</button><button id="backTitle">タイトルへ</button></div></div></div>
+
+  <div id="modal_status" class="modal hidden"><div class="panel"><button class="close">閉じる</button><h2>STATUS</h2><div class="subtle">好感度の目安：低 30% / 中 50% / 高 80%。数値は0〜100で正規化しています。</div><div class="statgrid" id="statGrid"></div></div></div>
+  <div id="modal_backlog" class="modal hidden"><div class="panel"><button class="close">閉じる</button><h2>BACKLOG</h2><div id="logList"></div></div></div>
+  <div id="modal_save" class="modal hidden"><div class="panel"><button class="close">閉じる</button><h2>SAVE / LOAD</h2><div class="saveToolbar"><button id="saveDeleteMode" class="saveDeleteMode" type="button">削除モード：OFF</button><span id="saveDeleteHint" class="subtle">削除モード中は、保存済みスロットを選ぶと削除します。</span></div><div class="savegrid" id="saveGrid"></div></div></div>
+  <div id="modal_endings" class="modal hidden"><div class="panel"><button class="close">閉じる</button><h2>ENDING LIST</h2><div class="subtle">回収済みのエンディングと、現在確認できる分岐を記録します。</div><div id="endingCounter" class="endingCounter"><span class="counterLabel">ENDING COLLECTION</span><strong class="counterValue">0/21</strong></div><div class="endingGrid" id="endingGrid"></div></div></div>
+  <div id="modal_debug" class="modal hidden"><div class="panel"><button class="close">閉じる</button><h2>DEBUG</h2><div class="subtle">分岐確認用。パラメーター・主要フラグを直接操作できます。</div><div id="debugStats"></div><h3>フラグ</h3><div class="flaggrid" id="debugFlags"></div><p><button class="tool" id="debugMaxTruth">TRUE条件寄せ</button> <button class="tool" id="debugReset">パラメーター初期化</button></p><hr class="debugDivider"><h3>エンド直前分岐ジャンプ</h3><div class="subtle">必要なパラメーターとフラグを自動設定し、選択すれば対象エンドへ到達できる直前まで移動します。</div><div class="debugEndingGrid" id="debugEndingJumps"></div></div></div>
+</div>
+<script src="./忘却のモラトリアム/scenario_data.js"></script>
+<script>
+(()=>{
+'use strict';
+const D=window.FM_SCENARIO;
+if(!D){document.body.innerHTML='<pre style="color:white">シナリオファイルが読み込めませんでした。</pre>';return;}
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const baseState=()=>({node:D.start,aff:{mio:0,shiro:0,keigo:0,chikage:0},truth:0,oblivion:0,resolve:0,realism:0,avoidance:0,overload:0,obsession:0,despair:0,route:null,flags:{},history:[],lastChoiceNode:null,lastChoiceSnapshot:null,lastChapter:-1,entered:{}});
+let st=baseState(), typing=false, fullText='', timer=null, auto=false, skip=false, ended=false, endingSequence=null, debugEnabled=false, saveDeleteMode=false, debugSpecialUnlockId=null;
+const SEEN_CHOICES_KEY='fm_seen_choices';
+const SPECIAL_ROUTE_KEY='fm_special_ch8_routes';
+const SPECIAL_ROUTE_IDS=['mio','shiro','keigo','chikage','none'];
+const SPECIAL2_CATEGORY_GROUPS=[
+  {id:'true',label:'TRUE END',ids:['true1','true2']},
+  {id:'character',label:'キャラクター別 END',ids:['mioA','mioB','shiroA','shiroB','keigo','chikage']},
+  {id:'normal',label:'NORMAL END',ids:['normal1','normal2','normal3']},
+  {id:'merry',label:'MERRY BAD END',ids:['merry1','merry2']},
+  {id:'bad',label:'BAD END',ids:['bad1','bad2']},
+  {id:'early',label:'EARLY END',ids:['early1','early2','early3']},
+  {id:'dead',label:'DEAD END',ids:['dead1','dead2','dead3']}
+];
+const baseEndingIds=()=>D.endings.filter(e=>!e.postgame).map(e=>e.id);
+function unlockedEndingSet(){try{const v=JSON.parse(localStorage.getItem('fm_endings')||'[]');return new Set(Array.isArray(v)?v:[])}catch{return new Set()}}
+function allBaseEndingsUnlocked(){const u=unlockedEndingSet();return baseEndingIds().every(id=>u.has(id))}
+function special2CategoryStatus(){const u=unlockedEndingSet();return SPECIAL2_CATEGORY_GROUPS.map(g=>({id:g.id,label:g.label,done:g.ids.some(id=>u.has(id))}))}
+function special2CategoriesActuallyComplete(){return special2CategoryStatus().every(g=>g.done)}
+function special2CategoriesComplete(){if(debugSpecialUnlockId==='special2')return true;return special2CategoriesActuallyComplete()}
+function getSpecialRouteProgress(){try{const v=JSON.parse(localStorage.getItem(SPECIAL_ROUTE_KEY)||'[]');return new Set(Array.isArray(v)?v.filter(x=>SPECIAL_ROUTE_IDS.includes(x)):[])}catch{return new Set()}}
+function markSpecialChapterRoute(route){if(!allBaseEndingsUnlocked()||!SPECIAL_ROUTE_IDS.includes(route))return;const p=getSpecialRouteProgress();if(p.has(route))return;p.add(route);localStorage.setItem(SPECIAL_ROUTE_KEY,JSON.stringify([...p]))}
+function specialProgressComplete(){if(debugSpecialUnlockId==='special')return true;if(!allBaseEndingsUnlocked())return false;const p=getSpecialRouteProgress();return SPECIAL_ROUTE_IDS.every(id=>p.has(id))}
+const clamp=v=>Math.max(0,Math.min(100,v));
+const AFF_MAX={mio:62,shiro:61,keigo:57,chikage:44};
+const affPct=k=>Math.max(0,Math.min(100,Math.round((st.aff[k]||0)/AFF_MAX[k]*100)));
+function snap(){const x=JSON.parse(JSON.stringify(st));x.lastChoiceSnapshot=null;return JSON.stringify(x)}
+function applyEffects(e={}){if(e.aff)for(const k in e.aff)st.aff[k]=clamp((st.aff[k]||0)+e.aff[k]);for(const k of ['truth','oblivion','resolve'])if(k in e)st[k]=clamp(st[k]+e[k]);for(const k of ['realism','avoidance','overload','obsession','despair'])if(k in e)st[k]=(st[k]||0)+e[k];if(e.flags)Object.assign(st.flags,e.flags);if(e.route!==undefined)st.route=e.route;}
+function requirementMet(r){if(!r)return true;if(r.resolve!==undefined&&st.resolve<r.resolve)return false;if(r.truth!==undefined&&st.truth<r.truth)return false;if(r.flag&&!st.flags[r.flag])return false;if(r.special2Categories&&!special2CategoriesComplete())return false;return true;}
+function getSeenChoices(){try{const v=JSON.parse(localStorage.getItem(SEEN_CHOICES_KEY)||'[]');return new Set(Array.isArray(v)?v:[])}catch{return new Set()}}
+function choiceKey(node,index,c){return `${node}::${index}::${c.next||''}::${c.text||''}`}
+function finalChoiceKey(route,o){return `FINAL::${route||'none'}::${o.id}::${o.text||''}`}
+function markChoiceSeen(key){const seen=getSeenChoices();if(seen.has(key))return;seen.add(key);localStorage.setItem(SEEN_CHOICES_KEY,JSON.stringify([...seen]))}
+function syncChoiceSafeArea(){const top=$('.topbar'),dialog=$('#dialogueWrap');const topH=top?Math.ceil(top.getBoundingClientRect().height+10):90;const bottomH=dialog&&!dialog.classList.contains('hidden')?Math.ceil(dialog.getBoundingClientRect().height+10):24;document.documentElement.style.setProperty('--choice-top-safe',topH+'px');document.documentElement.style.setProperty('--choice-bottom-safe',bottomH+'px')}
+function syncDebugButton(){$('#debugTool').classList.toggle('hidden',!debugEnabled);$('#app').classList.toggle('debugModeOn',debugEnabled);syncChoiceSafeArea()}
+function applyTitleDebugSetting(){debugEnabled=$('#debugStartToggle').getAttribute('aria-pressed')==='true';syncDebugButton()}
+function furiganaHTML(text){return esc(String(text??''))}
+function setRubyText(el,text){if(!el)return;el.textContent=String(text??'')}
+const DEBUG_STAT_LABELS={mio:'澪好感度',shiro:'シロ好感度',keigo:'啓吾好感度',chikage:'千景好感度',truth:'真理度',oblivion:'忘却度',resolve:'覚悟度',realism:'現実志向',avoidance:'回避',overload:'負荷',obsession:'執着',despair:'絶望'};
+const DEBUG_FLAG_REQUIRE_LABELS={hidden1:'千景ルート隠し手掛かり 1/3 取得済み',hidden2:'千景ルート隠し手掛かり 2/3 取得済み',hidden3:'千景ルート隠し手掛かり 3/3 取得済み',humanize:'シロ人間化の手掛かりを入手済み',humanize2:'シロの名前の手掛かりを入手済み',name_clue:'司書の名前の手掛かりを入手済み',anchor:'記憶の錨を確保済み',special2_folded_page:'第七章で「七色の栞と折り返し頁」を回収済み'};
+const DEBUG_FLAG_SET_LABELS={
+  name_clue:'「司書の名前」の手掛かりを得る',
+  withdraw_mio:'図書館に頼らず、澪と現実の方法を選ぶ',
+  anchor:'啓吾と安全策を詰めてから図書館へ入る',
+  humanize:'シロを人間として解放する手掛かりを得る',
+  humanize2:'シロ人間化に必要な「名前」の条件を満たす',
+  escape_shiro:'シロと図書館から逃げる道を選ぶ',
+  leave_blank:'白紙の本を暴かず、そのまま閉じる',
+  special2_folded_page:'「七色の栞と折り返し頁」を回収する',
+  mio_keep:'「事故の記憶を残す」',
+  mio_erase:'「事故の記憶を切り離す」',
+  mio_doll:'「澪の記憶を覚への依存へ整理する」',
+  human_choice:'「シロ本人にこれからの名前を選ばせる」',
+  shiro_run:'「シロと頁の隙間へ逃げる」',
+  shiro_stay:'「現実を捨て、シロと図書館に残る」',
+  seal:'「時計塔の入口を封鎖する」',
+  force_restore:'「凛の記憶を力ずくで戻す」',
+  rewrite:'「凛の記憶を書き換える」',
+  withdraw_tower:'「時計塔との接点を断つ」'
+};
+function signedDebugValue(v){return v>0?`+${v}`:String(v)}
+function choiceEffectDebugText(c){const e=c&&c.effects||{},parts=[];if(e.aff)for(const k of ['mio','shiro','keigo','chikage'])if(e.aff[k])parts.push(`${DEBUG_STAT_LABELS[k]} ${signedDebugValue(e.aff[k])}`);for(const k of ['truth','oblivion','resolve','realism','avoidance','overload','obsession','despair'])if(e[k])parts.push(`${DEBUG_STAT_LABELS[k]} ${signedDebugValue(e[k])}`);return parts.length?parts.join(' / '):'ステータス変動なし'}
+function choiceNewFlags(c){
+  const found={};
+  const add=f=>{if(!f)return;for(const [k,v] of Object.entries(f))if(v===true&&!st.flags[k])found[k]=true};
+  add(c&&c.effects&&c.effects.flags);
+  const nx=c&&c.next&&D.scenes[c.next];
+  if(nx&&nx.effects&&nx.effects.flags)add(nx.effects.flags);
+  return found;
+}
+function choiceFlagDebugText(c){
+  const flags=choiceNewFlags(c),keys=Object.keys(flags);if(!keys.length)return'';
+  const parts=[];
+  const hiddenKeys=['hidden1','hidden2','hidden3'];
+  if(hiddenKeys.some(k=>flags[k])||flags.hidden_all){
+    const after=hiddenKeys.filter(k=>st.flags[k]||flags[k]).length;
+    parts.push(`千景ルート隠し手掛かり ${after}/3`);
+  }
+  // hidden_all は hidden1～3 の3/3表示に統合して重複表示しない。
+  const skip=new Set(['hidden1','hidden2','hidden3','hidden_all']);
+  // humanize と humanize2 が同時に立つ場合は、内部名を並べず一つの意味にまとめる。
+  if(flags.humanize&&flags.humanize2){parts.push('シロ人間化の手掛かりを揃える');skip.add('humanize');skip.add('humanize2')}
+  for(const k of keys){if(skip.has(k))continue;parts.push(DEBUG_FLAG_SET_LABELS[k]||DEBUG_FLAG_REQUIRE_LABELS[k]?.replace(/取得済み$/,'')||`「${k}」`)}
+  return parts.join(' / ');
+}
+function choiceRequirementDebugText(r){if(!r)return'';const parts=[];if(r.resolve!==undefined)parts.push(`覚悟度 ${r.resolve}以上`);if(r.truth!==undefined)parts.push(`真理度 ${r.truth}以上`);if(r.flag)parts.push(DEBUG_FLAG_REQUIRE_LABELS[r.flag]||`フラグ「${r.flag}」取得済み`);if(r.special2Categories)parts.push('TRUE／キャラ別／NORMAL／MERRY BAD／BAD／EARLY／DEADを各1種以上回収済み');return parts.length?parts.join(' / '):'条件情報なし'}
+function traceEndingFromNode(nodeId,maxSteps=40){const seen=new Set();let cur=nodeId;for(let step=0;step<maxSteps&&cur;step++){if(seen.has(cur))return null;seen.add(cur);const n=D.scenes[cur];if(!n)return null;if(n.type==='ending')return n.ending||null;if(n.type==='resolve'||n.choices||!n.next)return null;cur=n.next}return null}
+function choiceEndingDebugInfo(c){let id=null;if(c&&c.id&&D.endings.some(e=>e.id===c.id))id=c.id;else if(c&&c.next)id=traceEndingFromNode(c.next);if(!id)return null;const m=D.endings.find(e=>e.id===id);const t=D.endingTexts&&D.endingTexts[id];return{id,label:m?endingLabel(m):'ENDING',name:(t&&t.title)||(m&&m.name)||id}}
+function appendChoiceDebugMeta(button,c){if(!debugEnabled)return;const meta=document.createElement('span');meta.className='choiceDebugMeta';button.classList.add('debugAnnotated');const end=choiceEndingDebugInfo(c),hasReq=!!(c&&c.require),reqOK=hasReq?requirementMet(c.require):true,flagText=choiceFlagDebugText(c);let lines=[];const addResult=()=>{if(end){meta.classList.add('ending');lines.push('<span class="debugPrefix">END：</span>'+esc(end.label+'「'+end.name+'」'))}else{lines.push('<span class="debugPrefix">変動：</span>'+esc(choiceEffectDebugText(c)))}if(flagText)lines.push('<span class="debugPrefix">フラグ：</span>'+esc(flagText))};if(hasReq){meta.classList.add('condition');lines.push('<span class="debugPrefix">条件：</span>'+esc(choiceRequirementDebugText(c.require))+(reqOK?' ✓':' ✕'));if(reqOK)addResult()}else addResult();meta.innerHTML=lines.join('<br>');button.appendChild(meta)}
+function bg(name){$('#bg').className='bg-'+(name||'city');}
+function showChapter(n){if(n.chapter===undefined||n.chapter===st.lastChapter)return;st.lastChapter=n.chapter;const c=$('#chapterCard');c.querySelector('.chapterNo').textContent=n.chapter===0?'PROLOGUE':'CHAPTER '+String(n.chapter).padStart(2,'0');setRubyText(c.querySelector('.chapterTitle'),n.chapterTitle||'');c.classList.add('show');setTimeout(()=>c.classList.remove('show'),1900);}
+function pushLog(n){if(!n.speaker||!n.text)return;st.history.push({speaker:n.speaker,text:n.text});if(st.history.length>120)st.history.shift();}
+function typeText(text,done){clearInterval(timer);typing=true;fullText=text;const el=$('#text');el.innerHTML='';let i=0;const chars=[...text];const speed=skip?1:24;timer=setInterval(()=>{const step=skip?8:1;i=Math.min(chars.length,i+step);setRubyText(el,chars.slice(0,i).join(''));if(i>=chars.length){clearInterval(timer);typing=false;done&&done();if(auto&&!$('#choices').classList.contains('hidden'))return;if(auto)setTimeout(()=>advance(),900)}},speed)}
+function reveal(){if(!typing)return false;clearInterval(timer);setRubyText($('#text'),fullText);typing=false;if(auto)setTimeout(()=>advance(),650);return true;}
+function render(){ended=false;$('#endScreen').classList.add('hidden');const n=D.scenes[st.node];if(!n){console.error('Missing node',st.node);return;}if(n.type==='ending'){showEnding(n.ending);return;}if(n.type==='resolve'){resolveEnding(n.route);return;}st.entered=st.entered||{};if(n.effects&&!st.entered[st.node]){applyEffects(n.effects);st.entered[st.node]=true;}showChapter(n);bg(n.bg);setRubyText($('#speaker'),n.speaker||'');$('#choices').classList.add('hidden');$('#advance').classList.remove('hidden');pushLog(n);typeText(n.text||'',()=>{if(n.choices)showChoices(n);});autosave();}
+function advance(){if(endingSequence){if(reveal())return;advanceEndingSequence();return;}if(ended)return;if(reveal())return;const n=D.scenes[st.node];if(!n||n.type!=='scene')return;if(n.choices){showChoices(n);return;}if(n.next){st.node=n.next;render();}}
+function showChoices(n){
+  syncChoiceSafeArea();$('#choices').classList.remove('hidden');$('#advance').classList.add('hidden');const box=$('#choices .choiceBox');box.innerHTML='';box.scrollTop=0;const seen=getSeenChoices();
+  n.choices.forEach((c,i)=>{const ok=requirementMet(c.require);if(c.hiddenUntilMet&&!ok&&!debugEnabled)return;const b=document.createElement('button'),key=choiceKey(st.node,i,c);b.className='choice'+(seen.has(key)?' visited':'')+(ok?'':' locked')+(c.hiddenUntilMet&&ok?' specialUnlocked':'');setRubyText(b,c.text);appendChoiceDebugMeta(b,c);b.onclick=()=>{if(!ok)return;markChoiceSeen(key);if(st.node==='c8_route')markSpecialChapterRoute(c.effects&&c.effects.route);st.lastChoiceNode=st.node;st.lastChoiceSnapshot=snap();applyEffects(c.effects||{});$('#choices').classList.add('hidden');st.node=c.next;render();};box.appendChild(b)})
+}
+function scoreHigh(k){return affPct(k)>=80} function allMid(){return Object.keys(AFF_MAX).every(k=>affPct(k)>=50)}
+function resolveEnding(route){let id='normal1';
+  if(st.flags.rewrite){id='bad2'}
+  else if(route==='mio'){
+    if(st.flags.mio_doll&&scoreHigh('mio')&&st.oblivion>=85&&st.obsession>=3) id='merry1';
+    else if(st.flags.mio_erase&&scoreHigh('mio')&&st.oblivion>=55) id='mioB';
+    else if(st.flags.mio_keep&&scoreHigh('mio')&&st.resolve>=65&&st.oblivion<=35) id='mioA';
+    else if(st.overload>=4) id='bad1';
+    else id=st.avoidance>=4?'normal3':'normal1';
+  } else if(route==='shiro'){
+    if(st.flags.shiro_stay&&scoreHigh('shiro')&&st.oblivion>=80&&st.despair>=3) id='merry2';
+    else if(st.flags.shiro_run&&scoreHigh('shiro')&&st.truth<=45) id='shiroB';
+    else if(st.flags.humanize&&st.flags.humanize2&&scoreHigh('shiro')&&st.truth>=65) id='shiroA';
+    else id=st.avoidance>=4?'normal3':'normal1';
+  } else if(route==='keigo'){
+    if(st.flags.force_restore&&st.overload>=4) id='bad1';
+    else if(st.flags.seal&&scoreHigh('keigo')&&st.truth>=40&&st.truth<=85&&st.realism>=4) id='keigo';
+    else id=st.avoidance>=4?'normal3':'normal1';
+  } else if(route==='chikage'){
+    if(st.flags.hidden1&&st.flags.hidden2&&st.flags.hidden3&&scoreHigh('chikage')) id='chikage';
+    else id='normal1';
+  } else { id=st.avoidance>=4?'normal3':'normal1'; }
+  // Global true-end overrides require high knowledge and bonds. They are reachable from any committed route.
+  if(allMid()&&st.truth>=90&&st.resolve>=80&&st.oblivion<=30) id='true1';
+  showFinalDecision(route,id);
+}
+function showFinalDecision(route,provisional){
+  const options=[];
+  if(specialProgressComplete()) options.push({text:'どの結末も忘れない。「余白目録」を開く',id:'special',special:true});
+  if(special2CategoriesComplete()&&st.flags.special2_folded_page) options.push({text:'七つの栞を原契約に挟み、「帰れる図書館」へ書き戻す',id:'special2',special:true});
+  // These choices are route-sensitive rather than a fixed universal list.
+  if(st.truth>=90&&st.oblivion>=30&&st.oblivion<=65) options.push({text:'自分が新しい司書となり、シロを現実へ返す',id:'true2'});
+  if(st.truth>=90&&allMid()&&st.resolve>=80&&st.oblivion<=30) options.push({text:'原契約を修復し、痛みを「返せる」図書館へ戻す',id:'true1'});
+  if(route==='mio'){
+    if(st.flags.mio_keep)options.push({text:'澪の記憶を消さず、二人で持ち帰る',id:provisional==='mioA'?'mioA':provisional});
+    if(st.flags.mio_erase)options.push({text:'事故の頁だけを図書館へ預ける',id:provisional==='mioB'?'mioB':provisional});
+    if(st.flags.mio_doll)options.push({text:'澪から「苦しむ可能性」そのものを消す',id:provisional==='merry1'?'merry1':'normal1'});
+  } else if(route==='shiro'){
+    if(st.flags.humanize)options.push({text:'シロを一人の人間として現実へ送り出す',id:provisional==='shiroA'?'shiroA':provisional});
+    if(st.flags.shiro_run)options.push({text:'頁の隙間へ二人で逃げる',id:provisional==='shiroB'?'shiroB':provisional});
+    if(st.flags.shiro_stay)options.push({text:'現実の記憶を捨て、図書館に残る',id:provisional==='merry2'?'merry2':provisional});
+  } else if(route==='keigo'){
+    if(st.flags.seal)options.push({text:'入口を封じ、凛を現実の治療へ繋ぐ',id:provisional});
+    if(st.flags.force_restore)options.push({text:'流出した痛みを自分へ集めて凛を戻す',id:st.overload>=4?'bad1':'normal1'});
+    if(st.flags.rewrite)options.push({text:'凛の記憶を書き換える',id:'bad2'});
+  } else if(route==='chikage'){
+    options.push({text:'幻影堂で、怪異と現実の境界を見張る',id:provisional});
+  } else options.push({text:'時計塔の工事にすべてを委ねる',id:provisional});
+  options.push({text:'自分の「痛みを見る力」を代価にして降りる',id:'normal2'});
+  if(st.avoidance>=3)options.push({text:'もう何も選ばず、目を閉じる',id:'normal3'});
+  setRubyText($('#speaker'),'SYSTEM');setRubyText($('#text'),'最後に、何を差し出し、何を残す？');$('#advance').classList.add('hidden');syncChoiceSafeArea();$('#choices').classList.remove('hidden');const box=$('#choices .choiceBox');box.innerHTML='';box.scrollTop=0;
+  const seen=getSeenChoices();options.forEach(o=>{const b=document.createElement('button'),key=finalChoiceKey(route,o);b.className='choice'+(seen.has(key)?' visited':'')+(o.special?' specialUnlocked':'');setRubyText(b,o.text);appendChoiceDebugMeta(b,o);b.onclick=()=>{markChoiceSeen(key);st.lastChoiceSnapshot=snap();showEnding(o.id)};box.appendChild(b)});
+}
+function endingLabel(meta){const same=D.endings.filter(e=>e.kind===meta.kind);const idx=same.findIndex(e=>e.id===meta.id)+1;return same.length>1?`${meta.kind} ${idx}`:meta.kind;}
+function showEndingPart(){if(!endingSequence)return;const part=endingSequence.parts[endingSequence.index]||'';setRubyText($('#speaker'),'');$('#choices').classList.add('hidden');$('#advance').classList.remove('hidden');typeText(part);}
+function advanceEndingSequence(){if(!endingSequence)return;endingSequence.index++;if(endingSequence.index>=endingSequence.parts.length){finalizeEnding(endingSequence.id);return;}showEndingPart();}
+function finalizeEnding(id){const meta=D.endings.find(e=>e.id===id), et=D.endingTexts[id];endingSequence=null;ended=true;$('#choices').classList.add('hidden');$('#dialogueWrap').classList.add('hidden');let unlocked=JSON.parse(localStorage.getItem('fm_endings')||'[]');if(!unlocked.includes(id)){unlocked.push(id);localStorage.setItem('fm_endings',JSON.stringify(unlocked))}setRubyText($('#endScreen .endKind'),endingLabel(meta));setRubyText($('#endScreen .endTitle'),et.title);$('#endScreen .endText').textContent='';$('#endScreen .endText').classList.add('hidden');$('#endScreen').classList.remove('hidden');localStorage.setItem('fm_lastEnding',id);renderEndings();}
+function showEnding(id){const meta=D.endings.find(e=>e.id===id), et=D.endingTexts[id];if(!meta||!et)return;ended=false;$('#endScreen').classList.add('hidden');$('#endScreen .endText').classList.remove('hidden');$('#dialogueWrap').classList.remove('hidden');const parts=(et.sequence||String(et.text||'').split(/\n\s*\n/)).map(x=>String(x).trim()).filter(Boolean);endingSequence={id,parts,index:0};showEndingPart();}
+function newGame(){applyTitleDebugSetting();debugSpecialUnlockId=null;st=baseState();auto=false;skip=false;ended=false;endingSequence=null;$('#autoBtn').textContent='AUTO';$('#skipBtn').textContent='SKIP';$('#titleScreen').classList.add('hidden');$('#dialogueWrap').classList.remove('hidden');render()}
+function autosave(){localStorage.setItem('fm_auto',JSON.stringify(st))}
+function continueGame(){applyTitleDebugSetting();debugSpecialUnlockId=null;const a=localStorage.getItem('fm_auto');if(!a)return newGame();try{st=JSON.parse(a);$('#titleScreen').classList.add('hidden');$('#dialogueWrap').classList.remove('hidden');render()}catch(e){newGame()}}
+function openModal(name){if(name==='debug'&&!debugEnabled)return;$$('.modal').forEach(m=>m.classList.add('hidden'));const m=$('#modal_'+name);if(m)m.classList.remove('hidden');if(name==='status')renderStats();if(name==='backlog')renderLog();if(name==='save'){saveDeleteMode=false;renderSaves()}if(name==='debug')renderDebug();}
+function closeModals(){$$('.modal').forEach(m=>m.classList.add('hidden'))}
+function renderStats(){const av=[['澪 好感度','mio'],['シロ 好感度','shiro'],['啓吾 好感度','keigo'],['千景 好感度','chikage']];const pv=[['真理度',st.truth],['忘却度',st.oblivion],['覚悟度',st.resolve]];let h=av.map(([n,k])=>{const v=affPct(k);return `<div class="stat"><b><span>${n}</span><span>${v}%</span></b><div class="bar"><div class="fill" style="width:${v}%"></div></div><div class="subtle">内部値 ${st.aff[k]} / 理論最大 ${AFF_MAX[k]}</div></div>`}).join('');h+=pv.map(([n,v])=>`<div class="stat"><b><span>${n}</span><span>${v}</span></b><div class="bar"><div class="fill" style="width:${v}%"></div></div></div>`).join('');$('#statGrid').innerHTML=h+`<div class="stat"><b>現実志向 <span>${st.realism}</span></b><div class="subtle">回避 ${st.avoidance} / 過負荷 ${st.overload} / 執着 ${st.obsession} / 絶望 ${st.despair}</div></div>`}
+function renderLog(){$('#logList').innerHTML=st.history.slice().reverse().map(x=>`<p><b>${furiganaHTML(x.speaker)}</b><br><span class="subtle">${furiganaHTML(x.text).replace(/\n/g,'<br>')}</span></p>`).join('')||'<p class="subtle">まだ履歴はありません。</p>'}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function renderSaves(){
+  const g=$('#saveGrid'),modeBtn=$('#saveDeleteMode'),hint=$('#saveDeleteHint');
+  modeBtn.textContent=saveDeleteMode?'削除モード：ON':'削除モード：OFF';modeBtn.classList.toggle('active',saveDeleteMode);
+  hint.textContent=saveDeleteMode?'保存済みスロットを選ぶと、そのデータを削除します。':'削除モード中は、保存済みスロットを選ぶと削除します。';
+  g.innerHTML='';
+  for(let i=1;i<=8;i++){
+    const key='fm_save_'+i,raw=localStorage.getItem(key);let label='空きスロット';
+    if(raw){try{const x=JSON.parse(raw),n=D.scenes[x.node];label=(n?.chapterTitle||x.node)+' / 真理 '+x.truth}catch{}}
+    const d=document.createElement('div');d.className='saveSlot'+(saveDeleteMode?(raw?' deleteReady':' deleteEmpty'):'');
+    if(saveDeleteMode){d.innerHTML=`<h4>SLOT ${i}</h4><div class="subtle">${furiganaHTML(label)}</div><div class="deletePrompt">${raw?'このスロットを選択して削除':'削除するデータはありません'}</div>`;if(raw)d.onclick=()=>{localStorage.removeItem(key);renderSaves()}}
+    else d.innerHTML=`<h4>SLOT ${i}</h4><div class="subtle">${furiganaHTML(label)}</div><button data-s="${i}">SAVE</button><button data-l="${i}" ${raw?'':'disabled'}>LOAD</button>`;
+    g.appendChild(d)
+  }
+  if(!saveDeleteMode){g.querySelectorAll('[data-s]').forEach(b=>b.onclick=e=>{e.stopPropagation();localStorage.setItem('fm_save_'+b.dataset.s,JSON.stringify(st));renderSaves()});g.querySelectorAll('[data-l]').forEach(b=>b.onclick=e=>{e.stopPropagation();const raw=localStorage.getItem('fm_save_'+b.dataset.l);if(raw){st=JSON.parse(raw);closeModals();$('#titleScreen').classList.add('hidden');$('#dialogueWrap').classList.remove('hidden');render()}})}
+}
+function renderEndings(){
+  const u=JSON.parse(localStorage.getItem('fm_endings')||'[]'),baseDone=allBaseEndingsUnlocked(),specialCount=getSpecialRouteProgress().size,catStatus=special2CategoryStatus(),catDone=catStatus.filter(x=>x.done).length;
+  // SPECIAL ENDは隠しルート扱い。SPECIAL END 2の7カテゴリ前提条件を実際に満たすまでは、
+  // ENDING LIST上に存在そのものを表示しない（DEBUGによる擬似解禁は表示条件に含めない）。
+  const revealSpecial=special2CategoriesActuallyComplete()||u.includes('special')||u.includes('special2');
+  const visibleEndings=D.endings
+    .filter(e=>!e.postgame||revealSpecial)
+    .map((e,i)=>({e,i}))
+    .sort((a,b)=>(a.e.postgame?0:1)-(b.e.postgame?0:1)||a.i-b.i)
+    .map(x=>x.e);
+  const visibleIds=new Set(visibleEndings.map(e=>e.id));
+  const collected=u.filter(id=>visibleIds.has(id)).length;
+  const total=revealSpecial?23:21;
+  const counterText=`${collected}/${total}`;
+  const modalCounter=$('#endingCounter .counterValue'),titleCounter=$('#titleEndingCounter');
+  if(modalCounter)modalCounter.textContent=counterText;
+  if(titleCounter)titleCounter.textContent=`ENDINGS ${counterText}`;
+  $('#endingGrid').innerHTML=visibleEndings.map(e=>{const on=u.includes(e.id),badge=e.postgame?'<span class="canonicalBadge">スペシャルエンド</span>':(e.canonical?'<span class="canonicalBadge">完走エンド</span>':'<span class="canonicalBadge">途中エンド</span>');let hint=e.hint||'';
+    if(e.id==='special'&&!on)hint=baseDone?`第八章の5つの方針を、全回収後に改めて辿る。進行 ${specialCount}/5。すべて揃うと最終章に新しい選択肢が現れる。`:'21の結末をすべて見届けると、解禁条件がわかるようになります。';
+    if(e.id==='special2'&&!on)hint='第七章「閉架書庫」に現れる特別な選択肢を選ぶと、最終章にSPECIAL ENDに向かう選択肢が現れます。';
+    return `<div class="endingCard ${on?'':'locked'}"><div class="kind">${furiganaHTML(e.kind)} ${badge}</div><h3>${on?furiganaHTML(e.name):'？？？？？？'}</h3>${on?`<p class="achievementCondition"><strong>達成条件：</strong>${furiganaHTML(ENDING_DEBUG_CONDITIONS[e.id]||e.hint||'条件情報なし')}</p>`:`<p>${furiganaHTML(hint)}</p>`}</div>`}).join('')
+}
+const ENDING_DEBUG_CONDITIONS={
+  true1:'全キャラ好感度 中（50%）以上 / 真理度90以上 / 覚悟度80以上 / 忘却度30以下 / 最終選択「原契約を修復し、痛みを『返せる』図書館へ戻す」',
+  true2:'真理度90以上 / 忘却度30〜65 / 最終選択「自分が新しい司書となり、シロを現実へ返す」',
+  mioA:'澪ルート / 澪好感度 高（80%）以上 / mio_keep（事故の記憶を消さず持たせる）取得 / 覚悟度65以上 / 忘却度35以下 / 最終選択「澪の記憶を消さず、二人で持ち帰る」 / ※TRUE END 1条件成立時はTRUE END 1が優先',
+  mioB:'澪ルート / 澪好感度 高（80%）以上 / mio_erase（事故の記憶を切り離す）取得 / 忘却度55以上 / 最終選択「事故の頁だけを図書館へ預ける」',
+  shiroA:'シロルート / シロ好感度 高（80%）以上 / humanize・humanize2取得 / 真理度65以上 / 最終選択「シロを一人の人間として現実へ送り出す」 / ※TRUE END 1条件成立時はTRUE END 1が優先',
+  shiroB:'シロルート / シロ好感度 高（80%）以上 / shiro_run取得 / 真理度45以下 / 最終選択「頁の隙間へ二人で逃げる」',
+  keigo:'啓吾ルート / 啓吾好感度 高（80%）以上 / seal（入口封鎖）取得 / 真理度40〜85 / 現実志向4以上 / 最終選択「入口を封じ、凛を現実の治療へ繋ぐ」',
+  chikage:'千景ルート / 千景好感度 高（80%）以上 / hidden1・hidden2・hidden3をすべて取得 / 最終選択「幻影堂で、怪異と現実の境界を見張る」 / ※TRUE END 1条件成立時はTRUE END 1が優先',
+  normal1:'以下のいずれか。①最終判定でTRUE END 1・各ルート固有END・BAD/MERRY条件を満たさず通常側へ進み、対応する通常選択を選ぶ（澪・シロ・啓吾・無所属は原則回避度4未満、千景は隠し条件不足） / ②澪ルートでmio_doll取得後「澪から『苦しむ可能性』そのものを消す」を選ぶがMERRY BAD END 1条件不足 / ③啓吾ルートでforce_restore取得後「流出した痛みを自分へ集めて凛を戻す」を選び過負荷3以下',
+  normal2:'最終局面まで到達 / 最終選択「自分の『痛みを見る力』を代価にして降りる」 / パラメーター・ルート条件なし（最終分岐で常時選択可能）',
+  normal3:'回避度3以上で最終選択「もう何も選ばず、目を閉じる」が出現し、それを選択 / または回避度4以上で澪・シロ・啓吾・無所属ルートの固有条件不足時に暫定NORMAL END 3となり、その暫定結果を引き継ぐ通常選択を選ぶ',
+  bad1:'以下のいずれか。①啓吾ルート / force_restore取得 / 過負荷4以上 / 最終選択「流出した痛みを自分へ集めて凛を戻す」（sealも同時取得時は「入口を封じ〜」でも暫定BAD END 1を引き継ぐ） / ②澪ルートでmerry1・mioB・mioA条件を満たさず過負荷4以上となり、暫定BAD END 1を引き継ぐ澪ルート選択を選ぶ',
+  bad2:'rewrite（凛の記憶改ざん）取得で最終判定がBAD END 2優先 / 啓吾ルートの最終選択「凛の記憶を書き換える」で確定（rewriteとsealを同時取得している場合はseal側選択でも暫定BAD END 2を引き継ぐ）',
+  merry1:'澪ルート / 澪好感度 高（80%）以上 / mio_doll取得 / 忘却度85以上 / 執着3以上 / 最終選択「澪から『苦しむ可能性』そのものを消す」',
+  merry2:'シロルート / シロ好感度 高（80%）以上 / shiro_stay取得 / 忘却度80以上 / 絶望3以上 / 最終選択「現実の記憶を捨て、図書館に残る」',
+  early1:'第四章「雨の記憶」で「図書館にはもう頼らない。現実の方法を一緒に探そう」を選択',
+  early2:'第五章で時計塔の調査から距離を置いた後、「啓吾にも撤退を頼み、時計塔との接点を断つ」を選択',
+  early3:'第六章「白紙の目録」で「過去を暴かず、白紙の本は白紙のまま閉じる」を選択',
+  dead1:'第四章で「全部、俺に寄越せ」と痛みを一気に引き受ける → 続けて「もっと深く、残りも全部引き受ける」を選択',
+  dead2:'第五章で時計塔へ単独で踏み込み、「十三回目まで、その場に立ち続ける」を選択',
+  dead3:'第七章「閉架書庫」で「逆さ文字を声に出して完成させる」を選択',
+  special:'既存21エンドをすべて回収後、第八章「誰の記憶を信じるか」の5択（澪／シロ／啓吾／千景／誰にも深入りしない）を全回収後に改めて1回ずつ選択 / 最終章で「どの結末も忘れない。『余白目録』を開く」を選択',
+  special2:'TRUE END／キャラクター別END／NORMAL END／MERRY BAD END／BAD END／EARLY END／DEAD ENDを各1種以上回収 / 第七章「閉架書庫」で「棚の奥に挟まった、七色の栞と折り返し頁を調べる」を選択 / 最終章で「七つの栞を原契約に挟み、『帰れる図書館』へ書き戻す」を選択'
+}
+const ENDING_DEBUG_PRESETS={
+  true1:{node:'resolve_mio',route:'mio',aff:{mio:38,shiro:31,keigo:29,chikage:22},truth:95,resolve:85,oblivion:20,flags:{mio_keep:true,hidden1:true,hidden2:true,hidden3:true,humanize:true,humanize2:true}},
+  true2:{node:'resolve_shiro',route:'shiro',aff:{mio:0,shiro:50,keigo:0,chikage:0},truth:95,resolve:55,oblivion:45,flags:{humanize:true,humanize2:true}},
+  mioA:{node:'resolve_mio',route:'mio',aff:{mio:55,shiro:0,keigo:0,chikage:0},truth:55,resolve:75,oblivion:20,flags:{mio_keep:true}},
+  mioB:{node:'resolve_mio',route:'mio',aff:{mio:55,shiro:0,keigo:0,chikage:0},truth:45,resolve:45,oblivion:65,flags:{mio_erase:true}},
+  shiroA:{node:'resolve_shiro',route:'shiro',aff:{mio:0,shiro:52,keigo:0,chikage:0},truth:75,resolve:60,oblivion:25,flags:{humanize:true,humanize2:true,human_choice:true}},
+  shiroB:{node:'resolve_shiro',route:'shiro',aff:{mio:0,shiro:52,keigo:0,chikage:0},truth:35,resolve:35,oblivion:40,despair:2,flags:{shiro_run:true}},
+  keigo:{node:'resolve_keigo',route:'keigo',aff:{mio:0,shiro:0,keigo:50,chikage:0},truth:60,resolve:60,oblivion:20,realism:5,flags:{seal:true}},
+  chikage:{node:'resolve_chikage',route:'chikage',aff:{mio:0,shiro:0,keigo:0,chikage:40},truth:70,resolve:55,oblivion:20,flags:{hidden1:true,hidden2:true,hidden3:true,hidden_all:true}},
+  normal1:{node:'resolve_none',route:'none',aff:{mio:0,shiro:0,keigo:0,chikage:0},truth:25,resolve:20,oblivion:25,avoidance:1,flags:{}},
+  normal2:{node:'resolve_none',route:'none',aff:{mio:0,shiro:0,keigo:0,chikage:0},truth:35,resolve:30,oblivion:25,avoidance:1,flags:{}},
+  normal3:{node:'resolve_none',route:'none',aff:{mio:0,shiro:0,keigo:0,chikage:0},truth:15,resolve:15,oblivion:45,avoidance:5,flags:{}},
+  bad1:{node:'resolve_keigo',route:'keigo',aff:{mio:0,shiro:0,keigo:25,chikage:0},truth:55,resolve:35,oblivion:40,overload:5,flags:{force_restore:true}},
+  bad2:{node:'resolve_keigo',route:'keigo',aff:{mio:0,shiro:0,keigo:25,chikage:0},truth:55,resolve:35,oblivion:60,flags:{rewrite:true}},
+  merry1:{node:'resolve_mio',route:'mio',aff:{mio:55,shiro:0,keigo:0,chikage:0},truth:40,resolve:35,oblivion:90,obsession:4,flags:{mio_doll:true}},
+  merry2:{node:'resolve_shiro',route:'shiro',aff:{mio:0,shiro:52,keigo:0,chikage:0},truth:45,resolve:30,oblivion:90,despair:4,flags:{shiro_stay:true}},
+  early1:{node:'c4_miochoice',route:null,aff:{mio:18,shiro:0,keigo:0,chikage:0},truth:15,resolve:20,oblivion:10,flags:{}},
+  early2:{node:'c5_skip_choice',route:null,aff:{mio:0,shiro:0,keigo:8,chikage:0},truth:18,resolve:15,oblivion:12,flags:{}},
+  early3:{node:'c6_choice',route:null,aff:{mio:0,shiro:12,keigo:0,chikage:0},truth:25,resolve:20,oblivion:10,flags:{}},
+  dead1:{node:'c4_absorb_check',route:null,aff:{mio:20,shiro:0,keigo:0,chikage:0},truth:20,resolve:20,oblivion:10,flags:{}},
+  dead2:{node:'c5_solo_choice',route:null,aff:{mio:0,shiro:0,keigo:10,chikage:0},truth:25,resolve:20,oblivion:10,flags:{}},
+  dead3:{node:'c7_choice',route:null,aff:{mio:0,shiro:10,keigo:0,chikage:0},truth:45,resolve:35,oblivion:20,flags:{}},
+  special:{node:'resolve_none',route:'none',aff:{mio:0,shiro:0,keigo:0,chikage:0},truth:50,resolve:50,oblivion:30,avoidance:0,flags:{}},
+  special2:{node:'resolve_none',route:'none',aff:{mio:0,shiro:0,keigo:0,chikage:0},truth:50,resolve:50,oblivion:30,avoidance:0,flags:{special2_folded_page:true}}
+};
+function applyDebugPreset(p){
+  const fresh=baseState();
+  st=fresh;
+  st.node=p.node;
+  st.route=p.route??null;
+  st.aff=Object.assign({mio:0,shiro:0,keigo:0,chikage:0},p.aff||{});
+  for(const k of ['truth','oblivion','resolve','realism','avoidance','overload','obsession','despair'])st[k]=p[k]??0;
+  st.flags=Object.assign({},p.flags||{});
+  st.history=[];st.lastChoiceNode=null;st.lastChoiceSnapshot=null;st.lastChapter=-1;st.entered={};
+}
+function jumpToEndingDebug(id){
+  const p=ENDING_DEBUG_PRESETS[id];if(!p)return;
+  debugSpecialUnlockId=(id==='special'||id==='special2')?id:null;
+  clearInterval(timer);typing=false;auto=false;skip=false;ended=false;endingSequence=null;
+  $('#autoBtn').textContent='AUTO';$('#skipBtn').textContent='SKIP';
+  applyDebugPreset(p);closeModals();$('#titleScreen').classList.add('hidden');$('#endScreen').classList.add('hidden');$('#dialogueWrap').classList.remove('hidden');
+  const jumpBg={resolve_mio:'collapse',resolve_shiro:'collapse',resolve_keigo:'tower_inside',resolve_chikage:'bookshop',resolve_none:'gray'};if(jumpBg[p.node])bg(jumpBg[p.node]);
+  autosave();render();
+}
+function renderDebug(){
+  const list=[['mio','澪 好感度'],['shiro','シロ 好感度'],['keigo','啓吾 好感度'],['chikage','千景 好感度'],['truth','真理度'],['oblivion','忘却度'],['resolve','覚悟度']];
+  $('#debugStats').innerHTML=list.map(([k,n])=>{const isAff=['mio','shiro','keigo','chikage'].includes(k),v=isAff?st.aff[k]:st[k],mx=isAff?AFF_MAX[k]:100,show=isAff?affPct(k)+'%':v;return `<div class="debugRow"><label>${n}</label><input type="range" min="0" max="${mx}" value="${v}" data-dstat="${k}"><span>${show}</span></div>`}).join('');
+  $$('[data-dstat]').forEach(r=>r.oninput=()=>{const k=r.dataset.dstat,v=+r.value;if(['mio','shiro','keigo','chikage'].includes(k)){st.aff[k]=v;r.nextElementSibling.textContent=affPct(k)+'%'}else{st[k]=v;r.nextElementSibling.textContent=v}autosave()});
+  const flags=['hidden1','hidden2','hidden3','hidden_all','name_clue','humanize','humanize2','human_choice','anchor','mio_keep','mio_erase','mio_doll','shiro_run','shiro_stay','seal','force_restore','rewrite','withdraw_mio','withdraw_tower','leave_blank','special2_folded_page'];
+  $('#debugFlags').innerHTML=flags.map(f=>`<label><input type="checkbox" data-flag="${f}" ${st.flags[f]?'checked':''}> ${f}</label>`).join('');
+  $$('[data-flag]').forEach(c=>c.onchange=()=>{st.flags[c.dataset.flag]=c.checked;autosave()});
+  const jumps=$('#debugEndingJumps');
+  jumps.innerHTML=D.endings.map((e,i)=>({e,i})).sort((a,b)=>(a.e.postgame?0:1)-(b.e.postgame?0:1)||a.i-b.i).map(x=>x.e).map(e=>`<button class="debugEndJump" data-endjump="${esc(e.id)}"><b>${esc(endingLabel(e))}</b><span>${furiganaHTML(e.name)}</span><span class="condition"><strong>突入条件：</strong>${furiganaHTML(ENDING_DEBUG_CONDITIONS[e.id]||e.hint||'条件情報なし')}</span></button>`).join('');
+  $$('[data-endjump]').forEach(b=>b.onclick=()=>jumpToEndingDebug(b.dataset.endjump));
+}
+function retryChoice(){if(!st.lastChoiceSnapshot){newGame();return}st=JSON.parse(st.lastChoiceSnapshot);ended=false;endingSequence=null;$('#endScreen').classList.add('hidden');$('#dialogueWrap').classList.remove('hidden');render();}
+$('#dialogue').onclick=advance;document.addEventListener('keydown',e=>{if([' ','Enter'].includes(e.key)&&$('#titleScreen').classList.contains('hidden')&&$$('.modal:not(.hidden)').length===0){e.preventDefault();advance()}});
+$$('[data-open]').forEach(b=>b.onclick=()=>openModal(b.dataset.open));$$('.close').forEach(b=>b.onclick=closeModals);$$('.modal').forEach(m=>m.onclick=e=>{if(e.target===m)closeModals()});
+$('#debugStartToggle').onclick=()=>{const b=$('#debugStartToggle'),on=b.getAttribute('aria-pressed')==='true';b.setAttribute('aria-pressed',String(!on));b.classList.toggle('active',!on)};
+$('#saveDeleteMode').onclick=()=>{saveDeleteMode=!saveDeleteMode;renderSaves()};
+$('#newGame').onclick=newGame;$('#continueGame').onclick=continueGame;$('#endingListTitle').onclick=()=>{renderEndings();openModal('endings')};$('#titleBtn').onclick=()=>{$('#titleScreen').classList.remove('hidden');closeModals()};$('#backTitle').onclick=()=>{$('#endScreen').classList.add('hidden');$('#titleScreen').classList.remove('hidden')};$('#endingsFromEnd').onclick=()=>{renderEndings();openModal('endings')};$('#retryChoice').onclick=retryChoice;
+$('#autoBtn').onclick=()=>{auto=!auto;$('#autoBtn').textContent=auto?'AUTO ●':'AUTO';if(auto&&!typing)setTimeout(()=>advance(),400)};$('#skipBtn').onclick=()=>{skip=!skip;$('#skipBtn').textContent=skip?'SKIP ●':'SKIP';if(skip&&typing)reveal()};
+$('#debugMaxTruth').onclick=()=>{st.aff={mio:38,shiro:37,keigo:35,chikage:27};st.truth=95;st.resolve=85;st.oblivion=20;st.flags.hidden1=st.flags.hidden2=st.flags.hidden3=st.flags.hidden_all=st.flags.humanize=st.flags.humanize2=true;renderDebug();autosave()};$('#debugReset').onclick=()=>{const keep={node:st.node,history:st.history,lastChoiceNode:st.lastChoiceNode,lastChoiceSnapshot:st.lastChoiceSnapshot,lastChapter:st.lastChapter};st=Object.assign(baseState(),keep);renderDebug();autosave()};
+syncDebugButton();
+window.addEventListener('resize',syncChoiceSafeArea);
+renderEndings();
+})();
+</script>
+</body>
+</html>

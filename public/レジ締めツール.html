@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レジ締め計算ツール</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+            padding-bottom: 100px;
+            color: #333;
+        }
+        .container { max-width: 480px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #4a5568;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-title .icon { font-size: 18px; }
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .row:last-child { margin-bottom: 0; }
+        .label {
+            font-size: 14px;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .label .unit { font-size: 12px; color: #888; }
+        input[type="number"] {
+            width: 120px;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            text-align: right;
+            transition: border-color 0.2s;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        input[type="number"]::placeholder { color: #ccc; }
+        .result-section {
+            background: #1e293b;
+            color: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        .result-row:last-child {
+            margin-bottom: 0;
+            padding-top: 12px;
+            border-top: 1px solid #334155;
+        }
+        .result-label { color: #94a3b8; }
+        .result-value {
+            font-weight: 700;
+            font-size: 16px;
+            font-family: 'SF Mono', monospace;
+        }
+        .result-value.large { font-size: 24px; }
+        .positive { color: #4ade80; }
+        .negative { color: #f87171; }
+        .zero { color: #e2e8f0; }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-calc {
+            background: #3b82f6;
+            color: #fff;
+        }
+        .btn-calc:hover { background: #2563eb; }
+        .btn-reset {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .btn-reset:hover { background: #cbd5e1; }
+        .detail-toggle {
+            text-align: center;
+            margin-top: 12px;
+        }
+        .detail-toggle button {
+            background: transparent;
+            color: #94a3b8;
+            font-size: 13px;
+            padding: 6px;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            width: auto;
+        }
+        .detail-table {
+            margin-top: 12px;
+            width: 100%;
+            font-size: 13px;
+            border-collapse: collapse;
+        }
+        .detail-table th, .detail-table td {
+            padding: 6px 8px;
+            text-align: right;
+        }
+        .detail-table th:first-child, .detail-table td:first-child { text-align: left; }
+        .detail-table th {
+            color: #94a3b8;
+            font-weight: 400;
+            border-bottom: 1px solid #334155;
+        }
+        .hidden { display: none; }
+        .machine-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .machine-table th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            padding: 8px 6px;
+            text-align: center;
+            border-bottom: 2px solid #e2e8f0;
+            font-size: 12px;
+        }
+        .machine-table td {
+            padding: 6px;
+            border-bottom: 1px solid #f1f5f9;
+            text-align: center;
+        }
+        .machine-table td:first-child {
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            font-size: 13px;
+        }
+        .machine-table td:nth-child(2) {
+            color: #3b82f6;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .machine-table input {
+            width: 80px;
+            padding: 6px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: right;
+        }
+        .machine-table input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .machine-table tr:nth-child(even) { background: #fafbfc; }
+        .machine-table tr:hover { background: #f0f9ff; }
+        .rate-badge {
+            display: inline-block;
+            font-size: 10px;
+            padding: 1px 5px;
+            border-radius: 4px;
+            margin-left: 4px;
+            font-weight: 600;
+        }
+        .rate-800 { background: #fef3c7; color: #92400e; }
+        .rate-1000 { background: #dbeafe; color: #1e40af; }
+        .rate-2000 { background: #fce7f3; color: #9d174d; }
+        .no-number {
+            color: #9ca3af;
+            font-size: 11px;
+        }
+        .medal-count-section {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+        }
+        .medal-count-title {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .medal-count-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .medal-count-item {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .medal-count-label {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-bottom: 2px;
+        }
+        .medal-count-value {
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'SF Mono', monospace;
+        }
+        .count-800 { color: #fbbf24; }
+        .count-1000 { color: #60a5fa; }
+        .count-2000 { color: #f472b6; }
+        .count-pachi { color: #a78bfa; }
+        .payout-result-section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .payout-summary {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .payout-summary-item {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .payout-summary-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+        .payout-summary-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+            font-family: 'SF Mono', monospace;
+        }
+        .total-credit {
+            background: #1e293b;
+            color: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 16px;
+        }
+        .total-credit-label {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        .total-credit-value {
+            font-size: 32px;
+            font-weight: 700;
+            font-family: 'SF Mono', monospace;
+        }
+        .note {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 12px;
+            line-height: 1.6;
+        }
+        .top-list-section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .top-list-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .top-list-table th {
+            background: #fef3c7;
+            color: #92400e;
+            font-weight: 600;
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 2px solid #f59e0b;
+        }
+        .top-list-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #fef3c7;
+            text-align: center;
+        }
+        .top-list-table td:first-child {
+            font-weight: 700;
+            color: #b45309;
+            font-size: 16px;
+        }
+        .top-list-table td:nth-child(2) {
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+        }
+        .top-list-table td:nth-child(3) {
+            color: #6b7280;
+            font-size: 11px;
+        }
+        .top-list-table td:nth-child(4) {
+            color: #dc2626;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .top-list-table tr:nth-child(even) { background: #fffbeb; }
+        .top-list-table tr:hover { background: #fef3c7; }
+        .no-data {
+            text-align: center;
+            color: #94a3b8;
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        /* ===== 画面上部固定の追従バー（入力エリアにいる時のみ表示） ===== */
+        .sticky-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #1e293b;
+            color: #fff;
+            padding: 10px 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            border-bottom: 2px solid #334155;
+            animation: slideDown 0.25s ease;
+        }
+        .sticky-bar.visible { display: flex; }
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .sticky-bar-label {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        .sticky-bar-value {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'SF Mono', monospace;
+        }
+        .sticky-bar-value.positive { color: #4ade80; }
+        .sticky-bar-value.negative { color: #f87171; }
+        .sticky-bar-value.zero { color: #e2e8f0; }
+        .sticky-bar-sub {
+            font-size: 11px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <!-- 画面上部固定の追従バー -->
+    <div class="sticky-bar" id="stickyBar">
+        <span class="sticky-bar-label">過不足</span>
+        <span class="sticky-bar-value" id="stickyBarValue">¥0</span>
+        <span class="sticky-bar-sub" id="stickyBarSub"></span>
+    </div>
+
+    <div class="container">
+        <h1>🧮 レジ締め計算ツール</h1>
+
+        <div class="section">
+            <div class="section-title"><span class="icon">📋</span>基準額</div>
+            <div class="row">
+                <span class="label">基準額 <span class="unit">(円)</span></span>
+                <input type="number" id="baseAmount" placeholder="0" min="0">
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="icon">🎰</span>スロット機種</div>
+            <p style="font-size:12px;color:#64748b;margin-bottom:12px;">各機種のメダル枚数を入力してください。レートは自動で計算されます。</p>
+            <table class="machine-table">
+                <thead>
+                    <tr>
+                        <th>台番</th>
+                        <th>レート</th>
+                        <th>メダル枚数</th>
+                    </tr>
+                </thead>
+                <tbody id="slotBody"></tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="icon">🔵</span>パチンコ機種</div>
+            <p style="font-size:12px;color:#64748b;margin-bottom:12px;">各機種のメダル枚数を入力してください。全て1000円メダルです。</p>
+            <table class="machine-table">
+                <thead>
+                    <tr>
+                        <th>機種名</th>
+                        <th>レート</th>
+                        <th>メダル枚数</th>
+                    </tr>
+                </thead>
+                <tbody id="pachinkoBody"></tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="icon">💴</span>紙幣・硬貨</div>
+            <div class="row">
+                <span class="label">100円 <span class="unit">(枚)</span></span>
+                <input type="number" id="coin100" placeholder="0" min="0">
+            </div>
+            <div class="row">
+                <span class="label">500円 <span class="unit">(枚)</span></span>
+                <input type="number" id="coin500" placeholder="0" min="0">
+            </div>
+            <div class="row">
+                <span class="label">レジ内1000円 <span class="unit">(枚)</span></span>
+                <input type="number" id="bill1000regi" placeholder="0" min="0">
+            </div>
+            <div class="row">
+                <span class="label">両替用1000円 <span class="unit">(枚)</span></span>
+                <input type="number" id="bill1000change" placeholder="0" min="0">
+            </div>
+            <div class="row">
+                <span class="label">2000円 <span class="unit">(枚)</span></span>
+                <input type="number" id="bill2000" placeholder="0" min="0">
+            </div>
+            <div class="row">
+                <span class="label">5000円 <span class="unit">(枚)</span></span>
+                <input type="number" id="bill5000" placeholder="0" min="0">
+            </div>
+            <div class="row">
+                <span class="label">10000円 <span class="unit">(枚)</span></span>
+                <input type="number" id="bill10000" placeholder="0" min="0">
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="icon">🔧</span>調整額</div>
+            <div class="row">
+                <span class="label">エラー/サービス調整額 <span class="unit">(円)</span></span>
+                <input type="number" id="adjustment" placeholder="0">
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-calc" onclick="calculateRegi()">計算する</button>
+            <button class="btn-reset" onclick="resetRegi()">リセット</button>
+        </div>
+
+        <!-- レジ締め結果 -->
+        <div class="result-section" id="resultSection" style="display:none;">
+            <div class="result-row">
+                <span class="result-label">メダル合計</span>
+                <span class="result-value" id="medalTotal">¥0</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">現金合計</span>
+                <span class="result-value" id="cashTotal">¥0</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">調整額</span>
+                <span class="result-value" id="adjDisplay">¥0</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">実際の合計</span>
+                <span class="result-value" id="actualTotal">¥0</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">基準額</span>
+                <span class="result-value" id="baseDisplay">¥0</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">差額（過不足）</span>
+                <span class="result-value large" id="diffAmount">¥0</span>
+            </div>
+
+            <div class="detail-toggle">
+                <button onclick="toggleDetail()">▼ 内訳を表示</button>
+            </div>
+            <div id="detailArea" class="hidden">
+                <table class="detail-table">
+                    <thead>
+                        <tr><th>金種</th><th>枚数</th><th>小計</th></tr>
+                    </thead>
+                    <tbody id="detailBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- メダル枚数集計 -->
+        <div class="medal-count-section" id="medalCountSection" style="display:none;">
+            <div class="medal-count-title">📊 メダル枚数集計</div>
+            <div class="medal-count-grid">
+                <div class="medal-count-item">
+                    <div class="medal-count-label">800円メダル</div>
+                    <div class="medal-count-value count-800" id="count800">0枚</div>
+                </div>
+                <div class="medal-count-item">
+                    <div class="medal-count-label">1000円メダル(スロ)</div>
+                    <div class="medal-count-value count-1000" id="count1000s">0枚</div>
+                </div>
+                <div class="medal-count-item">
+                    <div class="medal-count-label">2000円メダル</div>
+                    <div class="medal-count-value count-2000" id="count2000">0枚</div>
+                </div>
+                <div class="medal-count-item">
+                    <div class="medal-count-label">1000円メダル(パチ)</div>
+                    <div class="medal-count-value count-pachi" id="countPachi">0枚</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ペイアウト計算結果 -->
+        <div class="payout-result-section" id="payoutResultSection" style="display:none;">
+            <div class="section-title" style="margin-top:0;border-bottom-color:#e2e8f0;"><span class="icon">🎰</span>ペイアウト計算結果</div>
+            <div class="payout-summary">
+                <div class="payout-summary-item">
+                    <div class="payout-summary-label">総メダル枚数</div>
+                    <div class="payout-summary-value" id="totalMedals">0枚</div>
+                </div>
+                <div class="payout-summary-item">
+                    <div class="payout-summary-label">入力済み台数</div>
+                    <div class="payout-summary-value" id="inputCount">0/46台</div>
+                </div>
+            </div>
+            <div class="total-credit">
+                <div class="total-credit-label">総クレジット数</div>
+                <div class="total-credit-value" id="totalCredits">0</div>
+            </div>
+            <div class="note">
+                ※クレジット数 = メダル枚数 × 1枚出すためのクレジット数<br>
+                ※空白の台は計算対象外となります
+            </div>
+        </div>
+
+        <div class="top-list-section" id="topListSection" style="display:none;">
+            <div class="section-title" style="margin-top:0;border-bottom-color:#e2e8f0;"><span class="icon">🏆</span>クレジット1000以上の機種（高い順）</div>
+            <table class="top-list-table">
+                <thead>
+                    <tr>
+                        <th>順位</th>
+                        <th>台番・機種名</th>
+                        <th>メダル枚数</th>
+                        <th>クレジット</th>
+                    </tr>
+                </thead>
+                <tbody id="topListBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // ===== スロット機種データ =====
+        const slotData = [
+            {no:1, name:'銭形', rate:1000},
+            {no:2, name:'北斗の拳', rate:1000},
+            {no:3, name:'南国育ち', rate:2000},
+            {no:4, name:'ハナハナ①', rate:2000},
+            {no:5, name:'バジリスク絆①', rate:1000},
+            {no:6, name:'ハナハナ②', rate:2000},
+            {no:7, name:'かぐや様', rate:1000},
+            {no:8, name:'からくり', rate:1000},
+            {no:9, name:'沖ドキ③', rate:1000},
+            {no:10, name:'吉宗②', rate:1000},
+            {no:11, name:'沖ドキ②', rate:1000},
+            {no:12, name:'サラリーマン番長', rate:1000},
+            {no:13, name:'押忍番長', rate:2000},
+            {no:14, name:'沖ドキ①', rate:1000},
+            {no:15, name:'モンハン月下雷鳴', rate:1000},
+            {no:16, name:'吉宗①', rate:1000},
+            {no:17, name:'ミリオンゴッド凱旋', rate:1000},
+            {no:18, name:'バジリスク絆②', rate:1000},
+            {no:34, name:'ラブ嬢', rate:1000},
+            {no:35, name:'甲鉄城のカバネリ', rate:1000},
+            {no:36, name:'バジリスク絆③', rate:1000},
+            {no:null, name:'ワンバー', rate:1000},
+            {no:null, name:'0ペカジャグラー', rate:800},
+            {no:null, name:'ジャグラー①', rate:2000},
+            {no:null, name:'ジャグラー②', rate:1000},
+            {no:null, name:'ジャグラー③', rate:1000},
+        ];
+
+        // ===== パチンコ機種データ =====
+        const pachinkoData = [
+            {name:'レールガン', rate:1000},
+            {name:'リング', rate:1000},
+            {name:'GARO魔戒ノ花', rate:1000},
+            {name:'初代GARO', rate:1000},
+            {name:'逆襲のシャア', rate:1000},
+            {name:'初代シンフォギア', rate:1000, medalNo:'32番メダル'},
+            {name:'花の慶次', rate:1000},
+            {name:'ユニコーン', rate:1000},
+            {name:'北斗無双②', rate:1000},
+            {name:'GAROファイナル', rate:1000},
+            {name:'新鬼武者', rate:1000},
+            {name:'義風堂々', rate:1000},
+            {name:'シンフォギア黄金絶唱', rate:1000, medalNo:'27番メダル'},
+            {name:'仮面ライダー', rate:1000},
+            {name:'Re:ゼロ', rate:1000},
+            {name:'エヴァンゲリオン', rate:1000},
+            {name:'ダンバイン', rate:1000},
+            {name:'北斗無双①', rate:1000},
+            {name:'GARO金色', rate:1000},
+            {name:'シンフォギア2', rate:1000, medalNo:'28番メダル'},
+        ];
+
+        // ===== ペイアウト設定データ =====
+        const payoutData = [
+            {no:1, name:'銭形', credit:130},
+            {no:2, name:'北斗の拳', credit:120},
+            {no:3, name:'南国育ち', credit:120},
+            {no:4, name:'ハナハナ①', credit:120},
+            {no:5, name:'バジリスク絆①', credit:130},
+            {no:6, name:'ハナハナ②', credit:240},
+            {no:7, name:'かぐや様', credit:150},
+            {no:8, name:'からくり', credit:150},
+            {no:9, name:'沖ドキ③', credit:180},
+            {no:10, name:'吉宗②', credit:180},
+            {no:11, name:'沖ドキ②', credit:240},
+            {no:12, name:'サラリーマン番長', credit:240},
+            {no:13, name:'押忍番長', credit:110},
+            {no:14, name:'沖ドキ①', credit:180},
+            {no:15, name:'モンハン月下雷鳴', credit:150},
+            {no:16, name:'吉宗①', credit:120},
+            {no:17, name:'ミリオンゴッド凱旋', credit:180},
+            {no:18, name:'バジリスク絆②', credit:150},
+            {no:34, name:'ラブ嬢', credit:180},
+            {no:35, name:'甲鉄城のカバネリ', credit:120},
+            {no:36, name:'バジリスク絆③', credit:180},
+            {no:null, name:'ワンバー', credit:250},
+            {no:null, name:'0ペカジャグラー', credit:110},
+            {no:null, name:'ジャグラー①', credit:260},
+            {no:null, name:'ジャグラー②', credit:310},
+            {no:null, name:'ジャグラー③', credit:190},
+        ];
+
+        function getRateClass(rate) {
+            if (rate === 800) return 'rate-800';
+            if (rate === 2000) return 'rate-2000';
+            return 'rate-1000';
+        }
+
+        function initMachineTables() {
+            const slotBody = document.getElementById('slotBody');
+            slotBody.innerHTML = slotData.map(m => {
+                const noLabel = m.no !== null ? `No.${m.no}` : '<span class="no-number">番号なし</span>';
+                return `
+                    <tr>
+                        <td>${noLabel} ${m.name}</td>
+                        <td><span class="rate-badge ${getRateClass(m.rate)}">${m.rate}円</span></td>
+                        <td><input type="number" id="slot-${m.no !== null ? m.no : m.name}" placeholder="0" min="0"></td>
+                    </tr>
+                `;
+            }).join('');
+
+            const pachinkoBody = document.getElementById('pachinkoBody');
+            pachinkoBody.innerHTML = pachinkoData.map(m => {
+                const medalLabel = m.medalNo ? ` <span style="color:#9ca3af;font-size:11px;">(${m.medalNo})</span>` : '';
+                return `
+                    <tr>
+                        <td>${m.name}${medalLabel}</td>
+                        <td><span class="rate-badge ${getRateClass(m.rate)}">${m.rate}円</span></td>
+                        <td><input type="number" id="pachi-${m.name}" placeholder="0" min="0"></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getVal(id) {
+            const v = document.getElementById(id).value;
+            return v === '' ? 0 : parseInt(v, 10) || 0;
+        }
+        function fmt(n) {
+            return '¥' + n.toLocaleString('ja-JP');
+        }
+
+        // ===== リアルタイム計算 & 上部追従バー =====
+        let hasAnyInput = false;
+
+        function updateStickyBar(diff, diffClass, medalTotal, cashTotal) {
+            const bar = document.getElementById('stickyBar');
+            const valEl = document.getElementById('stickyBarValue');
+            const subEl = document.getElementById('stickyBarSub');
+
+            valEl.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
+            valEl.className = 'sticky-bar-value ' + diffClass;
+            subEl.textContent = `メダル ${fmt(medalTotal)} / 現金 ${fmt(cashTotal)}`;
+
+            updateStickyBarVisibility();
+        }
+
+        function updateStickyBarVisibility() {
+            const bar = document.getElementById('stickyBar');
+            const resultSection = document.getElementById('resultSection');
+
+            if (resultSection.style.display === 'none' || !hasAnyInput) {
+                bar.classList.remove('visible');
+                return;
+            }
+
+            const resultRect = resultSection.getBoundingClientRect();
+            // 結果表示エリアの上部が画面内にある（入力エリアにいる）時に表示
+            if (resultRect.top > window.innerHeight) {
+                bar.classList.add('visible');
+            } else {
+                bar.classList.remove('visible');
+            }
+        }
+
+        function checkAnyInput() {
+            const inputs = document.querySelectorAll('input[type="number"]');
+            for (const input of inputs) {
+                if (input.value !== '' && input.value !== '0') {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function realTimeCalc() {
+            hasAnyInput = checkAnyInput();
+
+            const base = getVal('baseAmount');
+
+            let count800 = 0;
+            let count1000s = 0;
+            let count2000 = 0;
+            let countPachi = 0;
+
+            let slotMedalTotal = 0;
+            const slotDetails = [];
+            slotData.forEach(m => {
+                const id = m.no !== null ? `slot-${m.no}` : `slot-${m.name}`;
+                const count = getVal(id);
+                if (count > 0) {
+                    const sub = count * m.rate;
+                    slotMedalTotal += sub;
+                    slotDetails.push({name: m.name, count: count, rate: m.rate, sub: sub});
+                    if (m.rate === 800) count800 += count;
+                    else if (m.rate === 2000) count2000 += count;
+                    else count1000s += count;
+                }
+            });
+
+            let pachiMedalTotal = 0;
+            const pachiDetails = [];
+            pachinkoData.forEach(m => {
+                const count = getVal(`pachi-${m.name}`);
+                if (count > 0) {
+                    const sub = count * m.rate;
+                    pachiMedalTotal += sub;
+                    pachiDetails.push({name: m.name, count: count, rate: m.rate, sub: sub});
+                    countPachi += count;
+                }
+            });
+
+            const medalTotal = slotMedalTotal + pachiMedalTotal;
+
+            const c100 = getVal('coin100');
+            const c500 = getVal('coin500');
+            const b1000regi = getVal('bill1000regi');
+            const b1000change = getVal('bill1000change');
+            const b2000 = getVal('bill2000');
+            const b5000 = getVal('bill5000');
+            const b10000 = getVal('bill10000');
+            const adj = getVal('adjustment');
+
+            const cashTotal = c100 * 100 + c500 * 500 + b1000regi * 1000 + b1000change * 1000 + b2000 * 2000 + b5000 * 5000 + b10000 * 10000;
+            const actualTotal = medalTotal + cashTotal + adj;
+            const diff = actualTotal - base;
+
+            // レジ締め結果表示
+            document.getElementById('medalTotal').textContent = fmt(medalTotal);
+            document.getElementById('cashTotal').textContent = fmt(cashTotal);
+            document.getElementById('adjDisplay').textContent = fmt(adj);
+            document.getElementById('actualTotal').textContent = fmt(actualTotal);
+            document.getElementById('baseDisplay').textContent = fmt(base);
+
+            const diffEl = document.getElementById('diffAmount');
+            const diffText = (diff >= 0 ? '+' : '') + fmt(diff);
+            diffEl.textContent = diffText;
+
+            let diffClass;
+            if (diff > 0) diffClass = 'positive';
+            else if (diff < 0) diffClass = 'negative';
+            else diffClass = 'zero';
+            diffEl.className = 'result-value large ' + diffClass;
+
+            // 上部追従バー更新
+            updateStickyBar(diff, diffClass, medalTotal, cashTotal);
+
+            // メダル枚数集計表示
+            document.getElementById('count800').textContent = count800.toLocaleString('ja-JP') + '枚';
+            document.getElementById('count1000s').textContent = count1000s.toLocaleString('ja-JP') + '枚';
+            document.getElementById('count2000').textContent = count2000.toLocaleString('ja-JP') + '枚';
+            document.getElementById('countPachi').textContent = countPachi.toLocaleString('ja-JP') + '枚';
+            document.getElementById('medalCountSection').style.display = 'block';
+
+            // 内訳
+            const details = [];
+            slotDetails.forEach(d => {
+                details.push({name: `【スロ】${d.name}(${d.rate}円)`, count: d.count, sub: d.sub});
+            });
+            pachiDetails.forEach(d => {
+                details.push({name: `【パチ】${d.name}(${d.rate}円)`, count: d.count, sub: d.sub});
+            });
+            if (c100 > 0) details.push({name:'100円', count:c100, sub:c100*100});
+            if (c500 > 0) details.push({name:'500円', count:c500, sub:c500*500});
+            if (b1000regi > 0) details.push({name:'レジ内1000円', count:b1000regi, sub:b1000regi*1000});
+            if (b1000change > 0) details.push({name:'両替用1000円', count:b1000change, sub:b1000change*1000});
+            if (b2000 > 0) details.push({name:'2000円', count:b2000, sub:b2000*2000});
+            if (b5000 > 0) details.push({name:'5000円', count:b5000, sub:b5000*5000});
+            if (b10000 > 0) details.push({name:'10000円', count:b10000, sub:b10000*10000});
+
+            const tbody = document.getElementById('detailBody');
+            tbody.innerHTML = details.map(d =>
+                `<tr><td>${d.name}</td><td>${d.count.toLocaleString('ja-JP')}枚</td><td>${fmt(d.sub)}</td></tr>`
+            ).join('') + (details.length === 0 ? '<tr><td colspan="3" style="text-align:center;color:#64748b;">入力なし</td></tr>' : '');
+
+            document.getElementById('resultSection').style.display = 'block';
+
+            // ペイアウト計算
+            calculatePayoutInRegi();
+        }
+
+        function calculatePayoutInRegi() {
+            let totalMedals = 0;
+            let totalCredits = 0;
+            let inputCount = 0;
+            let machineDataArr = [];
+
+            slotData.forEach(m => {
+                const id = m.no !== null ? `slot-${m.no}` : `slot-${m.name}`;
+                const val = document.getElementById(id).value;
+                const payoutSetting = payoutData.find(p => p.name === m.name);
+                if (val !== '' && val !== '0' && payoutSetting) {
+                    const medals = parseInt(val, 10) || 0;
+                    const credits = medals * payoutSetting.credit;
+                    totalMedals += medals;
+                    totalCredits += credits;
+                    inputCount++;
+                    machineDataArr.push({
+                        no: m.no,
+                        name: m.name,
+                        medals: medals,
+                        credits: credits
+                    });
+                }
+            });
+
+            document.getElementById('totalMedals').textContent = totalMedals.toLocaleString('ja-JP') + '枚';
+            document.getElementById('inputCount').textContent = `${inputCount}/${payoutData.length}台`;
+            document.getElementById('totalCredits').textContent = totalCredits.toLocaleString('ja-JP');
+            document.getElementById('payoutResultSection').style.display = 'block';
+
+            const topList = machineDataArr
+                .filter(m => m.credits >= 1000)
+                .sort((a, b) => b.credits - a.credits);
+
+            const topListBody = document.getElementById('topListBody');
+            if (topList.length > 0) {
+                topListBody.innerHTML = topList.map((m, i) => {
+                    const noLabel = m.no !== null ? `No.${m.no}` : '番号なし';
+                    return `
+                        <tr>
+                            <td>${i + 1}位</td>
+                            <td>${noLabel} ${m.name}</td>
+                            <td>${m.medals.toLocaleString('ja-JP')}枚</td>
+                            <td>${m.credits.toLocaleString('ja-JP')}クレ</td>
+                        </tr>
+                    `;
+                }).join('');
+                document.getElementById('topListSection').style.display = 'block';
+            } else {
+                topListBody.innerHTML = '<tr><td colspan="4" class="no-data">クレジット1000以上の機種はありません</td></tr>';
+                document.getElementById('topListSection').style.display = 'block';
+            }
+        }
+
+        function calculateRegi() {
+            realTimeCalc();
+            // 計算ボタン押下時は結果エリアまでスクロール
+            document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function resetRegi() {
+            document.getElementById('baseAmount').value = '';
+            document.getElementById('adjustment').value = '';
+
+            slotData.forEach(m => {
+                const id = m.no !== null ? `slot-${m.no}` : `slot-${m.name}`;
+                document.getElementById(id).value = '';
+            });
+            pachinkoData.forEach(m => {
+                document.getElementById(`pachi-${m.name}`).value = '';
+            });
+
+            const cashIds = ['coin100','coin500','bill1000regi','bill1000change','bill2000','bill5000','bill10000'];
+            cashIds.forEach(id => document.getElementById(id).value = '');
+
+            document.getElementById('resultSection').style.display = 'none';
+            document.getElementById('medalCountSection').style.display = 'none';
+            document.getElementById('payoutResultSection').style.display = 'none';
+            document.getElementById('topListSection').style.display = 'none';
+
+            // 追従バー非表示
+            document.getElementById('stickyBar').classList.remove('visible');
+            hasAnyInput = false;
+        }
+
+        function toggleDetail() {
+            const el = document.getElementById('detailArea');
+            el.classList.toggle('hidden');
+        }
+
+        // スクロール監視（入力エリアにいる時のみ上部バーを表示）
+        window.addEventListener('scroll', updateStickyBarVisibility);
+        window.addEventListener('resize', updateStickyBarVisibility);
+
+        // リアルタイム計算：すべてのinputにイベントリスナーを設定
+        function attachRealTimeListeners() {
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                input.addEventListener('input', realTimeCalc);
+            });
+        }
+
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') calculateRegi();
+            });
+        });
+
+        initMachineTables();
+        attachRealTimeListeners();
+    </script>
+</body>
+</html>

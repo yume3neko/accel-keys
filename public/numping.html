@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字早撃ちゲーム</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the progress bar and general layout */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevent scroll bars */
+        }
+        .game-container {
+            background-color: #ffffff; /* White background for the game area */
+            border-radius: 1.5rem; /* More rounded corners */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); /* Stronger shadow */
+            padding: 2.5rem; /* Increased padding */
+            text-align: center;
+            width: 90%; /* Responsive width */
+            max-width: 500px; /* Max width for desktop */
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem; /* Space between elements */
+        }
+        .progress-bar-container {
+            width: 100%;
+            background-color: #e2e8f0; /* Light gray for empty bar */
+            border-radius: 0.75rem; /* Rounded corners for progress bar */
+            height: 1.5rem; /* Height of the progress bar */
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #3b82f6; /* Blue for filled bar */
+            width: 100%; /* Initial width */
+            border-radius: 0.75rem;
+            transition: width 0.1s linear; /* Smooth transition for timer */
+        }
+        .input-field {
+            -webkit-appearance: none; /* Remove default iOS styling */
+            margin: 0; /* Remove margin for number input */
+            -moz-appearance: textfield; /* Remove default Firefox styling */
+        }
+        .input-field::-webkit-outer-spin-button,
+        .input-field::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .clickable-text {
+            cursor: pointer;
+            user-select: none; /* Prevent text selection */
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- デスクトップ用レイアウト: ゲーム中は常に表示 -->
+        <div id="desktop-stats-container" class="sm:flex flex-col gap-1.5rem hidden md:block">
+            <div class="flex justify-around text-2xl font-bold text-gray-700">
+                <div>スコア: <span id="desktop-score" class="text-blue-600">0</span></div>
+                <div>ハイスコア: <span id="desktop-high-score" class="text-purple-600">0</span></div>
+            </div>
+            <div class="flex items-center justify-between text-xl font-semibold text-gray-700">
+                <span id="desktop-mode-text" class="clickable-text">残り時間:</span>
+                <span id="desktop-timer-text" class="text-blue-600 clickable-text">30.0s</span>
+            </div>
+            <div class="progress-bar-container">
+                <div id="desktop-progress-bar" class="progress-bar"></div>
+            </div>
+            <div id="desktop-combo-display" class="text-xl font-semibold text-green-600">
+                コンボ: 0
+            </div>
+        </div>
+
+        <!-- ゲームオーバーメッセージ（表示位置は固定） -->
+        <div id="game-over-message" class="text-3xl font-bold text-red-600 mt-4 hidden">
+            ゲームオーバー！<br>最終スコア: <span id="final-score">0</span>
+            <div id="high-score-update-message" class="text-xl text-purple-700 mt-2 hidden">ハイスコア更新！🎉</div>
+        </div>
+
+        <!-- ペナルティメッセージ（表示位置は固定） -->
+        <div id="penalty-message" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative hidden mt-4">
+            <strong class="font-bold">ミス！</strong>
+            <span class="block sm:inline">1秒間入力ロックされます。</span>
+        </div>
+
+        <!-- スマートフォン用レイアウト: ゲーム中のみ表示 -->
+        <div id="mobile-stats-container" class="md:hidden flex-col gap-1.5rem hidden">
+            <div class="flex justify-around text-2xl font-bold text-gray-700">
+                <div>スコア: <span id="mobile-score" class="text-blue-600">0</span></div>
+                <div>ハイスコア: <span id="mobile-high-score" class="text-purple-600">0</span></div>
+            </div>
+            <div class="flex items-center justify-between text-xl font-semibold text-gray-700">
+                <span id="mobile-mode-text" class="clickable-text">残り時間:</span>
+                <span id="mobile-timer-text" class="text-blue-600 clickable-text">30.0s</span>
+            </div>
+            <div class="progress-bar-container">
+                <div id="mobile-progress-bar" class="progress-bar"></div>
+            </div>
+            <div id="mobile-combo-display" class="text-xl font-semibold text-green-600">
+                コンボ: 0
+            </div>
+        </div>
+
+        <!-- 数字表示エリア -->
+        <div id="current-number-display" class="text-7xl font-bold text-gray-800 my-8">
+            <span id="current-number"></span>
+        </div>
+
+        <!-- ユーザー入力欄 -->
+        <input
+            type="number"
+            id="user-input"
+            class="input-field w-full p-4 text-center text-4xl border-4 border-blue-300 rounded-xl focus:outline-none focus:border-blue-500 transition duration-200 ease-in-out placeholder:text-2xl"
+            placeholder="何か入力してゲーム開始"
+            inputmode="numeric"
+            pattern="[0-9]*"
+        />
+    </div>
+
+    <script>
+        // ゲームの状態を管理する変数
+        let score = 0;
+        let highScore = 0;
+        let correctStreak = 0;
+        let basePoints = 1;
+        let currentNumber = '';
+        let timeLeft = 30;
+        let gameMode = 'timeLimit'; // 'timeLimit' or 'timeAttack'
+        let timeLimitMode = 30; // 30 or 60
+        const timeLimitModes = [30, 60];
+        let timeAttackMode = 10; // 10, 30, 60, 100
+        const timeAttackModes = [10, 30, 60, 100];
+        let remainingCount; // タイムアタックモード用の残り個数
+        let gameInterval;
+        let countdownInterval;
+        let penaltyTimeout;
+        let isInputLocked = false;
+        let gameState = 'waiting'; // 'waiting', 'countdown', 'playing', 'gameOver'
+
+        // DOM要素の取得
+        const desktopStatsContainer = document.getElementById('desktop-stats-container');
+        const mobileStatsContainer = document.getElementById('mobile-stats-container');
+
+        const desktopScoreDisplay = document.getElementById('desktop-score');
+        const desktopHighScoreDisplay = document.getElementById('desktop-high-score');
+        const desktopTimerText = document.getElementById('desktop-timer-text');
+        const desktopModeText = document.getElementById('desktop-mode-text');
+        const desktopProgressBarContainer = desktopStatsContainer.querySelector('.progress-bar-container');
+        const desktopProgressBar = document.getElementById('desktop-progress-bar');
+        const desktopComboDisplay = document.getElementById('desktop-combo-display');
+
+        const mobileScoreDisplay = document.getElementById('mobile-score');
+        const mobileHighScoreDisplay = document.getElementById('mobile-high-score');
+        const mobileTimerText = document.getElementById('mobile-timer-text');
+        const mobileModeText = document.getElementById('mobile-mode-text');
+        const mobileProgressBarContainer = mobileStatsContainer.querySelector('.progress-bar-container');
+        const mobileProgressBar = document.getElementById('mobile-progress-bar');
+        const mobileComboDisplay = document.getElementById('mobile-combo-display');
+        
+        const currentNumberDisplay = document.getElementById('current-number');
+        const userInput = document.getElementById('user-input');
+        const gameOverMessage = document.getElementById('game-over-message');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const penaltyMessage = document.getElementById('penalty-message');
+        const highScoreUpdateMessage = document.getElementById('high-score-update-message');
+
+        // ゲーム初期化
+        function initializeGame() {
+            score = 0;
+            correctStreak = 0;
+            basePoints = 1;
+            timeLeft = (gameMode === 'timeLimit') ? timeLimitMode : 0;
+            remainingCount = (gameMode === 'timeAttack') ? timeAttackMode : 0;
+            currentNumber = '';
+            isInputLocked = false;
+            gameState = 'waiting';
+
+            // 選択されたモードのハイスコアをローカルストレージから読み込む
+            if (gameMode === 'timeLimit') {
+                highScore = parseInt(localStorage.getItem(`highScore${timeLimitMode}s`) || '0', 10);
+            } else {
+                // タイムアタックモードは「クリアタイム」なので、小さいほど良い
+                highScore = parseFloat(localStorage.getItem(`highScore${timeAttackMode}count`) || '99999', 10);
+            }
+            
+            updateDisplays();
+
+            userInput.value = '';
+            userInput.disabled = false;
+            updatePlaceholder();
+            gameOverMessage.style.display = 'none';
+            penaltyMessage.style.display = 'none';
+            highScoreUpdateMessage.style.display = 'none';
+
+            // スマホ用statsを非表示にする
+            mobileStatsContainer.classList.add('hidden');
+            desktopStatsContainer.classList.remove('hidden');
+
+            // プログレスバーの表示・非表示を切り替え
+            if (gameMode === 'timeLimit') {
+                desktopProgressBarContainer.style.display = 'block';
+                mobileProgressBarContainer.style.display = 'block';
+            } else {
+                desktopProgressBarContainer.style.display = 'none';
+                mobileProgressBarContainer.style.display = 'none';
+            }
+
+            clearInterval(gameInterval);
+            clearInterval(countdownInterval);
+            clearTimeout(penaltyTimeout);
+        }
+        
+        // プレースホルダーのテキストを更新する関数
+        function updatePlaceholder() {
+            if (gameState === 'playing' && gameMode === 'timeAttack') {
+                userInput.placeholder = `残り: ${remainingCount}個`;
+            } else if (gameState === 'waiting') {
+                userInput.placeholder = '何か入力してゲーム開始';
+            } else {
+                userInput.placeholder = '';
+            }
+        }
+
+        // 全ての表示を更新するヘルパー関数
+        function updateDisplays() {
+            if (gameMode === 'timeLimit') {
+                desktopModeText.textContent = '残り時間:';
+                mobileModeText.textContent = '残り時間:';
+                desktopTimerText.textContent = `${timeLeft.toFixed(1)}s`;
+                mobileTimerText.textContent = `${timeLeft.toFixed(1)}s`;
+                desktopHighScoreDisplay.textContent = highScore;
+                mobileHighScoreDisplay.textContent = highScore;
+            } else { // timeAttack
+                desktopModeText.textContent = '残り個数:';
+                mobileModeText.textContent = '残り個数:';
+                desktopTimerText.textContent = `${remainingCount}個`;
+                mobileTimerText.textContent = `${remainingCount}個`;
+                // タイムアタックのハイスコアはクリアタイム
+                desktopHighScoreDisplay.textContent = (highScore === 99999) ? '---' : `${highScore.toFixed(2)}s`;
+                mobileHighScoreDisplay.textContent = (highScore === 99999) ? '---' : `${highScore.toFixed(2)}s`;
+            }
+            
+            desktopScoreDisplay.textContent = score;
+            mobileScoreDisplay.textContent = score;
+
+            desktopComboDisplay.textContent = `コンボ: ${correctStreak}`;
+            mobileComboDisplay.textContent = `コンボ: ${correctStreak}`;
+
+            if (gameMode === 'timeLimit') {
+                const progress = (timeLeft / timeLimitMode) * 100;
+                desktopProgressBar.style.width = `${progress}%`;
+                mobileProgressBar.style.width = `${progress}%`;
+                const progressBarColor = progress < 25 ? '#ef4444' : progress < 50 ? '#f97316' : '#3b82f6';
+                desktopProgressBar.style.backgroundColor = progressBarColor;
+                mobileProgressBar.style.backgroundColor = progressBarColor;
+            }
+        }
+
+        // 数字を生成する関数
+        function generateNumber() {
+            let numDigits;
+            const rand = Math.random();
+            if (rand < 0.2) {
+                numDigits = 1;
+            } else {
+                numDigits = 2;
+            }
+
+            if (numDigits === 1) {
+                currentNumber = Math.floor(Math.random() * 9) + 1;
+            } else {
+                currentNumber = Math.floor(Math.random() * 90) + 10;
+            }
+            currentNumberDisplay.textContent = currentNumber;
+        }
+
+        // カウントダウンを開始する関数
+        function startCountdown() {
+            gameState = 'countdown';
+            gameOverMessage.style.display = 'none';
+            penaltyMessage.style.display = 'none';
+            userInput.disabled = true;
+            userInput.placeholder = '';
+
+            let count = 3;
+            currentNumberDisplay.textContent = count;
+
+            countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    currentNumberDisplay.textContent = count;
+                } else {
+                    clearInterval(countdownInterval);
+                    currentNumberDisplay.textContent = 'スタート！';
+                    setTimeout(() => {
+                        startGame();
+                    }, 500);
+                }
+            }, 1000);
+        }
+
+        // ゲームを開始する関数
+        function startGame() {
+            gameState = 'playing';
+            generateNumber();
+            userInput.value = '';
+            userInput.disabled = false;
+            userInput.focus();
+            updatePlaceholder();
+
+            if (window.innerWidth < 768) {
+                mobileStatsContainer.classList.remove('hidden');
+                desktopStatsContainer.classList.add('hidden');
+            }
+
+            if (gameMode === 'timeLimit') {
+                gameInterval = setInterval(() => {
+                    timeLeft -= 0.1;
+                    if (timeLeft <= 0) {
+                        timeLeft = 0;
+                        endGame();
+                    }
+                    updateDisplays();
+                }, 100);
+            } else { // timeAttack
+                timeLeft = 0; // タイムアタックモードでは時間を計測
+                gameInterval = setInterval(() => {
+                    timeLeft += 0.01;
+                    // updateDisplays(); // 毎フレーム更新する必要はない
+                }, 10);
+            }
+        }
+
+        // ゲームを終了する関数
+        function endGame() {
+            gameState = 'gameOver';
+            clearInterval(gameInterval);
+            clearInterval(countdownInterval);
+            clearTimeout(penaltyTimeout);
+            userInput.disabled = true;
+            gameOverMessage.style.display = 'block';
+            currentNumberDisplay.textContent = '';
+            penaltyMessage.style.display = 'none';
+
+            if (gameMode === 'timeLimit') {
+                finalScoreDisplay.textContent = score;
+                const currentHighScore = parseInt(localStorage.getItem(`highScore${timeLimitMode}s`) || '0', 10);
+                if (score > currentHighScore) {
+                    highScore = score;
+                    localStorage.setItem(`highScore${timeLimitMode}s`, highScore.toString());
+                    updateDisplays();
+                    highScoreUpdateMessage.style.display = 'block';
+                } else {
+                    highScoreUpdateMessage.style.display = 'none';
+                }
+            } else { // timeAttack
+                finalScoreDisplay.textContent = remainingCount === 0 ? timeLeft.toFixed(2) + 's' : '---';
+                const currentHighScore = parseFloat(localStorage.getItem(`highScore${timeAttackMode}count`) || '99999', 10);
+                if (remainingCount === 0 && timeLeft < currentHighScore) {
+                    highScore = timeLeft;
+                    localStorage.setItem(`highScore${timeAttackMode}count`, highScore.toString());
+                    updateDisplays();
+                    highScoreUpdateMessage.style.display = 'block';
+                } else {
+                    highScoreUpdateMessage.style.display = 'none';
+                }
+            }
+
+            mobileStatsContainer.classList.add('hidden');
+            desktopStatsContainer.classList.remove('hidden');
+            
+            setTimeout(() => {
+                initializeGame();
+            }, 2000);
+        }
+
+        // ユーザー入力の処理
+        userInput.addEventListener('input', (event) => {
+            if (gameState === 'waiting') {
+                startCountdown();
+                event.target.value = '';
+                return;
+            }
+
+            if (gameState !== 'playing' || isInputLocked) {
+                event.preventDefault();
+                userInput.value = '';
+                return;
+            }
+
+            const input = event.target.value;
+
+            if (input === currentNumber.toString()) {
+                if (gameMode === 'timeLimit') {
+                    score += basePoints;
+                } else { // timeAttack
+                    score++;
+                    remainingCount--;
+                    if (remainingCount <= 0) {
+                        endGame(); // タイムアタック終了
+                        return;
+                    }
+                }
+                correctStreak++;
+                updateDisplays();
+                updatePlaceholder();
+
+                if (correctStreak > 0 && correctStreak % 5 === 0) {
+                    basePoints++;
+                }
+
+                generateNumber();
+                userInput.value = '';
+            } else if (input.length >= currentNumber.toString().length) {
+                correctStreak = 0;
+                basePoints = 1;
+                updateDisplays();
+
+                isInputLocked = true;
+                userInput.disabled = true;
+                penaltyMessage.style.display = 'block';
+                
+                penaltyTimeout = setTimeout(() => {
+                    isInputLocked = false;
+                    userInput.disabled = false;
+                    userInput.focus();
+                    penaltyMessage.style.display = 'none';
+                }, 1000);
+
+                userInput.value = '';
+            }
+        });
+
+        // モードを切り替える関数
+        function toggleGameMode() {
+            if (gameState !== 'waiting') return;
+            gameMode = (gameMode === 'timeLimit') ? 'timeAttack' : 'timeLimit';
+            initializeGame();
+        }
+
+        // タイムリミットモードの数字を切り替える関数
+        function toggleTimeLimitMode() {
+            if (gameState !== 'waiting' || gameMode !== 'timeLimit') return;
+            const currentIndex = timeLimitModes.indexOf(timeLimitMode);
+            const nextIndex = (currentIndex + 1) % timeLimitModes.length;
+            timeLimitMode = timeLimitModes[nextIndex];
+            initializeGame();
+        }
+
+        // タイムアタックモードの数字を切り替える関数
+        function toggleTimeAttackMode() {
+            if (gameState !== 'waiting' || gameMode !== 'timeAttack') return;
+            const currentIndex = timeAttackModes.indexOf(timeAttackMode);
+            const nextIndex = (currentIndex + 1) % timeAttackModes.length;
+            timeAttackMode = timeAttackModes[nextIndex];
+            initializeGame();
+        }
+
+        // イベントリスナーの設定
+        desktopModeText.addEventListener('click', toggleGameMode);
+        mobileModeText.addEventListener('click', toggleGameMode);
+        desktopTimerText.addEventListener('click', () => {
+            if (gameMode === 'timeLimit') {
+                toggleTimeLimitMode();
+            } else {
+                toggleTimeAttackMode();
+            }
+        });
+        mobileTimerText.addEventListener('click', () => {
+            if (gameMode === 'timeLimit') {
+                toggleTimeLimitMode();
+            } else {
+                toggleTimeAttackMode();
+            }
+        });
+
+        window.onload = initializeGame;
+        window.addEventListener('resize', () => {
+            if (gameState !== 'playing') {
+                if (window.innerWidth >= 768) {
+                    desktopStatsContainer.classList.remove('hidden');
+                    mobileStatsContainer.classList.add('hidden');
+                } else {
+                    desktopStatsContainer.classList.add('hidden');
+                    mobileStatsContainer.classList.add('hidden');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

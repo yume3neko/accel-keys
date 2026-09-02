@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ダブルアップゲーム - 裏難易度対応版</title>
+    <!-- Tailwind CSS CDNをロード -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムスタイル */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #f9fafb;
+        }
+        .game-container {
+            width: 95%;
+            max-width: 480px;
+            padding: 1.5rem;
+            background: #1e293b;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border: 4px solid #475569;
+        }
+        .small-win-button {
+            transition: all 0.1s ease-in-out;
+            cursor: pointer;
+        }
+        .small-win-button.hidden-value {
+            background-color: #fcd34d; /* 隠れている時の色 */
+            color: #1f2937;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 0 #b45309;
+            transform: translateY(0);
+        }
+        .small-win-button.hidden-value:active {
+            box-shadow: 0 2px 0 #b45309;
+            transform: translateY(2px);
+        }
+        .small-win-button.revealed-win {
+            background-color: #10b981; /* 勝利時の色 */
+            box-shadow: 0 4px 0 #047857;
+            color: white;
+        }
+        .small-win-button.revealed-lose {
+            background-color: #ef4444; /* 非選択時の色 */
+            box-shadow: 0 4px 0 #b91c1c;
+            color: white;
+        }
+        /* ダブルアップ専用ボタン */
+        .double-up-push {
+            background: linear-gradient(to bottom, #3b82f6, #1d4ed8);
+            box-shadow: 0 8px 0 #1e40af;
+            transition: transform 0.1s;
+        }
+        .double-up-push:active {
+            box-shadow: 0 4px 0 #1e40af;
+            transform: translateY(4px);
+        }
+        .info-panel {
+            background-color: #374151;
+            padding: 0.5rem 1rem;
+        }
+        
+        /* --- 連続失敗インジケーターのカスタムCSS --- */
+        .failure-indicator-box {
+            background-color: #4b5563;
+            color: #d1d5db;
+            transition: all 0.3s ease-in-out; 
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .failure-indicator-box.fail-0 {
+            background-color: #10b981; 
+            color: #1f2937;
+            animation: none;
+        }
+        .failure-indicator-box.fail-1 {
+            background-color: #f59e0b; 
+            color: #1f2937;
+            animation: pulse-yellow-slow 2s infinite; 
+        }
+        .failure-indicator-box.fail-2 {
+            background-color: #ef4444; 
+            color: #1f2937;
+            animation: pulse-red-fast 0.7s infinite; 
+        }
+        .failure-indicator-box.fail-3 {
+            background-color: #1f2937; 
+            color: #d1d5db;
+            animation: none; 
+            border: 2px dashed #9ca3af;
+        }
+
+        /* アニメーションの定義 */
+        @keyframes pulse-yellow-slow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+            50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+        }
+        @keyframes pulse-red-fast {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8); }
+            50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+        }
+        
+        /* 警告パネルのスタイル */
+        .warning-panel {
+            background-color: #44403c;
+            color: #f59e0b;
+            border-left: 4px solid #f59e0b;
+            padding: 0.75rem;
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            white-space: pre-line; /* 改行を有効にする */
+        }
+        /* 難易度選択ボタン */
+        .mode-button {
+            transition: all 0.2s;
+            transform: scale(1);
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+        }
+        .mode-button:hover {
+            transform: scale(1.02);
+        }
+        .mode-button:active {
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+            transform: translateY(4px);
+        }
+
+    </style>
+</head>
+<body class="selection:bg-yellow-400 selection:text-gray-900">
+
+    <div class="game-container rounded-xl">
+        <!-- タイトルを3回/6回クリックで隠しモード解放 -->
+        <h1 id="game-title" class="text-3xl font-extrabold text-center mb-4 text-yellow-300 cursor-pointer select-none">ダブルアップチャレンジ</h1>
+
+        <h2 id="total-set-status" class="text-xl font-bold text-center mb-6 text-blue-300">難易度を選択してください</h2>
+
+        <!-- 情報パネル -->
+        <div class="info-panel rounded-lg mb-4 flex justify-between font-mono text-lg border border-gray-600">
+            <span id="game-status" class="text-white">ゲーム開始</span>
+            <span id="current-stake" class="text-yellow-300">0枚</span>
+        </div>
+
+        <!-- 連続失敗回数インジケーター (ダブルアップパートでのみ表示) -->
+        <div id="failure-indicator" class="flex justify-center gap-2 mb-6 h-10">
+            <!-- 失敗回数がここに挿入される -->
+        </div>
+
+        <!-- メッセージエリア -->
+        <div id="message-display" class="h-12 flex items-center justify-center mb-6 text-xl font-semibold text-center text-white bg-gray-700 rounded-lg p-2">
+            モードを選んでゲームを開始します。
+        </div>
+
+        <!-- ボタン/ゲームエリア -->
+        <div id="game-area" class="flex flex-col gap-4">
+            <!-- ボタンがここに挿入されます -->
+        </div>
+
+    </div>
+
+    <script>
+        // ゲーム状態変数
+        let gameState = 'IDLE'; // IDLE, SMALL_WIN, DOUBLE_UP, RESULT
+        let currentStake = 0;
+        let smallWinRound = 0;
+        let totalDoubleUpWins = 0;
+        let currentSet = 1; // セット数はここで初期化しておく
+
+        // --- 隠しモード関連の変数 ---
+        let titleClickCount = 0;
+        let uraEasyUnlocked = false; // 裏イージー
+        let uraHardUnlocked = false; // 裏ハード
+
+        // --- 難易度・設定関連の変数 ---
+        let gameMode = null; // 'EASY' or 'URA_EASY' or 'HARD' or 'URA_HARD'
+        const BASE_WIN_CHANCE = 0.30; // EASY, HARD(2回目以降)の基本継続抽選率
+        const HARD_MODE_FIRST_WIN_CHANCE = 0.50; // ハードモード初回のみの継続抽選率
+        const URA_EASY_WIN_CHANCE = 0.70; // 裏イージーモードの継続抽選率
+        
+        // 裏ハードモードの継続率設定
+        const URA_HARD_START_CHANCE = 0.60; // 裏ハードモードの初回継続抽選率 (60%)
+        const URA_HARD_DECREASE_STEP_1 = 0.02; // 1〜10連目の減少率 (2%)
+        const URA_HARD_DECREASE_STEP_2 = 0.03; // 11連目以降の減少率 (3%)
+        const URA_HARD_DECREASE_LIMIT_1 = 10; // 減少率1の適用上限 (10連目まで)
+        
+        // ユーザー指定の継続率 (合算成功率) 表示用
+        const EASY_CONTINUITY_RATE = '約51%';
+        const URA_EASY_CONTINUITY_RATE = '約91%';
+        const HARD_FIRST_CONTINUITY_RATE = '約87.5%';
+        const HARD_REGULAR_CONTINUITY_RATE = '約51%';
+        
+        const MAX_SETS = 3; 
+        const DOUBLE_UP_MAX_WINS = 20;
+        const MAX_FAILURE = 3; 
+        let currentFailures = 0; 
+        let totalAcquiredStake = 0; 
+        // ------------------------------------------
+
+        // 小役パートの配当と確率設定
+        const BASE_SMALL_WIN_PAYOUTS = [
+            { value: 0, weight: 35 },
+            { value: 10, weight: 20 },
+            { value: 30, weight: 10 },
+            { value: 50, weight: 30 },
+            { value: 100, weight: 5 }
+        ];
+        
+        const URA_EASY_SMALL_WIN_PAYOUTS = [
+            { value: 30, weight: 30 }, // 30%
+            { value: 50, weight: 20 }, // 20%
+            { value: 100, weight: 50 } // 50%
+        ];
+        
+        // --- 確率に基づいて小役の値を抽選する (モード別) ---
+        const drawPayout = () => {
+            let payouts = [];
+            
+            if (gameMode === 'EASY') {
+                // EASYモード: 100枚を除外し、その重みを残りに均等振り分け
+                const removedPayout = BASE_SMALL_WIN_PAYOUTS.find(p => p.value === 100); 
+                const removedWeight = removedPayout ? removedPayout.weight : 0;
+                
+                const remainingPayouts = BASE_SMALL_WIN_PAYOUTS.filter(p => p.value !== 100);
+                const weightIncreasePerItem = removedWeight / remainingPayouts.length; 
+                
+                payouts = remainingPayouts.map(p => ({
+                    value: p.value,
+                    weight: p.weight + weightIncreasePerItem
+                }));
+
+            } else if (gameMode === 'URA_EASY') {
+                // 裏イージーモード: 30, 50, 100枚のみ
+                payouts = URA_EASY_SMALL_WIN_PAYOUTS;
+            } else { // HARD or URA_HARD モード
+                payouts = BASE_SMALL_WIN_PAYOUTS;
+            }
+
+            const totalWeight = payouts.reduce((sum, item) => sum + item.weight, 0);
+            let random = Math.random() * totalWeight;
+
+            for (const payout of payouts) {
+                if (random < payout.weight) {
+                    return payout.value;
+                }
+                random -= payout.weight;
+            }
+            return 0; 
+        };
+
+        // --- オール0回避のために非ゼロの値リストを取得する関数 ---
+        const getNonZeroValues = () => {
+            if (gameMode === 'EASY') {
+                return BASE_SMALL_WIN_PAYOUTS
+                    .filter(p => p.value !== 0 && p.value !== 100)
+                    .map(p => p.value);
+            } else if (gameMode === 'URA_EASY') {
+                // 裏イージーは全て非ゼロなので、全て返す
+                return URA_EASY_SMALL_WIN_PAYOUTS.map(p => p.value);
+            } else {
+                // HARD or URA_HARD
+                return BASE_SMALL_WIN_PAYOUTS
+                    .filter(p => p.value !== 0)
+                    .map(p => p.value);
+            }
+        };
+
+
+        const DOM = {
+            set: document.getElementById('total-set-status'),
+            status: document.getElementById('game-status'),
+            stake: document.getElementById('current-stake'),
+            message: document.getElementById('message-display'),
+            area: document.getElementById('game-area'),
+            failureIndicator: document.getElementById('failure-indicator') 
+        };
+
+        // 配列をシャッフルする 
+        const shuffleArray = (array) => {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        };
+
+        // UIを更新する 
+        const updateUI = () => {
+            DOM.stake.textContent = `${currentStake}枚`;
+            let modeText;
+            if (gameMode === 'EASY') modeText = 'イージー';
+            else if (gameMode === 'URA_EASY') modeText = '裏イージー';
+            else if (gameMode === 'HARD') modeText = 'ハード';
+            else if (gameMode === 'URA_HARD') modeText = '裏ハード';
+            else modeText = '';
+            
+            if (gameState === 'IDLE' && gameMode === null) {
+                DOM.set.textContent = '難易度を選択してください';
+            } else {
+                DOM.set.textContent = `セット ${currentSet} / ${MAX_SETS} (${modeText} / 累計: ${totalAcquiredStake}枚)`;
+            }
+            
+            let statusText = '';
+            if (gameState === 'SMALL_WIN') {
+                // smallWinRoundが4の場合は「ラストチャンス」と明記
+                if (smallWinRound === 4) {
+                    statusText = `小役パート (R ${smallWinRound}/3)`; // 4/3 表記
+                } else {
+                    statusText = `小役パート (R ${smallWinRound}/3)`;
+                }
+            } else if (gameState === 'DOUBLE_UP') {
+                statusText = `ダブルアップ (${totalDoubleUpWins}連)`;
+            } else if (gameState === 'RESULT') {
+                statusText = '結果表示';
+            } else {
+                statusText = '準備完了';
+            }
+            DOM.status.textContent = statusText;
+        };
+
+        // 失敗インジケーターを更新する 
+        const updateFailureUI = () => {
+            const indicator = DOM.failureIndicator;
+            
+            if (gameState !== 'DOUBLE_UP' && gameState !== 'RESULT') {
+                indicator.innerHTML = '';
+                return;
+            }
+
+            let failureClass = '';
+            
+            if (currentFailures === 0) {
+                failureClass = 'fail-0'; 
+            } else if (currentFailures === 1) {
+                failureClass = 'fail-1'; 
+            } else if (currentFailures === 2) {
+                failureClass = 'fail-2'; 
+            } else if (currentFailures >= MAX_FAILURE) {
+                failureClass = 'fail-3'; 
+            } else {
+                failureClass = ''; 
+            }
+
+            indicator.innerHTML = `
+                <div class="failure-indicator-box rounded-full w-40 h-full flex items-center justify-center font-bold text-sm shadow-md ${failureClass}">
+                    連続失敗: ${currentFailures} / ${MAX_FAILURE}
+                </div>
+            `;
+        };
+
+        // メッセージを表示する 
+        const displayMessage = (text, isAlert = false) => {
+            DOM.message.textContent = text;
+            if (isAlert) {
+                DOM.message.classList.add('bg-red-600');
+                DOM.message.classList.remove('bg-gray-700');
+            } else {
+                DOM.message.classList.remove('bg-red-600');
+                DOM.message.classList.add('bg-gray-700');
+            }
+        };
+
+        // --- 隠しモード解放処理 ---
+        const handleTitleClick = () => {
+            titleClickCount++;
+            const titleElement = document.getElementById('game-title');
+            
+            let updateNeeded = false;
+
+            // 1. 裏イージーモードの解放 (3回以上)
+            if (titleClickCount >= 3 && !uraEasyUnlocked) {
+                uraEasyUnlocked = true;
+                updateNeeded = true;
+            }
+
+            // 2. 裏ハードモードの解放 (6回以上)
+            if (titleClickCount >= 6 && !uraHardUnlocked) {
+                uraHardUnlocked = true;
+                updateNeeded = true;
+            }
+
+            if (updateNeeded) {
+                // モードボタンの表示を更新
+                showModeSelection(); 
+            }
+
+            // クリックフィードバック
+            titleElement.classList.add('scale-95');
+            setTimeout(() => titleElement.classList.remove('scale-95'), 100);
+        };
+        
+        // --- 難易度選択画面 ---
+        const showModeSelection = () => {
+            gameMode = null;
+            currentSet = 1;
+            totalAcquiredStake = 0;
+            currentStake = 0;
+            totalDoubleUpWins = 0;
+            currentFailures = 0;
+
+            gameState = 'IDLE';
+            updateUI();
+            updateFailureUI();
+            DOM.area.innerHTML = '';
+            displayMessage('挑戦する難易度を選択してください。', false);
+
+            const buttons = [];
+
+            // 1. 裏イージーモードボタン (解放されている場合、イージーの上に追加)
+            if (uraEasyUnlocked) {
+                let uraEasyButton = document.createElement('button');
+                uraEasyButton.className = 'mode-button bg-purple-600 hover:bg-purple-700 text-white text-xl font-bold py-6 rounded-xl shadow-purple-800/50';
+                uraEasyButton.innerHTML = `裏イージーモード (Ura Easy)<br><span class="text-sm font-normal">強制挑戦なし / 小役30, 50, 100確定 / 継続率 ${URA_EASY_CONTINUITY_RATE}</span>`;
+                uraEasyButton.onclick = () => startGameSetup('URA_EASY', true);
+                buttons.push(uraEasyButton);
+            }
+
+            // 2. イージーモードボタン
+            let easyButton = document.createElement('button');
+            easyButton.className = 'mode-button bg-green-500 hover:bg-green-600 text-white text-xl font-bold py-6 rounded-xl shadow-green-800/50';
+            easyButton.innerHTML = `イージーモード (Easy)<br><span class="text-sm font-normal">強制挑戦なし / 小役100枚なし / 継続率 ${EASY_CONTINUITY_RATE}</span>`;
+            easyButton.onclick = () => startGameSetup('EASY', true);
+            buttons.push(easyButton);
+
+            // 3. ハードモードボタン
+            let hardButton = document.createElement('button');
+            hardButton.className = 'mode-button bg-red-600 hover:bg-red-700 text-white text-xl font-bold py-6 rounded-xl shadow-red-800/50';
+            hardButton.innerHTML = `ハードモード (Hard)<br><span class="text-sm font-normal">初回強制挑戦あり / 初回継続率 ${HARD_FIRST_CONTINUITY_RATE} / 2回目以降 ${HARD_REGULAR_CONTINUITY_RATE}</span>`;
+            hardButton.onclick = () => startGameSetup('HARD', true);
+            buttons.push(hardButton);
+
+            // 4. 裏ハードモードボタン (解放されている場合、ハードの下に追加)
+            if (uraHardUnlocked) {
+                let uraHardButton = document.createElement('button');
+                const startProb = (URA_HARD_START_CHANCE * 100).toFixed(0);
+                uraHardButton.className = 'mode-button bg-red-800 hover:bg-red-900 text-white text-xl font-bold py-6 rounded-xl shadow-red-900/80';
+                uraHardButton.innerHTML = `裏ハードモード (Ura Hard)<br><span class="text-sm font-normal">初回強制挑戦あり / 継続率 ${startProb}%から連チャンに応じて減少</span>`;
+                uraHardButton.onclick = () => startGameSetup('URA_HARD', true);
+                buttons.push(uraHardButton);
+            }
+
+            // ボタンをDOMに追加
+            buttons.forEach(btn => DOM.area.appendChild(btn));
+        };
+
+        // ゲームを初期化する (セット開始または全リセット) 
+        const startGameSetup = (mode, isFullReset = false) => {
+            if (isFullReset) {
+                gameMode = mode;
+                currentSet = 1;
+                totalAcquiredStake = 0;
+                let modeJp = '';
+                if (mode === 'EASY') modeJp = 'イージー';
+                else if (mode === 'URA_EASY') modeJp = '裏イージー';
+                else if (mode === 'HARD') modeJp = 'ハード';
+                else if (mode === 'URA_HARD') modeJp = '裏ハード';
+                displayMessage(`「${modeJp}モード」で3セットチャレンジを開始します。`, false);
+            } else {
+                displayMessage(`セット ${currentSet} / ${MAX_SETS} を開始します。`, false);
+            }
+            
+            gameState = 'IDLE';
+            currentStake = 0;
+            smallWinRound = 0;
+            totalDoubleUpWins = 0;
+            currentFailures = 0; 
+            updateUI();
+            updateFailureUI(); 
+            DOM.area.innerHTML = '';
+
+
+            const startButton = document.createElement('button');
+            startButton.className = 'bg-green-500 hover:bg-green-600 text-white text-2xl font-bold py-4 rounded-xl transition shadow-lg shadow-green-800/50';
+            startButton.textContent = `セット${currentSet} スタート`;
+            startButton.onclick = playSmallWinRound;
+            DOM.area.appendChild(startButton);
+        };
+
+        // 小役パートのラウンドを開始する 
+        const playSmallWinRound = () => {
+            smallWinRound++;
+            gameState = 'SMALL_WIN';
+            updateUI();
+            DOM.area.innerHTML = '';
+            
+            // 小役パート終了チェック (規定3ラウンドで小役を獲得している場合、4ラウンド目に入る前にダブルアップへ)
+            if (smallWinRound > 3 && currentStake > 0) {
+                startDoubleUp(true); 
+                return;
+            }
+            
+            // 4ラウンド目をプレイした後、小役を獲得できなかった場合はセット終了
+            if (smallWinRound > 4) {
+                if (currentStake === 0) {
+                    displayMessage('ラストチャンスでも獲得できませんでした。セット失敗...', true);
+                    setTimeout(() => showSetResult(true), 2000); 
+                } else {
+                    startDoubleUp(true); 
+                }
+                return;
+            }
+            
+            // --- ラストチャンス判定 ---
+            if (smallWinRound === 4 && currentStake === 0) {
+                 displayMessage(`ラストチャンス! このゲームで獲得できなければセット終了です!`, true);
+            } else if (smallWinRound === 4 && currentStake > 0) {
+                // 規定3ラウンドで獲得していて、4ラウンド目に入ろうとした場合
+                startDoubleUp(true); 
+                return;
+            } else {
+                displayMessage(`小役パート: ${smallWinRound}ゲーム目! 3つのボタンから1つを選んでください。`, false);
+            }
+            // --- 判定終了 ---
+
+
+            // 3つの配当を確率に基づいて抽選 
+            let availableValues = [drawPayout(), drawPayout(), drawPayout()];
+
+            // --- オール0 フォールバック処理 ---
+            const allZero = availableValues.every(val => val === 0);
+            if (allZero) {
+                const nonZeroValues = getNonZeroValues(); 
+                if (nonZeroValues.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * nonZeroValues.length);
+                    const replacementValue = nonZeroValues[randomIndex];
+                    const indexToReplace = Math.floor(Math.random() * 3);
+                    availableValues[indexToReplace] = replacementValue;
+                }
+            }
+            // --- フォールバック処理 終了 ---
+
+            availableValues = shuffleArray(availableValues);
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'flex justify-around gap-3';
+            
+            availableValues.forEach(value => {
+                const button = document.createElement('button');
+                button.className = 'small-win-button hidden-value w-full text-2xl py-4 rounded-lg shadow-xl';
+                button.textContent = '???';
+                button.setAttribute('data-value', value);
+                button.onclick = () => selectSmallWin(value, button, availableValues);
+                buttonContainer.appendChild(button);
+            });
+            
+            DOM.area.appendChild(buttonContainer);
+        };
+
+        // 小役パートでボタンを選択する 
+        const selectSmallWin = (value, selectedButton, allValues) => {
+            const buttons = DOM.area.querySelectorAll('.small-win-button');
+            buttons.forEach(btn => btn.onclick = null);
+
+            buttons.forEach(btn => {
+                const buttonValue = parseInt(btn.getAttribute('data-value'));
+                btn.textContent = `${buttonValue}枚`;
+                btn.classList.remove('hidden-value');
+                if (btn === selectedButton) {
+                    btn.classList.add('revealed-win');
+                } else {
+                    btn.classList.add('revealed-lose');
+                }
+            });
+
+            currentStake += value;
+            updateUI();
+
+            displayMessage(`+${value}枚! 現在の賭け額: ${currentStake}枚`, false);
+
+            setTimeout(() => {
+                // 規定3ラウンドで0枚だった場合は4ラウンド目へ
+                if (smallWinRound < 3 || (smallWinRound === 3 && currentStake === 0)) {
+                    playSmallWinRound();
+                } else {
+                    // 獲得枚数が残っているか、ラストチャンスで獲得した場合、ダブルアップへ
+                    startDoubleUp(true); 
+                }
+            }, 1500); 
+        };
+
+        // --- 裏ハードモードの継続率を計算する関数 ---
+        const calculateUraHardChance = (wins) => {
+            let chance = URA_HARD_START_CHANCE; // 0.60 (60%)
+
+            if (wins > 0 && wins <= URA_HARD_DECREASE_LIMIT_1) {
+                // 1連目から10連目まで: 2%ずつ減少
+                chance -= wins * URA_HARD_DECREASE_STEP_1;
+            } else if (wins > URA_HARD_DECREASE_LIMIT_1) {
+                // 11連目以降: 10連目までの減少分 + (11連目以降の連チャン数 * 3%減少)
+                
+                // 10連目到達時の継続率 (60% - 10 * 2% = 40%)
+                const chanceAtTenWins = URA_HARD_START_CHANCE - URA_HARD_DECREASE_LIMIT_1 * URA_HARD_DECREASE_STEP_1;
+                
+                // 11連目以降の連チャン数
+                const winsAboveTen = wins - URA_HARD_DECREASE_LIMIT_1;
+                
+                chance = chanceAtTenWins - (winsAboveTen * URA_HARD_DECREASE_STEP_2);
+            }
+            // 継続率が0%未満にならないように制限
+            return Math.max(0, chance); 
+        };
+        // ------------------------------------------
+
+
+        // ダブルアップパートを開始する 
+        const startDoubleUp = (isFirstStart = false) => {
+            gameState = 'DOUBLE_UP';
+            updateUI();
+            DOM.area.innerHTML = '';
+            
+            if (isFirstStart) {
+                 currentFailures = 0;
+                 totalDoubleUpWins = 0;
+            }
+            
+            updateFailureUI();
+
+            if (currentStake === 0) {
+                displayMessage('獲得枚数が0枚でした。ダブルアップはできません。', true);
+                currentFailures = MAX_FAILURE; 
+                updateFailureUI();
+                setTimeout(() => showSetResult(true), 2000); 
+                return;
+            }
+
+            if (totalDoubleUpWins >= DOUBLE_UP_MAX_WINS) {
+                displayMessage('20連達成！おめでとうございます！', false);
+                setTimeout(() => showSetResult(false), 1500);
+                return;
+            }
+            
+            // --- 成功率の計算 ---
+            let currentWinChance;
+            let chanceText;
+            let isHardModeFirstRound = false;
+
+            if (gameMode === 'URA_HARD') {
+                currentWinChance = calculateUraHardChance(totalDoubleUpWins);
+                chanceText = `${(currentWinChance * 100).toFixed(0)}%`;
+                isHardModeFirstRound = totalDoubleUpWins === 0; // 初回は強制挑戦
+            } else if (gameMode === 'HARD' && totalDoubleUpWins === 0) {
+                // ハードモード初回
+                currentWinChance = HARD_MODE_FIRST_WIN_CHANCE; 
+                chanceText = `初回限定 ${(HARD_MODE_FIRST_WIN_CHANCE * 100).toFixed(0)}%`;
+                isHardModeFirstRound = true;
+            } else if (gameMode === 'URA_EASY') {
+                // 裏イージーモード
+                currentWinChance = URA_EASY_WIN_CHANCE; 
+                chanceText = `${(URA_EASY_WIN_CHANCE * 100).toFixed(0)}%`;
+            } else { 
+                // EASYモード、またはHARDモードの2回目以降
+                currentWinChance = BASE_WIN_CHANCE;
+                chanceText = `${(BASE_WIN_CHANCE * 100).toFixed(0)}%`;
+            }
+            // ------------------
+
+            displayMessage(`ダブルアップ継続抽選! 成功率${chanceText}を引け! 現在 ${currentStake}枚!`, false);
+
+            // プッシュボタン
+            const pushButton = document.createElement('button');
+            pushButton.className = 'double-up-push w-full text-white text-3xl font-extrabold py-6 rounded-xl transition shadow-2xl';
+            pushButton.textContent = 'PUSH!';
+            pushButton.onclick = () => playDoubleUp(currentWinChance);
+            DOM.area.appendChild(pushButton);
+            
+            // --- 警告パネル ---
+            const showWarning = !isHardModeFirstRound && currentFailures === 1;
+
+            if (showWarning) {
+                const warningPanel = document.createElement('div');
+                warningPanel.className = 'warning-panel rounded-lg mb-2';
+                warningPanel.textContent = 'この結果を確定出来るのはここまでです\n次に進むと後戻り出来ません';
+                DOM.area.appendChild(warningPanel);
+            }
+            // ------------------------------------------
+            
+            // やめとくボタン
+            const quitButton = document.createElement('button');
+            quitButton.className = 'bg-yellow-600 hover:bg-yellow-700 text-gray-900 text-xl font-bold py-3 rounded-xl transition w-full shadow-lg';
+            quitButton.onclick = () => showSetResult(false);
+
+            // --- ボタンの有効/無効化ロジック ---
+            
+            const isCriticalFailure = currentFailures >= (MAX_FAILURE - 1); 
+
+            if (isHardModeFirstRound) {
+                // ハードモード/裏ハードモードの初回は強制挑戦
+                quitButton.disabled = true;
+                quitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                quitButton.classList.remove('hover:bg-yellow-700');
+                quitButton.textContent = '初回は強制挑戦';
+            } 
+            else if (isCriticalFailure) { 
+                // 連続失敗2回目(MAX_FAILURE-1)以降は無効 (Easy/Hard/裏Easy/裏Hard共通)
+                quitButton.disabled = true;
+                quitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                quitButton.classList.remove('hover:bg-yellow-700');
+                quitButton.textContent = '今は離脱できません';
+            }
+            else {
+                 // その他の場合は離脱可能
+                 quitButton.disabled = false;
+                 quitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                 quitButton.classList.add('hover:bg-yellow-700');
+                 quitButton.textContent = 'やめて獲得';
+            }
+            // ------------------------------------------
+
+            DOM.area.appendChild(quitButton);
+        };
+
+        // ダブルアップパートをプレイする 
+        const playDoubleUp = (chance) => {
+            // ボタンと警告パネルを無効化・削除
+            DOM.area.querySelectorAll('button').forEach(btn => btn.onclick = null);
+            DOM.area.querySelectorAll('.warning-panel').forEach(panel => panel.remove()); 
+
+            // 抽選
+            const isWin = Math.random() < chance;
+
+            if (isWin) {
+                // 当選: 勝利 (継続確定)
+                const oldStake = currentStake;
+                currentStake *= 2;
+                totalDoubleUpWins++;
+                currentFailures = 0; 
+                updateUI();
+                updateFailureUI();
+
+                if (totalDoubleUpWins >= DOUBLE_UP_MAX_WINS) {
+                    displayMessage(`🎉 20連 完走! ${oldStake}枚 → ${currentStake}枚!`, false);
+                    setTimeout(() => showSetResult(false), 1500);
+                    return;
+                }
+
+                const successProb = (chance * 100).toFixed(0);
+                displayMessage(`🎯 成功 (${successProb}%)! 連続失敗回数リセット! ${oldStake}枚 → ${currentStake}枚! (${totalDoubleUpWins}連目)`, false);
+
+                setTimeout(() => startDoubleUp(false), 1500); 
+
+            } else {
+                // 非当選: 失敗回数増加
+                currentFailures++;
+                updateFailureUI();
+
+                if (currentFailures >= MAX_FAILURE) {
+                    // 3回連続失敗で敗北
+                    const finalStakeBeforeLoss = currentStake;
+                    currentStake = 0; 
+                    updateUI();
+                    
+                    updateFailureUI(); 
+
+                    displayMessage(`❌ ${MAX_FAILURE}回連続失敗... 獲得枚数${finalStakeBeforeLoss}枚は失われました。`, true);
+                    
+                    setTimeout(() => showSetResult(true), 2000); 
+                } else {
+                    // 1回または2回連続失敗
+                    const failureProb = ((1 - chance) * 100).toFixed(0);
+                    displayMessage(`ハズレ (${failureProb}%)。連続失敗が残り ${MAX_FAILURE - currentFailures}回で終了です。`, false);
+                    
+                    setTimeout(() => startDoubleUp(false), 1500); 
+                }
+            }
+        };
+
+        // セット結果を表示し、次のセットへ移行する 
+        const showSetResult = (lost = false) => {
+            gameState = 'RESULT';
+            updateUI();
+            
+            if (lost) {
+                 currentFailures = MAX_FAILURE;
+            }
+            updateFailureUI(); 
+
+            DOM.area.innerHTML = '';
+            
+            const finalWins = totalDoubleUpWins;
+            const setStake = currentStake; 
+            
+            totalAcquiredStake += setStake;
+
+            displayMessage(`セット ${currentSet} 終了`, false);
+
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'bg-blue-900/50 p-6 rounded-lg text-center border-2 border-blue-400 mb-6';
+
+            let resultText = '';
+            if (lost) {
+                resultText = `😢 セット失敗 😢`;
+                resultDiv.classList.add('text-3xl', 'font-bold', 'text-red-400');
+            } else if (finalWins === DOUBLE_UP_MAX_WINS) {
+                resultText = `🎉 ${currentSet}セット目 20連 完走達成 🎉`;
+                resultDiv.classList.add('text-4xl', 'font-extrabold', 'text-yellow-300');
+            } else if (setStake > 0) {
+                resultText = `結果: ${finalWins}連で獲得`;
+                resultDiv.classList.add('text-3xl', 'font-bold', 'text-green-400');
+            }
+            
+            resultDiv.innerHTML = `
+                <p class="text-xl mb-4">${resultText}</p>
+                <p class="text-6xl font-extrabold">${setStake}枚</p>
+                <p class="text-xl mt-4">${finalWins}連</p>
+                <p class="text-xl mt-6 font-semibold text-blue-300">累計獲得: ${totalAcquiredStake}枚</p>
+            `;
+            
+            let nextButton;
+            if (currentSet < MAX_SETS) {
+                currentSet++;
+                nextButton = document.createElement('button');
+                nextButton.className = 'bg-green-500 hover:bg-green-600 text-white text-2xl font-bold py-4 rounded-xl transition w-full shadow-lg shadow-green-800/50';
+                nextButton.textContent = `セット${currentSet} へ`;
+                nextButton.onclick = () => startGameSetup(gameMode, false); // 次のセットへ
+            } else {
+                // 全セット終了
+                nextButton = document.createElement('button');
+                nextButton.className = 'bg-yellow-500 hover:bg-yellow-600 text-gray-900 text-2xl font-bold py-4 rounded-xl transition w-full shadow-lg shadow-yellow-800/50';
+                nextButton.textContent = `全セット終了（難易度選択に戻る）`;
+                nextButton.onclick = showModeSelection; // 難易度選択に戻る
+                
+                const finalSummary = document.createElement('div');
+                finalSummary.className = 'bg-red-900/50 p-4 mt-4 rounded-lg text-center border-2 border-red-400';
+                finalSummary.innerHTML = `<p class="text-3xl font-extrabold text-yellow-300">最終獲得枚数: ${totalAcquiredStake}枚</p>`;
+                DOM.area.appendChild(finalSummary);
+            }
+
+            DOM.area.appendChild(resultDiv);
+            DOM.area.appendChild(nextButton);
+
+            currentStake = 0;
+            totalDoubleUpWins = 0;
+            currentFailures = 0;
+        };
+
+        // ページロード時に難易度選択画面を表示とタイトルリスナーを設定
+        window.onload = () => {
+            // タイトル要素にクリックリスナーを追加
+            const titleElement = document.getElementById('game-title');
+            if (titleElement) {
+                titleElement.style.cursor = 'pointer'; // クリック可能であることを示す
+                titleElement.onclick = handleTitleClick;
+                // タッチイベントも追加 (モバイル対応)
+                titleElement.ontouchstart = (e) => {
+                    e.preventDefault(); // デフォルトの長押しメニューなどを防止
+                    handleTitleClick();
+                };
+            }
+            showModeSelection(); 
+        };
+
+    </script>
+</body>
+</html>

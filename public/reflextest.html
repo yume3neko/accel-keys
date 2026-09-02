@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>反射神経＆正確性テスト</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムスタイル */
+        .game-container {
+            /* 画面いっぱいに広げ、ターゲットの出現領域とする */
+            min-height: calc(100vh - 150px); /* ヘッダーとフッターを考慮 */
+            position: relative;
+            overflow: hidden;
+            touch-action: manipulation; /* タッチ操作の遅延防止 */
+            cursor: pointer; /* スタートを促すカーソル */
+        }
+        .target {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            position: absolute;
+            transition: opacity 0.1s, background-color 0.1s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transform: translate(-50%, -50%); /* 中央を基準にする */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 14px;
+            user-select: none;
+            -webkit-user-select: none;
+            z-index: 20; 
+        }
+        .target.ready {
+            background-color: #10b981; /* 緑 */
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
+            opacity: 1; 
+            cursor: pointer;
+        }
+        .target.hidden {
+            opacity: 0;
+            cursor: default;
+        }
+        .start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.1);
+            color: #4b5563;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 0.75rem;
+            pointer-events: none; /* 下のコンテナのクリックイベントを妨げないように */
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 flex flex-col items-center p-4 font-sans min-h-screen">
+
+    <div id="app" class="w-full max-w-lg bg-white rounded-xl shadow-2xl p-6 md:p-8">
+        <h1 class="text-3xl font-extrabold text-gray-900 mb-4 text-center">反射神経＆正確性テスト</h1>
+        
+        <!-- メッセージエリア -->
+        <div id="message-area" class="h-10 text-center mb-4">
+            <p id="game-message" class="text-xl font-bold text-gray-700">ゲームエリア内をクリック/タップしてスタート</p>
+        </div>
+
+        <!-- ゲームコンテナ (ターゲット出現場所) -->
+        <div id="game-container" class="game-container bg-gray-200 rounded-xl mb-6 relative border-4 border-dashed border-gray-300">
+            <!-- スタート/次のラウンドへのオーバーレイ -->
+            <div id="start-overlay" class="start-overlay">
+                <p id="overlay-message">どこでもクリック/タップしてスタート</p>
+                <p id="countdown" class="text-3xl text-gray-600 mt-2 hidden"></p>
+            </div>
+            
+            <!-- ターゲット要素 -->
+            <div id="target" class="target hidden">
+            </div>
+
+            <!-- UI変更: ラウンド数、スコア表記をゲームエリア内最下部に移動 -->
+            <div id="game-info-overlay" class="absolute bottom-0 left-0 right-0 p-3 bg-gray-300/70 backdrop-blur-sm rounded-b-xl flex justify-between">
+                <div id="round-info" class="text-base font-semibold text-gray-800">ラウンド: 0/10</div>
+                <div id="current-score" class="text-base font-semibold text-gray-800">合計スコア: 0</div>
+            </div>
+        </div>
+
+        <!-- 統計情報 -->
+        <div id="stats-area" class="mb-6">
+            <h2 class="text-xl font-bold text-gray-700 mb-2">最新の結果</h2>
+            <div id="last-result" class="text-gray-600 space-y-1 text-sm bg-gray-100 p-3 rounded-lg">
+                <p><strong>結果:</strong> -</p>
+                <p><strong>正確性 (距離):</strong> -</p>
+                <p><strong>獲得/減点スコア:</strong> -</p>
+            </div>
+        </div>
+        
+        <!-- ハイスコア表示 -->
+        <div class="mt-8 pt-4 border-t border-gray-200">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">🏆 ハイスコア TOP 5</h2>
+            <ul id="high-scores" class="space-y-2">
+                <!-- ハイスコアはここに挿入されます -->
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        // =================================================================
+        // グローバル変数と定数
+        // =================================================================
+        const TOTAL_ROUNDS = 10; // 変更点 1: 10ラウンドに増加
+        const TARGET_RADIUS = 30; 
+        
+        // スコア設定
+        const BASE_SCORE = 5000;
+        const TIME_DEDUCTION_RATE = 5.0;   // 1msあたり5点減点
+        const ACCURACY_DEDUCTION_RATE = 10.0; // 1pxあたり10点減点
+        const FLYING_PENALTY = 1000; 
+        const MISS_MULTIPLIER = 0.5; // 変更点 3: ターゲット範囲外の場合のスコア乗数
+        
+        // タイム設定
+        const MAX_REACTION_TIME_MS = 1000; // ターゲット出現後の制限時間 (1秒)
+        const NEXT_ROUND_DELAY_MS = 10000; // ラウンド終了後の待機時間 (10秒)
+
+        let gameState = {
+            currentRound: 0,
+            totalScore: 0,
+            startTime: null,
+            roundEndTime: null, 
+            timeoutId: null, 
+            nextRoundTimeoutId: null, 
+            intervalId: null, 
+            isTargetReady: false, 
+            isGameRunning: false, 
+            isAwaitingStart: true, 
+            isAwaitingNextRound: false, 
+        };
+
+        // DOM要素
+        const elements = {
+            container: document.getElementById('game-container'),
+            target: document.getElementById('target'),
+            startOverlay: document.getElementById('start-overlay'),
+            overlayMessage: document.getElementById('overlay-message'),
+            countdown: document.getElementById('countdown'),
+            roundInfo: document.getElementById('round-info'),
+            currentScore: document.getElementById('current-score'),
+            gameMessage: document.getElementById('game-message'),
+            lastResult: document.getElementById('last-result'),
+            highScoresList: document.getElementById('high-scores'),
+        };
+
+        // =================================================================
+        // ユーティリティ関数
+        // =================================================================
+
+        /**
+         * 状態に基づいてUIを更新します。
+         */
+        function updateUI() {
+            elements.roundInfo.textContent = `ラウンド: ${gameState.currentRound}/${TOTAL_ROUNDS}`;
+            elements.currentScore.textContent = `合計スコア: ${gameState.totalScore.toLocaleString()} 点`;
+            
+            elements.target.classList.remove('ready', 'hidden');
+
+            if (gameState.isAwaitingStart) {
+                elements.startOverlay.classList.remove('hidden');
+                elements.overlayMessage.textContent = 'どこでもクリック/タップしてスタート';
+                elements.countdown.classList.add('hidden');
+                elements.container.style.cursor = 'pointer';
+            } else if (gameState.isAwaitingNextRound) {
+                elements.startOverlay.classList.remove('hidden');
+                elements.overlayMessage.textContent = '次のラウンドまで待機中 (タップでスキップ)';
+                elements.countdown.classList.remove('hidden');
+                
+                // カウントダウン表示の計算
+                const elapsed = performance.now() - gameState.roundEndTime;
+                const remaining = Math.max(0, NEXT_ROUND_DELAY_MS - elapsed);
+                const seconds = Math.ceil(remaining / 1000);
+                elements.countdown.textContent = `残り ${seconds} 秒`;
+                
+                elements.container.style.cursor = 'pointer';
+            } else {
+                elements.startOverlay.classList.add('hidden');
+                elements.container.style.cursor = 'default';
+            }
+            
+            if (gameState.isTargetReady) {
+                elements.target.classList.add('ready');
+                elements.target.style.cursor = 'pointer';
+            } else {
+                elements.target.classList.add('hidden');
+                elements.target.style.cursor = 'default';
+            }
+        }
+        
+        /**
+         * ラウンド終了後の10秒待機を開始します。
+         */
+        function setupNextRoundWait() {
+            // 変更点 2: 最終ラウンド終了後は待機をスキップ
+            if (gameState.currentRound >= TOTAL_ROUNDS) {
+                endGame();
+                return;
+            }
+
+            clearNextRoundWait(); 
+
+            gameState.isAwaitingNextRound = true;
+            gameState.roundEndTime = performance.now(); 
+            
+            updateUI(); 
+
+            // 1秒ごとにUIを更新して残り時間を表示するインターバル
+            gameState.intervalId = setInterval(() => {
+                updateUI(); 
+            }, 1000);
+
+            // 10秒後に自動的に次のラウンドへ進むタイマー
+            gameState.nextRoundTimeoutId = setTimeout(() => {
+                clearNextRoundWait();
+                startNextRound();
+            }, NEXT_ROUND_DELAY_MS);
+        }
+
+        /**
+         * 次のラウンドへの待機タイマーとインターバルをクリアします。
+         */
+        function clearNextRoundWait() {
+            gameState.isAwaitingNextRound = false;
+            if (gameState.intervalId !== null) {
+                clearInterval(gameState.intervalId);
+                gameState.intervalId = null;
+            }
+            if (gameState.nextRoundTimeoutId !== null) {
+                clearTimeout(gameState.nextRoundTimeoutId);
+                gameState.nextRoundTimeoutId = null;
+            }
+        }
+        
+        // --- スコア関連のユーティリティ関数（省略） ---
+        function loadHighScores() {
+            try {
+                // キーを変更 (v8用)
+                const scoresJson = localStorage.getItem('reactionTestHighScores5RoundsV8'); 
+                return scoresJson ? JSON.parse(scoresJson) : [];
+            } catch (e) {
+                console.error("ハイスコアの読み込み中にエラーが発生しました", e);
+                return [];
+            }
+        }
+
+        function saveHighScore(newScore) {
+            let highScores = loadHighScores();
+            const timestamp = new Date().toLocaleString('ja-JP');
+            
+            highScores.push({ score: newScore, date: timestamp });
+
+            highScores.sort((a, b) => b.score - a.score);
+            highScores = highScores.slice(0, 5);
+
+            try {
+                localStorage.setItem('reactionTestHighScores5RoundsV8', JSON.stringify(highScores));
+                displayHighScores(highScores);
+            } catch (e) {
+                console.error("ハイスコアの保存中にエラーが発生しました", e);
+            }
+        }
+
+        function displayHighScores(scores) {
+            const highScores = scores || loadHighScores();
+            elements.highScoresList.innerHTML = highScores.map((item, index) => `
+                <li class="flex justify-between items-center p-3 bg-white border-b border-gray-100 last:border-b-0 rounded-md">
+                    <span class="font-bold text-lg text-yellow-600 mr-4">#${index + 1}</span>
+                    <span class="text-2xl font-extrabold text-gray-900">${item.score.toLocaleString()} 点</span>
+                    <span class="text-sm text-gray-500">${item.date}</span>
+                </li>
+            `).join('');
+
+            if (highScores.length === 0) {
+                elements.highScoresList.innerHTML = '<li class="text-center text-gray-500 py-4">まだハイスコアがありません。</li>';
+            }
+        }
+
+        /**
+         * 最新の結果パネルを更新します。
+         */
+        function updateLastResult(reactionTime, distance, score, resultType) {
+            const timeDisplay = reactionTime !== "N/A" ? `${reactionTime.toFixed(0)} ms` : '-';
+            const distanceDisplay = distance !== "N/A" ? `${distance.toFixed(1)} px` : '-';
+            const scoreDisplay = score >= 0 ? 
+                `<span class="text-green-600 font-semibold">+${score.toLocaleString()} 点</span>` : 
+                `<span class="text-red-600 font-semibold">${score.toLocaleString()} 点</span>`;
+
+            elements.lastResult.innerHTML = `
+                <p><strong>結果:</strong> <span class="text-indigo-600 font-semibold">${resultType} (${timeDisplay})</span></p>
+                <p><strong>正確性 (距離):</strong> ${distanceDisplay} (半径 ${TARGET_RADIUS}px)</p>
+                <p><strong>獲得/減点スコア:</strong> ${scoreDisplay}</p>
+            `;
+        }
+        
+        /**
+         * ターゲットを指定された位置に配置します
+         */
+        function positionTarget(x, y) {
+            elements.target.style.left = `${x}px`;
+            elements.target.style.top = `${y}px`;
+            
+            elements.target.dataset.centerX = x;
+            elements.target.dataset.centerY = y;
+        }
+
+        // =================================================================
+        // ゲームロジック
+        // =================================================================
+
+        /**
+         * ゲームをリセットして開始します。
+         */
+        function startGame() {
+            clearNextRoundWait();
+            gameState.currentRound = 0;
+            gameState.totalScore = 0;
+            gameState.isAwaitingStart = false;
+            gameState.isGameRunning = true;
+            elements.lastResult.innerHTML = '<p><strong>結果:</strong> -</p><p><strong>正確性 (距離):</strong> -</p><p><strong>獲得/減点スコア:</strong> -</p>';
+            
+            elements.gameMessage.textContent = '集中！ターゲットが出現するのを待て...';
+            startNextRound();
+        }
+
+        /**
+         * 次のラウンドを開始します。
+         */
+        function startNextRound() {
+            if (gameState.currentRound >= TOTAL_ROUNDS) {
+                endGame();
+                return;
+            }
+
+            gameState.currentRound++;
+            gameState.isTargetReady = false;
+            gameState.startTime = null;
+            gameState.isGameRunning = true; 
+            
+            elements.gameMessage.textContent = '集中！ターゲットが出現するのを待て...';
+            updateUI();
+
+            // ランダムな遅延 (1000ms - 4000ms)
+            const delay = Math.random() * 3000 + 1000; 
+            
+            // ターゲット出現待ちタイマー
+            gameState.timeoutId = setTimeout(() => {
+                showTarget();
+            }, delay);
+        }
+
+        /**
+         * ターゲットをランダムな位置に出現させます。
+         */
+        function showTarget() {
+            if (!gameState.isGameRunning || gameState.isAwaitingStart) return;
+
+            const containerRect = elements.container.getBoundingClientRect();
+            const safePadding = TARGET_RADIUS; 
+
+            const maxX = containerRect.width - safePadding;
+            const maxY = containerRect.height - safePadding;
+            
+            const randomX = Math.random() * (maxX - safePadding) + safePadding;
+            const randomY = Math.random() * (maxY - safePadding) + safePadding;
+            
+            positionTarget(randomX, randomY);
+
+            // ターゲットを緑に変えて、時間を計測開始
+            gameState.isTargetReady = true;
+            gameState.startTime = performance.now();
+            elements.gameMessage.textContent = '今だ！タップ/クリック！';
+            updateUI();
+
+            // 1000ms 経過後のタイムアウトを設定
+            gameState.timeoutId = setTimeout(() => {
+                if (gameState.isTargetReady) {
+                    // 1秒以内にタップされなかった場合
+                    elements.gameMessage.textContent = `タイムオーバー (1000ms)！スコア 0 点。`;
+                    updateLastResult(MAX_REACTION_TIME_MS, "N/A", 0, "タイムオーバー"); 
+                    
+                    gameState.isTargetReady = false;
+                    gameState.isGameRunning = false;
+                    
+                    // 次のラウンドへ進む待機状態へ移行
+                    setupNextRoundWait();
+                }
+            }, MAX_REACTION_TIME_MS);
+        }
+
+        /**
+         * フライング判定を処理します。
+         */
+        function handleFlying() {
+            if (!gameState.isGameRunning || gameState.isAwaitingStart) return;
+
+            clearTimeout(gameState.timeoutId);
+            
+            // フライングでスコア -1000
+            gameState.totalScore = gameState.totalScore - FLYING_PENALTY; 
+            
+            // ターゲットを隠す
+            elements.target.classList.add('hidden');
+            
+            elements.gameMessage.textContent = `フライング！スコア -${FLYING_PENALTY}点。`;
+            
+            updateLastResult("N/A", "N/A", -FLYING_PENALTY, "フライング"); 
+            
+            gameState.isGameRunning = false;
+            gameState.isTargetReady = false;
+            
+            // 次のラウンドへ進む待機状態へ移行
+            setupNextRoundWait(); 
+        }
+
+        /**
+         * 正確性の判定とスコア計算を処理します。
+         * @param {number} clickX - クリック/タップのコンテナ内X座標
+         * @param {number} clickY - クリック/タップのコンテナ内Y座標
+         */
+        function scoreTargetHit(clickX, clickY) {
+            if (!gameState.isGameRunning || !gameState.isTargetReady) return;
+            
+            clearTimeout(gameState.timeoutId); // タイムオーバータイマーをクリア
+
+            // 1. 反応時間を計算
+            const reactionTime = performance.now() - gameState.startTime;
+
+            // 2. 正確性を計算 (距離)
+            const targetX = parseFloat(elements.target.dataset.centerX);
+            const targetY = parseFloat(elements.target.dataset.centerY);
+            
+            const distance = Math.sqrt(
+                Math.pow(clickX - targetX, 2) + Math.pow(clickY - targetY, 2)
+            );
+            
+            let resultType = "成功";
+            let scoreMultiplier = 1.0;
+
+            // ターゲットの半径よりも遠いか判定
+            if (distance > TARGET_RADIUS) {
+                // 変更点 3: ターゲット範囲外の場合、スコアを0.5倍にする
+                scoreMultiplier = MISS_MULTIPLIER;
+                resultType = `ミス (${MISS_MULTIPLIER}倍)`;
+            }
+
+            // 3. スコアを計算 (新しい計算式適用)
+            const timeDeduction = reactionTime * TIME_DEDUCTION_RATE;
+            const accuracyDeduction = distance * ACCURACY_DEDUCTION_RATE;
+
+            let roundScore = BASE_SCORE - timeDeduction - accuracyDeduction;
+            roundScore = Math.round(Math.max(0, roundScore) * scoreMultiplier); // 0点未満にならないようにしてから乗数を適用
+
+            // 4. ゲーム状態を更新
+            gameState.totalScore += roundScore;
+            gameState.isTargetReady = false;
+            gameState.isGameRunning = false;
+            
+            // 5. UIを更新
+            updateLastResult(reactionTime, distance, roundScore, resultType);
+            
+            elements.gameMessage.textContent = `ラウンド ${gameState.currentRound} 終了。スコア: ${roundScore.toLocaleString()} 点獲得。`;
+            
+            // 次のラウンドへ進む待機状態へ移行 (最終ラウンドでなければ)
+            setupNextRoundWait(); 
+        }
+
+        /**
+         * 全ラウンド終了後の処理。
+         */
+        function endGame() {
+            clearNextRoundWait(); 
+            const finalScore = gameState.totalScore;
+            gameState.isAwaitingStart = true;
+            gameState.isGameRunning = false;
+            
+            elements.gameMessage.textContent = `🎉 全10ラウンド終了！最終合計スコア: ${finalScore.toLocaleString()} 点！`;
+            
+            // ハイスコアの保存と表示
+            saveHighScore(finalScore);
+            updateUI();
+        }
+
+
+        // =================================================================
+        // イベントリスナー
+        // =================================================================
+        
+        // ゲームエリア全体への操作を処理
+        elements.container.addEventListener('click', (event) => {
+            handleAction(event, event.clientX, event.clientY);
+        });
+
+        // モバイル対応: タッチイベントも処理
+        elements.container.addEventListener('touchend', (event) => {
+            if (event.changedTouches.length > 0) {
+                const touch = event.changedTouches[0];
+                handleAction(event, touch.clientX, touch.clientY);
+            }
+        });
+        
+        /**
+         * 全ての操作アクションを処理する統一関数
+         */
+        function handleAction(event, clientX, clientY) {
+            // イベントの伝播を停止
+            event.preventDefault(); 
+            
+            // 1. スタート待ち状態
+            if (gameState.isAwaitingStart) {
+                startGame();
+                return;
+            }
+            
+            // 2. ラウンド終了後の待ち状態 (10秒タイマーが動いている間)
+            if (gameState.isAwaitingNextRound) {
+                clearNextRoundWait();
+                startNextRound();
+                return;
+            }
+
+            // 3. ゲーム進行中
+            if (gameState.isGameRunning) {
+                const containerRect = elements.container.getBoundingClientRect();
+                const clickX = clientX - containerRect.left;
+                const clickY = clientY - containerRect.top;
+
+                if (gameState.isTargetReady) {
+                    // ターゲットが出現している場合: スコア判定へ
+                    scoreTargetHit(clickX, clickY);
+
+                } else {
+                    // ターゲット出現前（待機中）の場合: フライング判定へ
+                    handleFlying();
+                }
+            }
+        }
+
+
+        // =================================================================
+        // 初期化
+        // =================================================================
+
+        /**
+         * ページロード時の初期化処理
+         */
+        window.onload = () => {
+            displayHighScores();
+            updateUI();
+        };
+
+    </script>
+
+</body>
+</html>

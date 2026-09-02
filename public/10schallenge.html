@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10秒ピッタリチャレンジ！</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 min-h-screen text-white flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-md w-full bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 text-center border border-white/20">
+        <h1 class="text-3xl font-extrabold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-pink-500">
+            10.00秒 チャレンジ
+        </h1>
+        <p class="text-gray-300 mb-6 text-sm">
+            スタートを押して、ちょうど10.00秒でストップを押そう！<br>神業を達成できるか！？
+        </p>
+
+        <!-- タイマー表示 -->
+        <div id="timerDisplay" class="text-6xl font-black font-mono tracking-wider mb-8 text-yellow-300 drop-shadow-lg">
+            00.00
+        </div>
+
+        <!-- ボタンエリア -->
+        <div class="flex justify-center gap-4">
+            <button id="startBtn" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition active:scale-95 text-lg cursor-pointer">
+                スタート
+            </button>
+            <button id="stopBtn" disabled class="bg-gradient-to-r from-gray-500 to-gray-600 opacity-50 cursor-not-allowed text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition text-lg">
+                ストップ
+            </button>
+        </div>
+    </div>
+
+    <!-- ドッキリ用ビデオオーバーレイ (初期状態は非表示) -->
+    <div id="rickrollOverlay" class="fixed inset-0 bg-black z-50 hidden flex flex-col items-center justify-center">
+        <div class="relative w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
+            <!-- RickRoll動画 -->
+            <video id="rickVideo" src="./Resource/RickRoll.mp4" class="w-full h-full object-contain pointer-events-none" autoplay></video>
+            
+            <!-- 動画の上に被せる完全透明の判定ブロック（一時停止などを防止） -->
+            <div class="absolute inset-0 z-10 bg-transparent cursor-default select-none" onclick="return false;" oncontextmenu="return false;"></div>
+        </div>
+        <p class="text-gray-400 mt-4 text-sm animate-pulse">おっと、引っかかりましたね？ 😎</p>
+        
+        <!-- ストップ時のみ誤差が表示されるエリア -->
+        <div id="errorResultContainer" class="mt-2 text-yellow-400 font-mono text-lg hidden">
+            記録: 10.00秒との誤差 <span id="errorValue"></span>
+        </div>
+
+        <button id="resetBtn" class="mt-4 bg-white/20 hover:bg-white/30 text-white text-xs px-4 py-2 rounded-full transition cursor-pointer z-20">
+            もう一度挑戦する？
+        </button>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const rickrollOverlay = document.getElementById('rickrollOverlay');
+        const rickVideo = document.getElementById('rickVideo');
+        const resetBtn = document.getElementById('resetBtn');
+        const errorResultContainer = document.getElementById('errorResultContainer');
+        const errorValue = document.getElementById('errorValue');
+
+        let startTime = 0;
+        let timerInterval = null;
+        let isRunning = false;
+        let targetActionIsStop = false; // 抽選結果（trueならストップで発動）
+
+        // ドッキリ発動関数
+        function triggerRickroll(showError = false, diffText = "") {
+            if (isRunning) {
+                clearInterval(timerInterval);
+                isRunning = false;
+            }
+
+            if (showError) {
+                errorValue.textContent = diffText;
+                errorResultContainer.classList.remove('hidden');
+            } else {
+                errorResultContainer.classList.add('hidden');
+            }
+
+            rickrollOverlay.classList.remove('hidden');
+            rickVideo.currentTime = 0;
+            rickVideo.play().catch(e => {
+                console.log("Auto-play prevented:", e);
+            });
+        }
+
+        // スタートボタンが押された時の処理
+        startBtn.addEventListener('click', () => {
+            // 1:1 (50%) の確率でどちらの罠にするか抽選
+            targetActionIsStop = Math.random() < 0.5;
+
+            if (!targetActionIsStop) {
+                // パターンA：スタートを押した瞬間にリックロール発動
+                triggerRickroll(false);
+            } else {
+                // パターンB：正常にタイマーを始動（ストップで発動するフラグ）
+                startBtn.disabled = true;
+                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                stopBtn.disabled = false;
+                stopBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gradient-to-r', 'from-gray-500', 'to-gray-600');
+                stopBtn.classList.add('bg-gradient-to-r', 'from-red-500', 'to-rose-600', 'hover:from-red-600', 'hover:to-rose-700', 'cursor-pointer');
+
+                startTime = performance.now();
+                isRunning = true;
+
+                timerInterval = setInterval(() => {
+                    const elapsed = (performance.now() - startTime) / 1000;
+                    timerDisplay.textContent = elapsed.toFixed(2);
+                }, 10);
+            }
+        });
+
+        // ストップボタンが押された時の処理
+        stopBtn.addEventListener('click', () => {
+            if (!isRunning) return;
+            clearInterval(timerInterval);
+            isRunning = false;
+
+            const stopTime = performance.now();
+            const elapsedSeconds = (stopTime - startTime) / 1000;
+            const diff = elapsedSeconds - 10.0;
+            
+            // 誤差の文字列整形 (例: +0.23秒 / -0.15秒)
+            const sign = diff >= 0 ? "+" : "";
+            const diffStr = `${sign}${diff.toFixed(2)}秒`;
+
+            // ストップボタンで発動する設定になっていたため、ここでリックロール発動 ＋ 誤差表示
+            triggerRickroll(true, diffStr);
+        });
+
+        // リセット処理
+        resetBtn.addEventListener('click', () => {
+            rickVideo.pause();
+            rickrollOverlay.classList.add('hidden');
+            timerDisplay.textContent = "00.00";
+            
+            // ボタンの状態を初期化
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            stopBtn.disabled = true;
+            stopBtn.classList.remove('bg-gradient-to-r', 'from-red-500', 'to-rose-600', 'hover:from-red-600', 'hover:to-rose-700', 'cursor-pointer');
+            stopBtn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-gradient-to-r', 'from-gray-500', 'to-gray-600');
+            errorResultContainer.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>

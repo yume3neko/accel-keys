@@ -1,0 +1,3239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>弾幕シューティング</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+body { background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; }
+#gameCanvas { display: block; background: #0a0a1a; box-shadow: 0 0 20px rgba(0, 150, 255, 0.3); }
+#ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 14px; text-shadow: 0 0 5px #0ff; z-index: 10; pointer-events: none; }
+#gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; display: none; z-index: 20; }
+#gameOver h1 { font-size: 48px; color: #ff0066; text-shadow: 0 0 20px #ff0066; margin-bottom: 20px; }
+#gameOver button { padding: 15px 40px; font-size: 20px; background: #0066ff; color: #fff; border: 2px solid #0ff; cursor: pointer; font-family: inherit; margin-top: 20px; pointer-events: all; }
+#gameOver button:hover { background: #0ff; color: #000; }
+.bomb-count { color: #ffaa00; }
+.score { color: #00ff88; }
+.life-display { color: #ff4444; font-size: 18px; margin-top: 5px; }
+#bossUI { position: absolute; top: 10px; right: 10px; color: #fff; text-align: right; display: none; pointer-events: none; }
+#bossName { font-size: 16px; text-shadow: 0 0 10px currentColor; margin-bottom: 5px; }
+#bossHpBar { width: 250px; height: 15px; background: #333; border: 2px solid currentColor; position: relative; }
+#bossHpFill { height: 100%; transition: width 0.1s; }
+#spellTimer { font-size: 14px; color: #ffcc00; margin-top: 5px; }
+#spellCardName { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 32px; text-align: center; text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff; display: none; z-index: 15; animation: spellCardAnim 3s ease-out forwards; white-space: nowrap; }
+@keyframes spellCardAnim { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); } }
+#startScreen { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; z-index: 30; }
+#startScreen h1 { font-size: 32px; color: #0ff; text-shadow: 0 0 30px #0ff; margin-bottom: 20px; }
+#startScreen p { font-size: 13px; color: #ccc; margin: 6px 0; line-height: 1.5; }
+#startScreen .highlight { color: #ffcc00; font-weight: bold; }
+#startScreen button { padding: 15px 50px; font-size: 20px; background: transparent; color: #0ff; border: 2px solid #0ff; cursor: pointer; font-family: inherit; margin: 8px; box-shadow: 0 0 15px rgba(0, 255, 255, 0.3); pointer-events: all; position: relative; overflow: hidden; }
+#startScreen button:hover { background: #0ff; color: #000; box-shadow: 0 0 30px #0ff; }
+#startBtn .pressFill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: rgba(255, 0, 255, 0.45); pointer-events: none; transition: width 0.05s linear; z-index: -1; }
+#startBtn { z-index: 1; }
+#startBtn .pressFill { z-index: 0; }
+#phaseMenuBtn { display: block; margin: 8px auto !important; padding: 10px 28px !important; font-size: 14px !important; color: #ff66ff !important; border-color: #ff66ff !important; box-shadow: 0 0 10px rgba(255, 0, 255, 0.3) !important; }
+#phaseMenuBtn:hover { background: #ff66ff !important; color: #000 !important; }
+#phaseMenu { display: none; max-height: 200px; overflow-y: auto; -webkit-overflow-scrolling: touch; margin: 6px auto; padding: 6px; border: 1px dashed #ff66ff; border-radius: 6px; background: rgba(40, 0, 40, 0.55); pointer-events: all; touch-action: pan-y; overscroll-behavior: contain; }
+#phaseMenu::-webkit-scrollbar { width: 8px; }
+#phaseMenu::-webkit-scrollbar-thumb { background: #ff66ff; border-radius: 4px; }
+#phaseMenu::-webkit-scrollbar-track { background: rgba(40, 0, 40, 0.6); }
+#phaseMenu button { display: block; width: 100%; padding: 5px 10px !important; font-size: 11px !important; margin: 2px 0 !important; color: #ffaaff !important; border-color: #ff66ff !important; text-align: left; box-shadow: none !important; position: relative; overflow: hidden; }
+#phaseMenu button:hover { background: #ff66ff !important; color: #000 !important; }
+#phaseMenu button .pressFill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: rgba(255, 0, 255, 0.45); pointer-events: none; transition: width 0.05s linear; z-index: 0; }
+#startHint { font-size: 11px !important; color: #ff88ff !important; margin-top: 8px !important; }
+.warning { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); color: #ff0000; font-size: 56px; font-weight: bold; text-shadow: 0 0 30px #ff0000; display: none; z-index: 12; animation: warningPulse 0.5s ease-in-out infinite; }
+@keyframes warningPulse { 0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.1); } }
+#phaseDisplay { margin-top: 5px; font-size: 12px; }
+#enemyCount { color: #ffaa00; font-size: 13px; margin-top: 3px; }
+#grazeLevel { color: #00ffcc; font-size: 13px; margin-top: 3px; }
+#watchModeIndicator { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); color: #ff00ff; font-size: 14px; text-shadow: 0 0 10px #ff00ff; display: none; z-index: 10; pointer-events: none; writing-mode: vertical-rl; }
+#resultScreen { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; display: none; z-index: 35; background: rgba(0, 0, 0, 0.92); border: 2px solid #0ff; padding: 20px 28px; border-radius: 8px; box-shadow: 0 0 40px rgba(0, 255, 255, 0.4); max-height: 90vh; overflow-y: auto; min-width: 360px; }
+#resultScreen h2 { color: #0ff; font-size: 28px; text-shadow: 0 0 18px #0ff; margin-bottom: 12px; }
+#resultScreen table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+#resultScreen th, #resultScreen td { padding: 5px 8px; border-bottom: 1px solid #0ff4; text-align: right; }
+#resultScreen th:first-child, #resultScreen td:first-child { text-align: left; color: #ffcc00; }
+#resultScreen thead th { color: #0ff; border-bottom: 2px solid #0ff; }
+#resultScreen tfoot th { color: #00ff88; border-top: 2px solid #0ff; border-bottom: none; padding-top: 8px; font-size: 13px; }
+#resultScreen .resultBtns { margin-top: 12px; }
+#resultScreen button { padding: 10px 28px; font-size: 16px; background: transparent; color: #0ff; border: 2px solid #0ff; cursor: pointer; font-family: inherit; margin: 4px; pointer-events: all; }
+#resultScreen button:hover { background: #0ff; color: #000; }
+
+/* ポーズボタン */
+#pauseBtn {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    width: 44px;
+    height: 44px;
+    background: rgba(0, 30, 60, 0.85);
+    border: 2px solid #0ff;
+    border-radius: 8px;
+    color: #0ff;
+    font-size: 18px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 40;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+    pointer-events: all;
+}
+#pauseBtn:hover {
+    background: #0ff;
+    color: #000;
+    box-shadow: 0 0 25px #0ff;
+}
+
+/* ポーズメニュー */
+#pauseMenu {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    text-align: center;
+    display: none;
+    z-index: 50;
+    background: rgba(0, 0, 0, 0.92);
+    border: 2px solid #0ff;
+    padding: 28px 40px;
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.4);
+    min-width: 280px;
+}
+#pauseMenu h2 {
+    color: #0ff;
+    font-size: 24px;
+    text-shadow: 0 0 18px #0ff;
+    margin-bottom: 20px;
+}
+#pauseMenu button {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 16px;
+    background: transparent;
+    color: #0ff;
+    border: 2px solid #0ff;
+    cursor: pointer;
+    font-family: inherit;
+    margin: 8px 0;
+    pointer-events: all;
+    transition: all 0.2s;
+}
+#pauseMenu button:hover {
+    background: #0ff;
+    color: #000;
+}
+#pauseMenu .resumeBtn {
+    color: #00ff88;
+    border-color: #00ff88;
+}
+#pauseMenu .resumeBtn:hover {
+    background: #00ff88;
+    color: #000;
+}
+#pauseMenu .dangerBtn {
+    color: #ff4444;
+    border-color: #ff4444;
+}
+#pauseMenu .dangerBtn:hover {
+    background: #ff4444;
+    color: #fff;
+}
+
+/* 練習モード画面 */
+#practiceScreen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    text-align: center;
+    display: none;
+    z-index: 30;
+    background: rgba(0, 0, 0, 0.92);
+    border: 2px solid #ff66ff;
+    padding: 16px 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(255, 0, 255, 0.4);
+    min-width: 320px;
+    max-width: 95vw;
+    overflow: visible;
+}
+#practiceScreen h2 {
+    color: #ff66ff;
+    font-size: 26px;
+    text-shadow: 0 0 18px #ff66ff;
+    margin-bottom: 16px;
+}
+#practiceScreen .practiceDesc {
+    font-size: 12px;
+    color: #ccc;
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+#practiceScreen .practiceHint {
+    font-size: 11px;
+    color: #ff88ff;
+    margin-bottom: 12px;
+}
+
+#practiceScreen .backBtn {
+    padding: 10px 28px;
+    font-size: 14px;
+    background: transparent;
+    color: #ff66ff;
+    border: 2px solid #ff66ff;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 12px;
+    pointer-events: all;
+    transition: all 0.2s;
+}
+#practiceScreen .backBtn:hover {
+    background: #ff66ff;
+    color: #000;
+}
+
+/* タイトル画面の練習モードボタン */
+#practiceMenuBtn {
+    display: block;
+    margin: 8px auto !important;
+    padding: 10px 28px !important;
+    font-size: 14px !important;
+    color: #ff66ff !important;
+    border-color: #ff66ff !important;
+    box-shadow: 0 0 10px rgba(255, 0, 255, 0.3) !important;
+}
+#practiceMenuBtn:hover {
+    background: #ff66ff !important;
+    color: #000 !important;
+}
+
+/* グレイズレベル選択（ステッパー方式） */
+.grazeSelect {
+    margin: 8px 0;
+    padding: 8px 12px;
+    border: 1px dashed #00ff88;
+    border-radius: 6px;
+    background: rgba(0, 40, 20, 0.55);
+}
+.grazeLabel {
+    font-size: 12px;
+    color: #00ff88;
+    margin-bottom: 4px;
+    text-shadow: 0 0 6px #00ff88;
+}
+.grazeStepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+.grazeStepBtn {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+    background: transparent;
+    color: #00ff88;
+    border: 1px solid #00ff88;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    pointer-events: all;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.grazeStepBtn:hover {
+    background: #00ff88;
+    color: #000;
+}
+.grazeValue {
+    font-size: 16px;
+    color: #fff;
+    min-width: 80px;
+    text-align: center;
+    font-weight: bold;
+    text-shadow: 0 0 8px #00ff88;
+}
+.grazeDesc {
+    font-size: 11px;
+    color: #88ffcc;
+    margin-top: 4px;
+    min-height: 14px;
+}
+
+/* 被弾判定トグル */
+.hitToggle {
+    margin: 8px 0;
+    padding: 8px 12px;
+    border: 1px dashed #ff4444;
+    border-radius: 6px;
+    background: rgba(40, 0, 0, 0.55);
+}
+.hitToggleLabel {
+    font-size: 12px;
+    color: #ff4444;
+    margin-bottom: 4px;
+    text-shadow: 0 0 6px #ff4444;
+}
+.hitToggleWrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+.hitToggleBtn {
+    padding: 6px 24px;
+    font-size: 14px;
+    background: transparent;
+    color: #ff4444;
+    border: 2px solid #ff4444;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    pointer-events: all;
+    transition: all 0.2s;
+    min-width: 80px;
+}
+.hitToggleBtn:hover {
+    background: #ff4444;
+    color: #000;
+}
+.hitToggleBtn.off {
+    color: #888;
+    border-color: #888;
+}
+.hitToggleBtn.off:hover {
+    background: #888;
+    color: #fff;
+}
+.hitToggleHint {
+    font-size: 10px;
+    color: #ff8888;
+    margin-top: 4px;
+}
+
+/* 練習モードグリッド（2列、スクロール無し） */
+.practiceGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin: 6px 0;
+}
+.practiceGrid .practiceBtn {
+    padding: 6px 8px;
+    font-size: 11px;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ===== 難易度選択画面 ===== */
+#difficultyScreen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    text-align: center;
+    display: none;
+    z-index: 31;
+    background: rgba(0, 0, 0, 0.92);
+    border: 2px solid #0ff;
+    padding: 24px 32px;
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.4);
+    min-width: 320px;
+}
+#difficultyScreen h2 {
+    color: #0ff;
+    font-size: 28px;
+    text-shadow: 0 0 18px #0ff;
+    margin-bottom: 16px;
+}
+.difficultyGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 12px 0;
+}
+.difficultyBtn {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 16px;
+    background: transparent;
+    color: #0ff;
+    border: 2px solid #0ff;
+    cursor: pointer;
+    font-family: inherit;
+    pointer-events: all;
+    transition: all 0.2s;
+    text-align: left;
+    position: relative;
+}
+.difficultyBtn:hover {
+    background: #0ff;
+    color: #000;
+}
+.difficultyBtn .diffName {
+    font-size: 18px;
+    font-weight: bold;
+    display: block;
+}
+.difficultyBtn .diffDesc {
+    font-size: 11px;
+    color: #aaa;
+    display: block;
+    margin-top: 2px;
+}
+.difficultyBtn:hover .diffDesc {
+    color: #333;
+}
+.difficultyBtn.easy { color: #00ff88; border-color: #00ff88; }
+.difficultyBtn.easy:hover { background: #00ff88; }
+.difficultyBtn.normal { color: #00ccff; border-color: #00ccff; }
+.difficultyBtn.normal:hover { background: #00ccff; }
+.difficultyBtn.hard { color: #ffaa00; border-color: #ffaa00; }
+.difficultyBtn.hard:hover { background: #ffaa00; color: #000; }
+.difficultyBtn.extra { color: #ff00ff; border-color: #ff00ff; }
+.difficultyBtn.extra:hover { background: #ff00ff; }
+.difficultyBtn.lunatic { color: #ff0000; border-color: #ff0000; }
+.difficultyBtn.lunatic:hover { background: #ff0000; color: #fff; }
+.difficultyBtn.lunaticextra { color: #ff0044; border-color: #ff0044; }
+.difficultyBtn.lunaticextra:hover { background: #ff0044; color: #fff; }
+
+#diffBackBtn {
+    padding: 10px 28px;
+    font-size: 14px;
+    background: transparent;
+    color: #888;
+    border: 1px solid #888;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 12px;
+    pointer-events: all;
+}
+#diffBackBtn:hover {
+    background: #888;
+    color: #000;
+}
+
+/* 難易度表示（ゲーム中） */
+#difficultyDisplay {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 0 10px currentColor;
+    z-index: 10;
+    pointer-events: none;
+}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<!-- ポーズボタン -->
+<button id="pauseBtn" onclick="togglePause()">⏸</button>
+
+<!-- ポーズメニュー -->
+<div id="pauseMenu">
+    <h2>PAUSED</h2>
+    <button class="resumeBtn" onclick="resumeGame()">▶ 再開</button>
+    <button onclick="restartFromPause()">↺ リトライ</button>
+    <button class="dangerBtn" onclick="quitToTitle()">✕ タイトルへ</button>
+</div>
+
+<!-- 難易度選択画面 -->
+<div id="difficultyScreen">
+    <h2>難易度選択</h2>
+    <div class="difficultyGrid">
+        <button class="difficultyBtn easy" onclick="selectDifficulty('EASY')">
+            <span class="diffName">EASY</span>
+            <span class="diffDesc">HP7 / BOMB10 / 弾速0.4倍 / 判定0.5倍 / スペル4まで</span>
+        </button>
+        <button class="difficultyBtn normal" onclick="selectDifficulty('NORMAL')">
+            <span class="diffName">NORMAL</span>
+            <span class="diffDesc">HP5 / BOMB7 / 弾速0.5倍 / 判定0.6倍 / スペル4まで</span>
+        </button>
+        <button class="difficultyBtn hard" onclick="selectDifficulty('HARD')">
+            <span class="diffName">HARD</span>
+            <span class="diffDesc">HP4 / BOMB5 / 弾速0.7倍 / 判定0.8倍 / スペル6まで</span>
+        </button>
+        <button class="difficultyBtn extra" onclick="selectDifficulty('EXTRA')">
+            <span class="diffName">EXTRA</span>
+            <span class="diffDesc">HP3 / BOMB4 / 弾速1.0倍 / 判定1.0倍 / スペル8まで</span>
+        </button>
+        <button class="difficultyBtn lunatic" onclick="selectDifficulty('LUNATIC')">
+            <span class="diffName">LUNATIC</span>
+            <span class="diffDesc">HP3 / BOMB3 / 弾速1.0倍 / 判定1.0倍 / スペル10まで</span>
+        </button>
+        <button class="difficultyBtn lunaticextra" onclick="selectDifficulty('LUNATICEXTRA')">
+            <span class="diffName">LUNATIC EXTRA</span>
+            <span class="diffDesc">HP2 / BOMB2 / 弾速1.25倍 / 判定1.0倍 / スペル10まで</span>
+        </button>
+    </div>
+    <button id="diffBackBtn" onclick="backToTitleFromDifficulty()">◀ タイトルに戻る</button>
+</div>
+
+<!-- 練習モード画面 -->
+<div id="practiceScreen">
+    <h2>練習モード</h2>
+    <p class="practiceDesc">被弾判定有効 / HP・BOMB無限 / ゲームオーバーなし</p>
+    <div class="grazeSelect">
+        <p class="grazeLabel">POWERレベル</p>
+        <div class="grazeStepper">
+            <button class="grazeStepBtn" onclick="changeGrazeLevel(-1)">−</button>
+            <span class="grazeValue" id="grazeValue">Lv8</span>
+            <button class="grazeStepBtn" onclick="changeGrazeLevel(1)">＋</button>
+        </div>
+        <p class="grazeDesc" id="grazeDesc">5way + 誘導弾</p>
+    </div>
+    <div class="hitToggle">
+        <p class="hitToggleLabel">被弾判定</p>
+        <div class="hitToggleWrap">
+            <button class="hitToggleBtn" id="hitToggleBtn" onclick="toggleHitEnabled()">有効</button>
+        </div>
+        <p class="hitToggleHint">OFFにすると弾に当たっても被弾しません</p>
+    </div>
+    <p class="practiceHint">※ 短押し: 通常プレイ開始 | 長押し(3秒): 鑑賞モード開始</p>
+    <div class="difficultySelect">
+        <p class="difficultyLabel">練習難易度</p>
+        <div class="difficultyStepper">
+            <button class="difficultyStepBtn" onclick="changePracticeDifficulty(-1)">−</button>
+            <span class="difficultyValue" id="practiceDiffValue">EXTRA</span>
+            <button class="difficultyStepBtn" onclick="changePracticeDifficulty(1)">＋</button>
+        </div>
+        <p class="difficultyDesc" id="practiceDiffDesc">HP3 / BOMB4 / 弾速1.0倍</p>
+    </div>
+    <div class="practiceGrid">
+        <button class="practiceBtn" data-phase="1">1「群星の散開」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="2">2「静寂の波紋」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="3">3「忍び寄る影」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="4">4「混沌の奔流」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="5">5「彗星の乱舞」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="6">6「煌めく夜空」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="7">7「閃光の華」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="8">8「深淵と最果」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="9" id="practiceBtn9">9「終焉の輪舞曲」<span class="pressFill"></span></button>
+        <button class="practiceBtn" data-phase="10" id="practiceBtn10">10「世界最後の魔法」<span class="pressFill"></span></button>
+    </div>
+    <button class="backBtn" onclick="backToTitleFromPractice()">◀ タイトルに戻る</button>
+</div>
+
+<div id="ui">
+    <div class="score">SCORE: <span id="score">0</span></div>
+    <div class="life-display">LIFE: <span id="lifeIcons">❤️❤️❤️🖤🖤</span></div>
+    <div class="bomb-count">BOMB: <span id="bomb">3</span> / <span id="bombMax">6</span></div>
+    <div id="enemyCount">残り敵: <span id="enemyLeft">40</span></div>
+    <div id="grazeLevel">POWER: Lv<span id="grazeLv">0</span></div>
+    <div style="margin-top:8px;font-size:11px;color:#888">1本指:移動+射撃 | 2本指:ボム</div>
+    <div id="phaseDisplay"></div>
+</div>
+<div id="bossUI">
+    <div id="bossName"></div>
+    <div id="bossHpBar"><div id="bossHpFill" style="width:100%"></div></div>
+    <div id="spellTimer"></div>
+</div>
+<div id="spellCardName"></div>
+<div class="warning" id="warning">WARNING</div>
+<div id="watchModeIndicator">鑑賞モード</div>
+<div id="difficultyDisplay"></div>
+<div id="startScreen">
+    <h1>弾幕シューティング</h1>
+    <p><span class="highlight">1本指でタッチ</span>：移動+自動射撃</p>
+    <p><span class="highlight">2本指でタッチ</span>：ボム発動</p>
+    <p>HP最大5 / BOMB最大6</p>
+    <p>被弾でBOMB=3, 全敵弾削除</p>
+    <p>敵40体撃破でボス戦開始！</p>
+    <button id="startBtn" onclick="startGame()">START</button>
+    <button id="watchModeBtn" onclick="startWatchMode()">鑑賞モード 👁</button>
+    <button id="practiceMenuBtn" onclick="openPracticeScreen()">練習モード ▶</button>
+</div>
+<div id="gameOver">
+    <h1>GAME OVER</h1>
+    <p style="font-size:24px">SCORE: <span id="finalScore">0</span></p>
+    <button onclick="restartGame()">RETRY</button>
+</div>
+<div id="resultScreen">
+    <h2>STAGE CLEAR!</h2>
+    <table>
+        <thead><tr><th>スペル</th><th>スコア</th><th>被弾</th><th>時間</th></tr></thead>
+        <tbody id="resultRows"></tbody>
+        <tfoot><tr><th>合計</th><th id="resultTotalScore">0</th><th id="resultTotalHits">0被弾</th><th id="resultTotalTime">0:00.00</th></tr></tfoot>
+    </table>
+    <p style="font-size:11px;color:#888;margin-top:6px">※ 待ち時間/演出は計測除外</p>
+    <div class="resultBtns">
+        <button onclick="restartFromResult()">RETRY</button>
+        <button onclick="backToTitle()">TITLE</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+function resizeCanvas() { 
+    canvas.width = Math.min(window.innerWidth, 600); 
+    canvas.height = Math.min(window.innerHeight, 800);
+    canvas.style.width = canvas.width + 'px';
+    canvas.style.height = canvas.height + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ========== 難易度設定 ==========
+const DIFFICULTY = {
+    EASY:         { name: 'EASY',         hp: 7, heal: 3, bomb: 10, rate: 0.40, hit: 0.50, graze: 4, bossHp: 0.50, time: 0.40, maxSpell: 4, color: '#00ff88',
+        stage: { spawnInterval: 90, maxEnemies: 4, totalEnemies: 25, enemySpeed: 0.7, bulletSpeed: 0.7, shootInterval: 130 } },
+    NORMAL:       { name: 'NORMAL',       hp: 5, heal: 3, bomb: 7,  rate: 0.50, hit: 0.60, graze: 2, bossHp: 0.75, time: 0.65, maxSpell: 4, color: '#00ccff',
+        stage: { spawnInterval: 80, maxEnemies: 5, totalEnemies: 30, enemySpeed: 0.85, bulletSpeed: 0.85, shootInterval: 110 } },
+    HARD:         { name: 'HARD',         hp: 4, heal: 2, bomb: 5,  rate: 0.70, hit: 0.80, graze: 1, bossHp: 0.90, time: 0.80, maxSpell: 6, color: '#ffaa00',
+        stage: { spawnInterval: 65, maxEnemies: 5, totalEnemies: 35, enemySpeed: 1.0, bulletSpeed: 1.0, shootInterval: 95 } },
+    EXTRA:        { name: 'EXTRA',        hp: 3, heal: 1, bomb: 4,  rate: 1.00, hit: 1.00, graze: 0, bossHp: 1.00, time: 1.00, maxSpell: 8, color: '#ff00ff',
+        stage: { spawnInterval: 55, maxEnemies: 6, totalEnemies: 40, enemySpeed: 1.1, bulletSpeed: 1.0, shootInterval: 90 } },
+    LUNATIC:      { name: 'LUNATIC',      hp: 3, heal: 0, bomb: 3,  rate: 1.00, hit: 1.00, graze: 0, bossHp: 1.00, time: 1.00, maxSpell: 10, color: '#ff0000',
+        stage: { spawnInterval: 45, maxEnemies: 6, totalEnemies: 45, enemySpeed: 1.2, bulletSpeed: 1.1, shootInterval: 80 } },
+    LUNATICEXTRA: { name: 'LUNATIC EXTRA', hp: 3, heal: 0, bomb: 3,  rate: 1.00, hit: 1.00, graze: 0, bossHp: 1.00, time: 1.00, maxSpell: 10, color: '#ff0044',
+        stage: { spawnInterval: 40, maxEnemies: 7, totalEnemies: 50, enemySpeed: 1.3, bulletSpeed: 1.2, shootInterval: 70 } }
+};
+
+let currentDifficulty = 'EXTRA';
+
+function getDiff() { return DIFFICULTY[currentDifficulty]; }
+
+// ========== グローバル変数 ==========
+let gameState = 'start';
+let score = 0;
+let frame = 0;
+let gamePhase = 'stage';
+let isWatchMode = false;
+
+const player = {
+    x: canvas.width / 2, y: canvas.height - 100, width: 20, height: 20,
+    life: 3, maxLife: 5, bomb: 3, maxBomb: 6,
+    invincible: 0, noShootTimer: 0, grazeCount: 0, grazeLevel: 0, speed: 5
+};
+
+let touchStartX = 0, touchStartY = 0, playerStartX = 0, playerStartY = 0, isTouching = false;
+let touches = [], isShooting = false, bombTriggered = false, bombCooldown = 0;
+
+let bullets = [], enemies = [], particles = [], enemyBullets = [], homingBullets = [], stars = [], bombEffect = null;
+let lasers = [];
+
+let boss = null, boss2 = null, bossPhase = 0;
+let spellDamage = 0, spellTimer = 0, spellTransitionTimer = 0;
+let fakeDefeatTimer = 0, isFakeDefeat = false, spellNameDisplaying = false;
+let bossInterlude = false;
+let hitDuringSpell = false;
+
+// 花火・レーザー用タイマ
+let saiHateLaserTimer = 0;
+let spell9LaserTimer = 0;
+let spell9LaserBlurTimer = 0;
+let spell9SpiralTimer = 0;
+
+// スペル10用
+let spell10SetCount = 1;
+let spell10SubPhase = 0;
+let spell10SubTimer = 0;
+let spell10FrozenBullets = [];
+
+// スペル8 パート管理
+let spell8Part = 1;
+let spell8Merging = false;
+let spell8MergeTimer = 0;
+
+// 移動範囲外レーザー
+let oobLaserQueue = 0;
+let oobLaserTimer = 0;
+let oobInsidePrev = true;
+
+// リザルト用統計
+let spellStats = {};
+let spellStartScore = 0;
+let spellHitCount = 0;
+let currentTrackedSpell = 0;
+let spellAccTime = 0;
+let totalActiveFrames = 0;
+let spell8Parts = [];
+let spell8PartStart = { score: 0, hits: 0, bombs: 0 };
+
+// 被弾時敵弾一括削除フラグ
+let clearEnemyBulletsOnHit = false;
+
+// プレイヤー死亡演出
+let playerDying = false;
+let playerDeathTimer = 0;
+
+// メニュー / 単一フェーズプレイ
+let startFromPhase = 0;
+let singlePhaseMode = false;
+let practiceGrazeLevel = 8;
+let practiceHitEnabled = true;
+
+// START長押し用
+
+
+
+
+// 鑑賞モード自動操作
+let watchTouch = { x: canvas.width / 2, y: canvas.height - 140 };
+
+let enemiesDefeated = 0, ENEMIES_TO_BOSS = 40;
+
+// ========== スペル設定（難易度で倍率適用） ==========
+function getSpellConfig() {
+    const d = getDiff();
+    return [
+        { name: '', hp: Math.floor(2000 * d.bossHp), type: 'damage', color: '#ff00ff', barColor: 'linear-gradient(90deg, #ff00ff, #aa00ff)' },
+        { name: '「群星の散開」', hp: Math.floor(7500 * d.bossHp), type: 'damage', color: '#ff66ff', barColor: 'linear-gradient(90deg, #ff66ff, #ff00ff)' },
+        { name: '「静寂の波紋」', hp: 99999, type: 'time', timeLimit: Math.floor(30 * d.time), color: '#ff4444', barColor: 'linear-gradient(90deg, #ff4444, #ff8800)' },
+        { name: '「忍び寄る影」', hp: Math.floor(10000 * d.bossHp), type: 'damage', color: '#ff0066', barColor: 'linear-gradient(90deg, #ff0066, #ff3366)' },
+        { name: '「混沌の奔流」', hp: 99999, type: 'time', timeLimit: Math.floor(60 * d.time), color: '#ff0000', barColor: 'linear-gradient(90deg, #ff0000, #ff4444)' },
+        { name: '「彗星の乱舞」', hp: Math.floor(15000 * d.bossHp), type: 'damage', color: '#00ffff', barColor: 'linear-gradient(90deg, #00ffff, #0088ff)' },
+        { name: '「煌めく夜空」', hp: Math.floor(17500 * d.bossHp), type: 'damage', color: '#ffff00', barColor: 'linear-gradient(90deg, #ffff00, #ffaa00)' },
+        { name: '「閃光の華」', hp: Math.floor(18000 * d.bossHp), type: 'damage', color: '#88ff44', barColor: 'linear-gradient(90deg, #88ff44, #00ff88)' },
+        { name: '「深淵と最果の二重奏」', hp: Math.floor(20000 * d.bossHp), type: 'damage', color: '#ffffff', barColor: 'linear-gradient(90deg, #ff0000, #00ffff)' },
+        { name: (d.name === 'LUNATIC EXTRA' ? '「終焉の狂想曲」' : '「終焉の輪舞曲」'), hp: 99999, type: 'time', timeLimit: Math.floor(60 * d.time), color: '#ffffff', barColor: 'linear-gradient(90deg, #ff00ff, #ffff00, #00ffff)' },
+        { name: (d.name === 'LUNATIC EXTRA' ? '「世界最後の審判」' : '「世界最後の魔法」'), hp: 99999, type: 'time', timeLimit: (d.name === 'LUNATIC EXTRA' ? 75 : 9999), color: '#ff00aa', barColor: 'linear-gradient(90deg, #ff00aa, #ff66ff, #aa00ff)' }
+    ];
+}
+
+let SPELL_CONFIG = getSpellConfig();
+const SPELL8_PART_HP_BASE = [20000, 25000, 30000];
+
+function getSpell8PartHp() {
+    const d = getDiff();
+    const mul = (currentDifficulty === 'LUNATIC') ? 0.7 : 1;
+    return SPELL8_PART_HP_BASE.map(h => Math.floor(h * d.bossHp * mul));
+}
+
+// ========== グレイズレベル設定 ==========
+const GRAZE_LEVELS = [
+    { threshold: 0, name: 'Lv0', shotInterval: 6, shotCount: 1, homing: false },
+    { threshold: 10, name: 'Lv1', shotInterval: 5, shotCount: 1, homing: false },
+    { threshold: 30, name: 'Lv2', shotInterval: 5, shotCount: 2, homing: false },
+    { threshold: 60, name: 'Lv3', shotInterval: 4, shotCount: 2, homing: false },
+    { threshold: 100, name: 'Lv4', shotInterval: 4, shotCount: 3, homing: false },
+    { threshold: 150, name: 'Lv5', shotInterval: 3, shotCount: 3, homing: false },
+    { threshold: 220, name: 'Lv6', shotInterval: 3, shotCount: 4, homing: false },
+    { threshold: 300, name: 'Lv7', shotInterval: 3, shotCount: 5, homing: false },
+    { threshold: 400, name: 'Lv8', shotInterval: 3, shotCount: 5, homing: true }
+];
+
+// ========== 初期化 ==========
+function initStars() {
+    stars = [];
+    for (let i = 0; i < 100; i++) {
+        stars.push({
+            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 0.5, speed: Math.random() * 2 + 0.5, brightness: Math.random()
+        });
+    }
+}
+initStars();
+
+// ========== 入力処理 ==========
+function handleTouchStart(e) {
+    e.preventDefault();
+    if (isWatchMode) return;
+    touches = Array.from(e.touches);
+    if (touches.length >= 2) {
+        if (!bombTriggered && bombCooldown <= 0) { triggerBomb(); bombTriggered = true; }
+        isShooting = false; isTouching = false;
+    } else if (touches.length === 1) {
+        isShooting = true; bombTriggered = false; isTouching = true;
+        const rect = canvas.getBoundingClientRect();
+        const touch = touches[0];
+        touchStartX = touch.clientX - rect.left;
+        touchStartY = touch.clientY - rect.top;
+        playerStartX = player.x;
+        playerStartY = player.y;
+    }
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (isWatchMode) return;
+    touches = Array.from(e.touches);
+    if (touches.length === 1 && isTouching) {
+        const rect = canvas.getBoundingClientRect();
+        const touch = touches[0];
+        player.x = playerStartX + (touch.clientX - rect.left) - touchStartX;
+        player.y = playerStartY + (touch.clientY - rect.top) - touchStartY;
+        clampPlayer();
+    }
+}
+
+function handleTouchEnd(e) {
+    e.preventDefault();
+    if (isWatchMode) return;
+    const prevCount = touches.length;
+    touches = Array.from(e.touches);
+    if (touches.length === 0) { isShooting = false; isTouching = false; bombTriggered = false; }
+    else if (touches.length === 1 && prevCount >= 2) {
+        bombTriggered = false; isShooting = true; isTouching = true;
+        const rect = canvas.getBoundingClientRect();
+        const touch = touches[0];
+        touchStartX = touch.clientX - rect.left;
+        touchStartY = touch.clientY - rect.top;
+        playerStartX = player.x;
+        playerStartY = player.y;
+    }
+}
+
+function getPlayerYBounds() {
+    if (gamePhase === 'boss') {
+        if (bossPhase === 5) {
+            return [canvas.height * 0.5, canvas.height - player.height];
+        }
+        if (bossPhase === 8) {
+            const upperGuard = (currentDifficulty === 'LUNATIC') ? canvas.height * 0.2 : (boss ? Math.max(boss.y + boss.height / 2 + 15, player.height) : player.height);
+            const lowerBound = (currentDifficulty === 'LUNATIC') ? canvas.height * 0.9 : canvas.height * 0.8;
+            return [upperGuard, lowerBound];
+        }
+    }
+    return [player.height, canvas.height - player.height];
+}
+
+function clampPlayer() {
+    player.x = Math.max(player.width, Math.min(canvas.width - player.width, player.x));
+    player.y = Math.max(player.height, Math.min(canvas.height - player.height, player.y));
+}
+
+canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+canvas.addEventListener('mousedown', (e) => {
+    if (isWatchMode) return;
+    const rect = canvas.getBoundingClientRect();
+    touchStartX = e.clientX - rect.left;
+    touchStartY = e.clientY - rect.top;
+    playerStartX = player.x;
+    playerStartY = player.y;
+    isTouching = true;
+    isShooting = true;
+    touches = [{ clientX: e.clientX, clientY: e.clientY, identifier: 'mouse' }];
+});
+canvas.addEventListener('mousemove', (e) => {
+    if (isWatchMode) return;
+    if (!isTouching) return;
+    const rect = canvas.getBoundingClientRect();
+    player.x = playerStartX + (e.clientX - rect.left) - touchStartX;
+    player.y = playerStartY + (e.clientY - rect.top) - touchStartY;
+    clampPlayer();
+    touches = [{ clientX: e.clientX, clientY: e.clientY, identifier: 'mouse' }];
+});
+canvas.addEventListener('mouseup', () => { if (isWatchMode) return; isTouching = false; isShooting = false; touches = []; });
+canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); if (!isWatchMode) triggerBomb(); });
+
+// ========== ユーティリティ関数 ==========
+function getElement(id) { return document.getElementById(id); }
+
+function traceLog(msg) {
+    const now = new Date().toLocaleTimeString('ja-JP', { hour12: false });
+    const prefix = `[${now}] [PHASE]`;
+    console.log(prefix, msg);
+}
+
+function updateUI() {
+    getElement('score').textContent = score;
+    if (singlePhaseMode && !isWatchMode) {
+        getElement('bomb').textContent = '∞';
+        getElement('bombMax').textContent = '∞';
+    } else {
+        getElement('bomb').textContent = player.bomb;
+        getElement('bombMax').textContent = player.maxBomb;
+    }
+    let hearts = '';
+    if (singlePhaseMode && !isWatchMode) {
+        hearts = '∞';
+    } else if (isWatchMode) {
+        hearts = '∞';
+    } else {
+        for (let i = 0; i < player.life; i++) hearts += '❤️';
+        for (let i = player.life; i < player.maxLife; i++) hearts += '🖤';
+    }
+    getElement('lifeIcons').textContent = hearts;
+    getElement('grazeLv').textContent = player.grazeLevel;
+    
+    if (gamePhase === 'stage' || gamePhase === 'stage2') {
+        getElement('enemyCount').style.display = 'block';
+        const total = gamePhase === 'stage2' ? Math.floor(getDiff().stage.totalEnemies * 0.6) : getDiff().stage.totalEnemies;
+        getElement('enemyLeft').textContent = Math.max(0, total - enemiesDefeated);
+    } else {
+        getElement('enemyCount').style.display = 'none';
+    }
+    
+    if ((boss || boss2) && !isFakeDefeat) {
+        const config = SPELL_CONFIG[bossPhase];
+        let hpPercent = 100;
+        let timerText = '';
+        if (bossPhase === 8) {
+            const partHp = getSpell8PartHp()[spell8Part - 1];
+            hpPercent = Math.max(0, ((partHp - spellDamage) / partHp) * 100);
+            timerText = `Part${spell8Part} 残り: ${Math.max(0, Math.ceil(partHp - spellDamage))}`;
+        } else if (bossPhase === 10) {
+            if (currentDifficulty === 'LUNATICEXTRA') {
+                // LUNATIC EX版は時間耐久型（通常版はセット制）
+                hpPercent = Math.max(0, ((config.timeLimit * 60 - spellTimer) / (config.timeLimit * 60)) * 100);
+                timerText = `残り: ${Math.max(0, Math.ceil((config.timeLimit * 60 - spellTimer) / 60))}秒`;
+            } else {
+                hpPercent = Math.max(0, ((6 - spell10SetCount) / 5) * 100);
+                const subNames = ['ばらまき', 'フリーズ', '花火発射', '破裂待ち', '解除待ち'];
+                timerText = `セット ${spell10SetCount}/5 | ${subNames[spell10SubPhase] || ''}`;
+            }
+        } else if (config.type === 'damage') {
+            hpPercent = Math.max(0, ((config.hp - spellDamage) / config.hp) * 100);
+            timerText = `残り: ${Math.max(0, Math.ceil(config.hp - spellDamage))}`;
+        } else if (config.type === 'time') {
+            hpPercent = Math.max(0, ((config.timeLimit * 60 - spellTimer) / (config.timeLimit * 60)) * 100);
+            timerText = `残り: ${Math.max(0, Math.ceil((config.timeLimit * 60 - spellTimer) / 60))}秒`;
+        }
+        getElement('bossHpFill').style.width = hpPercent + '%';
+        getElement('spellTimer').textContent = timerText;
+    }
+    
+    const phaseText = { stage: '道中', boss: bossPhase === 0 ? '序盤' : isFakeDefeat ? '...！' : bossPhase === 10 ? `スペル10 (Set ${spell10SetCount}/5)` : `スペル${bossPhase}`, clear: 'STAGE CLEAR' };
+    const phaseDiv = getElement('phaseDisplay');
+    phaseDiv.textContent = phaseText[gamePhase] || '';
+    phaseDiv.style.color = bossPhase >= 8 ? '#ffffff' : bossPhase >= 5 ? '#ff0000' : bossPhase >= 3 ? '#ff8800' : '#00ffff';
+    
+    // UI表示制御（タイトル画面時は非表示）
+    const uiDiv = getElement('ui');
+    if (uiDiv) {
+        if (gameState === 'playing' || gameState === 'dying') {
+            uiDiv.style.display = 'block';
+        } else {
+            uiDiv.style.display = 'none';
+        }
+    }
+
+    // 難易度表示
+    const diffDisp = getElement('difficultyDisplay');
+    const d = getDiff();
+    if (gameState === 'playing' || gameState === 'dying') {
+        diffDisp.style.display = 'block';
+        diffDisp.textContent = d.name;
+        diffDisp.style.color = d.color;
+    } else {
+        diffDisp.style.display = 'none';
+    }
+}
+
+function getDamageMultiplier() {
+    let mul = 1;
+    // ボス接近時: 15%アップ
+    if (boss && !isFakeDefeat) {
+        const dist = Math.hypot(player.x - boss.x, player.y - boss.y);
+        if (dist < 200) mul *= 1.15;
+    }
+    if (boss2 && !isFakeDefeat) {
+        const dist = Math.hypot(player.x - boss2.x, player.y - boss2.y);
+        if (dist < 200) mul *= 1.15;
+    }
+    if (spellNameDisplaying && SPELL_CONFIG[bossPhase].type === 'damage') mul *= 0.01;
+    return mul;
+}
+
+function getGrazeLevel() {
+    for (let i = GRAZE_LEVELS.length - 1; i >= 0; i--) {
+        if (player.grazeCount >= GRAZE_LEVELS[i].threshold) return i;
+    }
+    return 0;
+}
+
+// 当たり判定半径を取得（難易度反映）
+function getHitRadius() {
+    return 6 * getDiff().hit;
+}
+
+function playerHit() {
+    if (player.invincible > 0 || playerDying) return;
+    // 練習モードで被弾判定OFFの場合はスキップ
+    if (singlePhaseMode && !isWatchMode && !practiceHitEnabled) return;
+    if (singlePhaseMode && !isWatchMode) {
+        player.invincible = 60;
+        player.noShootTimer = 30;
+        hitDuringSpell = true;
+        if (gamePhase === 'boss' && bossPhase >= 1) spellHitCount++;
+        clearEnemyBulletsOnHit = true;
+        createExplosion(player.x, player.y, '#00ffff', 20);
+        updateUI();
+        return;
+    }
+    if (!isWatchMode && player.life <= 0) {
+        triggerPlayerDeath();
+        return;
+    }
+    if (!isWatchMode) player.life--;
+    player.invincible = 90;
+    player.noShootTimer = 90;
+    // 被弾時ボムリセット: 所持数が初期所持数の半分以上ならそのまま、未満なら半分にリセット
+    const d = getDiff();
+    const halfBomb = Math.ceil(d.bomb / 2);
+    if (player.bomb < halfBomb) {
+        player.bomb = halfBomb;
+    }
+    hitDuringSpell = true;
+    if (gamePhase === 'boss' && bossPhase >= 1) spellHitCount++;
+    clearEnemyBulletsOnHit = true;
+    createExplosion(player.x, player.y, '#00ffff', 20);
+    updateUI();
+}
+
+function triggerPlayerDeath() {
+    if (playerDying) return;
+    playerDying = true;
+    playerDeathTimer = 110;
+    enemyBullets = [];
+    lasers = [];
+    bombEffect = null;
+    gameState = 'dying';
+    createExplosion(player.x, player.y, '#ffffff', 40);
+    createExplosion(player.x, player.y, '#ff00ff', 30);
+}
+
+function triggerBomb() {
+    if (playerDying) return;
+    const canBomb = singlePhaseMode ? true : (player.bomb > 0);
+    if (canBomb && bombCooldown <= 0) {
+        if (!singlePhaseMode) player.bomb--;
+        bombCooldown = 120;
+        bombEffect = { radius: 0, maxRadius: Math.max(canvas.width, canvas.height) * 1.5, alpha: 1 };
+        enemyBullets = [];
+        lasers = [];
+        enemies.forEach(enemy => { enemy.hp -= 50; createExplosion(enemy.x, enemy.y, '#ff6600', 20); });
+        if (boss && isFakeDefeat) createExplosion(boss.x, boss.y, '#ff0000', 30);
+        score += 1000;
+        updateUI();
+    }
+}
+
+// ========== エフェクト ==========
+function createExplosion(x, y, color, count) {
+    const p = [];
+    for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+        const speed = Math.random() * 5 + 2;
+        p.push({ x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 30, maxLife: 30, color: color, size: Math.random() * 4 + 2 });
+    }
+    particles.push({
+        particles: p,
+        update: function() {
+            this.particles = this.particles.filter(pt => {
+                pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.95; pt.vy *= 0.95; pt.life--;
+                return pt.life > 0;
+            });
+        },
+        draw: function() {
+            this.particles.forEach(pt => {
+                ctx.globalAlpha = pt.life / pt.maxLife;
+                ctx.fillStyle = pt.color;
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+    });
+}
+
+// ========== 射撃 ==========
+function shoot() {
+    if (player.noShootTimer > 0) return;
+    const level = GRAZE_LEVELS[player.grazeLevel];
+    if (frame % level.shotInterval !== 0) return;
+    
+    const cx = player.x, cy = player.y - 15;
+    if (level.shotCount >= 1) bullets.push({ x: cx, y: cy, vx: 0, vy: -12, width: 4, height: 12, color: '#00ff88', damage: 10 });
+    if (level.shotCount >= 2) {
+        bullets.push({ x: cx - 12, y: cy + 5, vx: -1, vy: -11, width: 3, height: 10, color: '#00ffcc', damage: 8 });
+        bullets.push({ x: cx + 12, y: cy + 5, vx: 1, vy: -11, width: 3, height: 10, color: '#00ffcc', damage: 8 });
+    }
+    if (level.shotCount >= 3) {
+        bullets.push({ x: cx, y: cy, vx: -2, vy: -10, width: 3, height: 10, color: '#00ffff', damage: 6 });
+        bullets.push({ x: cx, y: cy, vx: 2, vy: -10, width: 3, height: 10, color: '#00ffff', damage: 6 });
+    }
+    if (level.shotCount >= 4) {
+        bullets.push({ x: cx - 8, y: cy + 3, vx: -3, vy: -9, width: 3, height: 9, color: '#88ffcc', damage: 5 });
+        bullets.push({ x: cx + 8, y: cy + 3, vx: 3, vy: -9, width: 3, height: 9, color: '#88ffcc', damage: 5 });
+    }
+    if (level.shotCount >= 5) bullets.push({ x: cx, y: cy, vx: 0, vy: -14, width: 5, height: 14, color: '#ffffff', damage: 15 });
+    
+    if (level.homing) {
+        let target = null;
+        if (boss2 && boss2.hp > 0) target = boss2;
+        else if (boss && boss.hp > 0) target = boss;
+        else {
+            let minDist = Infinity;
+            enemies.forEach(enemy => {
+                const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+                if (dist < minDist) { minDist = dist; target = enemy; }
+            });
+        }
+        if (target) {
+            const angle = Math.atan2(target.y - cy, target.x - cx);
+            homingBullets.push({
+                x: cx, y: cy, vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12,
+                radius: 5, color: '#ff00ff', damage: 15, target: target, life: 60
+            });
+        }
+    }
+}
+
+// ========== 敵生成 ==========
+function spawnEnemy() {
+    const d = getDiff();
+    if (gamePhase === 'stage2' && frame % 180 === 0) {
+        traceLog(`spawnEnemy stage2: enemies=${enemies.length}, defeated=${enemiesDefeated}, target=${Math.floor(d.stage.totalEnemies * 0.6)}`);
+    }
+    const st = d.stage;
+    const isSecondStage = (gamePhase === 'stage2');
+    const maxEnemies = isSecondStage ? st.maxEnemies + 1 : st.maxEnemies;
+    const spawnInterval = isSecondStage ? Math.max(30, st.spawnInterval - 10) : st.spawnInterval;
+    const totalTarget = isSecondStage ? Math.floor(st.totalEnemies * 0.6) : st.totalEnemies;
+
+    if ((gamePhase !== 'stage' && gamePhase !== 'stage2') || enemies.length >= maxEnemies || frame % spawnInterval !== 0) return;
+    if (enemiesDefeated >= totalTarget) return;
+
+    const type = Math.random();
+    const spdMul = st.enemySpeed;
+    const bulletMul = st.bulletSpeed;
+    let enemy = {
+        x: Math.random() * (canvas.width - 60) + 30, y: -30, width: 30, height: 30,
+        hp: Math.floor(15 * spdMul), maxHp: Math.floor(15 * spdMul), speed: 1.5 * spdMul, shootInterval: Math.floor(st.shootInterval / spdMul), shootTimer: 0, bulletType: 'normal', color: '#ff0066', bulletSpeedMul: bulletMul
+    };
+    if (type > 0.7) {
+        enemy.width = enemy.height = 40; enemy.hp = enemy.maxHp = Math.floor(35 * spdMul); enemy.speed = 0.8 * spdMul;
+        enemy.shootInterval = Math.floor(70 / spdMul); enemy.bulletType = 'spread'; enemy.color = '#ff00ff';
+    } else if (type > 0.4) {
+        enemy.speed = 2.5 * spdMul; enemy.hp = enemy.maxHp = Math.floor(10 * spdMul); enemy.shootInterval = Math.floor(100 / spdMul);
+        enemy.bulletType = 'aim'; enemy.color = '#ff6600';
+    }
+    enemies.push(enemy);
+}
+
+function enemyShoot(enemy) {
+    enemy.shootTimer++;
+    if (enemy.shootTimer < enemy.shootInterval) return;
+    enemy.shootTimer = 0;
+    const bmul = enemy.bulletSpeedMul || 1.0;
+    if (enemy.bulletType === 'normal') {
+        enemyBullets.push({ x: enemy.x, y: enemy.y + enemy.height / 2, vx: 0, vy: 3 * bmul, radius: 5, color: '#ff4444' });
+    } else if (enemy.bulletType === 'spread') {
+        for (let i = -1; i <= 1; i++) enemyBullets.push({ x: enemy.x, y: enemy.y + enemy.height / 2, vx: i * 1.5 * bmul, vy: 3 * bmul, radius: 6, color: '#ff44ff' });
+    } else if (enemy.bulletType === 'aim') {
+        const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+        enemyBullets.push({ x: enemy.x, y: enemy.y + enemy.height / 2, vx: Math.cos(angle) * 3.5 * bmul, vy: Math.sin(angle) * 3.5 * bmul, radius: 4, color: '#ff8844' });
+    }
+}
+
+// ========== ボスシステム ==========
+function spawnBoss() {
+    traceLog(`spawnBoss() called. enemiesDefeated=${enemiesDefeated}, gamePhase=${gamePhase}`);
+    const d = getDiff();
+    SPELL_CONFIG = getSpellConfig();
+    boss = {
+        x: canvas.width / 2, y: 120, width: 50, height: 50,
+        hp: SPELL_CONFIG[0].hp, maxHp: SPELL_CONFIG[0].hp,
+        speed: 1, moveTimer: 0, targetX: canvas.width / 2, baseY: 120,
+        name: '深淵の魔法使い', invincible: false
+    };
+    bossPhase = 0; spellDamage = 0; spellTimer = 0; spellTransitionTimer = 0;
+    fakeDefeatTimer = 0; isFakeDefeat = false;
+    hitDuringSpell = false;
+    gamePhase = 'boss';
+    getElement('bossName').textContent = boss.name;
+    getElement('bossUI').style.display = 'block';
+    updateBossUIColor(SPELL_CONFIG[0].color);
+    getElement('warning').style.display = 'block';
+    setTimeout(() => getElement('warning').style.display = 'none', 2000);
+}
+
+function spawnBossAfterStage2() {
+    traceLog(`spawnBossAfterStage2() called. enemiesDefeated=${enemiesDefeated}, gamePhase=${gamePhase}`);
+    // 道中2終了後、最果が上から登場 → スペル5
+    gamePhase = 'boss';
+    bossPhase = 5; spellDamage = 0; spellTimer = 0; hitDuringSpell = false;
+    boss = {
+        x: canvas.width / 2, y: -80, width: 50, height: 50,
+        hp: SPELL_CONFIG[5].hp, maxHp: SPELL_CONFIG[5].hp,
+        speed: 1, moveTimer: 0, targetX: canvas.width / 2, baseY: 120,
+        name: '最果の魔法使い', invincible: true
+    };
+    getElement('bossName').textContent = boss.name;
+    getElement('bossUI').style.display = 'block';
+    updateBossUIColor(SPELL_CONFIG[5].color);
+    updateUI();
+    getElement('warning').style.display = 'block';
+    getElement('warning').textContent = 'WARNING';
+    setTimeout(() => getElement('warning').style.display = 'none', 2000);
+    const enterInterval = setInterval(() => {
+        boss.y += 3;
+        if (boss.y >= 120) {
+            clearInterval(enterInterval);
+            boss.baseY = 120; boss.y = 120; boss.invincible = false;
+            showSpellName(5);
+            beginSpellTracking(5);
+        }
+    }, 16);
+}
+
+function updateBossUIColor(color) {
+    getElement('bossName').style.color = color;
+    getElement('bossHpBar').style.borderColor = color;
+    getElement('bossHpFill').style.background = SPELL_CONFIG[bossPhase].barColor;
+}
+
+function updateBossMovement(bossObj) {
+    if (!bossObj || bossObj.invincible) return;
+    // LUNATIC EXのスペル9,10は移動固定
+    if (currentDifficulty === 'LUNATICEXTRA' && (bossPhase === 9 || bossPhase === 10)) {
+        bossObj.x = canvas.width / 2;
+        bossObj.y = bossObj.baseY;
+        return;
+    }
+    bossObj.moveTimer++;
+    let moveSpeed = bossPhase >= 4 ? 0.04 : 0.02;
+    let moveRange = bossPhase >= 4 ? 200 : 150;
+    if (bossObj.moveTimer % 90 === 0) {
+        bossObj.targetX = canvas.width / 2 + (Math.random() - 0.5) * moveRange * 2;
+        bossObj.targetX = Math.max(80, Math.min(canvas.width - 80, bossObj.targetX));
+    }
+    bossObj.x += (bossObj.targetX - bossObj.x) * moveSpeed;
+    let yOffset = Math.sin(frame * 0.03) * 20;
+    if (bossPhase >= 5) yOffset = Math.sin(frame * 0.05) * 30;
+    bossObj.y = bossObj.baseY + yOffset;
+}
+
+function showSpellName(idx) {
+    const cfg = SPELL_CONFIG[idx];
+    if (!cfg.name) return;
+    const div = getElement('spellCardName');
+    div.textContent = cfg.name;
+    div.style.display = 'block';
+    spellNameDisplaying = true;
+    setTimeout(() => spellNameDisplaying = false, 3000);
+    setTimeout(() => div.style.display = 'none', 3000);
+}
+
+// ========== リザルト統計 ==========
+function beginSpellTracking(phase) {
+    currentTrackedSpell = phase;
+    spellStartScore = score;
+    spellHitCount = 0;
+    spellAccTime = 0;
+    if (phase === 8) {
+        spell8Parts = [];
+        spell8PartStart = { score: score, hits: 0 };
+    }
+}
+
+function snapshotSpell8Part() {
+    spell8Parts.push({
+        score: score - spell8PartStart.score,
+        hits: spellHitCount - spell8PartStart.hits,
+        time: spellTimer
+    });
+    spell8PartStart = { score: score, hits: spellHitCount };
+}
+
+function endSpellTracking() {
+    if (currentTrackedSpell <= 0) return;
+    const time = spellAccTime + spellTimer;
+    const stat = {
+        score: score - spellStartScore,
+        hits: spellHitCount,
+        time: time
+    };
+    if (currentTrackedSpell === 8) {
+        snapshotSpell8Part();
+        stat.parts = spell8Parts.slice();
+    }
+    spellStats[currentTrackedSpell] = stat;
+    totalActiveFrames += time;
+    currentTrackedSpell = 0;
+}
+
+function formatTime(frames) {
+    const total = Math.max(0, frames) / 60;
+    const m = Math.floor(total / 60);
+    const s = total - m * 60;
+    return `${m}:${s.toFixed(2).padStart(5, '0')}`;
+}
+
+function showResultScreen() {
+    const tbody = getElement('resultRows');
+    tbody.innerHTML = '';
+    let totalScore = 0, totalHits = 0;
+    const d = getDiff();
+    for (let i = 1; i <= 10; i++) {
+        const stat = spellStats[i];
+        const tr = document.createElement('tr');
+        const name = stat ? SPELL_CONFIG[i].name : '???';
+        const scoreCell = stat ? stat.score.toLocaleString() : '-';
+        const hitsCell = stat ? stat.hits + '回' : '-';
+        const time = stat ? formatTime(stat.time) : '-';
+        const expandable = (i === 8 && stat && stat.parts && stat.parts.length > 0);
+        const indicator = expandable ? ' <span style="color:#ff66ff">▶</span>' : '';
+        // 到達していないスペルはグレー表示
+        const reached = (i <= d.maxSpell);
+        tr.innerHTML = `<td>${i}. ${name}${indicator}</td><td>${scoreCell}</td><td>${hitsCell}</td><td>${time}</td>`;
+        if (stat) {
+            totalScore += stat.score;
+            if (i === 8 && stat.parts) {
+                totalHits += stat.parts.reduce((sum, p) => sum + (p.hits || 0), 0);
+            } else {
+                totalHits += stat.hits;
+            }
+        } else if (!reached) {
+            tr.style.color = '#333';
+            tr.innerHTML = `<td>${i}. ---</td><td>-</td><td>-</td><td>-</td>`;
+        } else {
+            tr.style.color = '#666';
+        }
+        tbody.appendChild(tr);
+        if (expandable) {
+            tr.style.cursor = 'pointer';
+            tr.title = 'タッチでパート別表示';
+            const subRows = stat.parts.map((p, idx) => {
+                const sub = document.createElement('tr');
+                sub.style.display = 'none';
+                sub.style.fontSize = '11px';
+                sub.style.color = '#aaccff';
+                sub.style.background = 'rgba(40,0,60,0.4)';
+                sub.innerHTML = `<td style="padding-left:18px">└ パート${idx + 1}</td><td>${p.score.toLocaleString()}</td><td>${p.hits || 0}回</td><td>${formatTime(p.time)}</td>`;
+                tbody.appendChild(sub);
+                return sub;
+            });
+            let opened = false;
+            const toggle = (e) => {
+                if (e) e.preventDefault();
+                opened = !opened;
+                subRows.forEach(s => s.style.display = opened ? '' : 'none');
+                const arrow = opened ? '▼' : '▶';
+                tr.querySelector('td').innerHTML = `${i}. ${name} <span style="color:#ff66ff">${arrow}</span>`;
+            };
+            tr.addEventListener('click', toggle);
+        }
+    }
+    getElement('resultTotalScore').textContent = totalScore.toLocaleString();
+    getElement('resultTotalHits').textContent = totalHits + '被弾';
+    getElement('resultTotalTime').textContent = formatTime(totalActiveFrames);
+    const titleEl = getElement('resultScreen').querySelector('h2');
+    if (titleEl) {
+        titleEl.textContent = singlePhaseMode
+            ? `スペル${startFromPhase} 終了`
+            : (gamePhase === 'clear' ? 'STAGE CLEAR!' : 'GAME OVER');
+        titleEl.style.color = (gamePhase === 'clear' || singlePhaseMode) ? '#0ff' : '#ff4477';
+    }
+    // 難易度表示を追加
+    const diffLabel = document.createElement('p');
+    diffLabel.style.cssText = 'font-size:14px;color:' + d.color + ';margin-bottom:8px;text-shadow:0 0 10px ' + d.color;
+    diffLabel.textContent = 'DIFFICULTY: ' + d.name;
+    const existing = getElement('resultScreen').querySelector('.diffLabel');
+    if (existing) existing.remove();
+    diffLabel.className = 'diffLabel';
+    getElement('resultScreen').insertBefore(diffLabel, getElement('resultScreen').querySelector('table'));
+    
+    getElement('resultScreen').style.display = 'block';
+    gameState = 'result';
+    getElement('bossUI').style.display = 'none';
+}
+
+function restartFromResult() {
+    getElement('resultScreen').style.display = 'none';
+    const retryPhase = singlePhaseMode ? startFromPhase : 0;
+    const wasWatchMode = isWatchMode;
+    if (!singlePhaseMode) {
+        startFromPhase = 0; singlePhaseMode = false;
+        isWatchMode = false;
+        getElement('watchModeIndicator').style.display = 'none';
+    }
+    resetGame();
+    if (singlePhaseMode && retryPhase > 0) {
+        jumpToPhase(retryPhase);
+    }
+    gameState = 'playing';
+}
+
+function backToTitle() {
+    exitFullscreen();
+    getElement('resultScreen').style.display = 'none';
+    getElement('startScreen').style.display = 'block';
+    getElement('watchModeIndicator').style.display = 'none';
+    getElement('pauseBtn').style.display = 'none';
+    isWatchMode = false;
+    startFromPhase = 0; singlePhaseMode = false;
+    resetGame();
+    gameState = 'start';
+}
+
+// ノーヒット回復処理
+function applyNoHitHeal() {
+    const d = getDiff();
+    if (!hitDuringSpell) {
+        // 通常の難易度回復（EASY〜EXTRA）
+        if (d.heal > 0) {
+            player.life = Math.min(player.maxLife, player.life + d.heal);
+            // 回復エフェクト
+            for (let i = 0; i < 10; i++) {
+                const angle = (Math.PI * 2 / 10) * i;
+                particles.push({
+                    particles: [{
+                        x: player.x + Math.cos(angle) * 20,
+                        y: player.y + Math.sin(angle) * 20,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        life: 30, maxLife: 30,
+                        color: '#00ff88', size: 3
+                    }],
+                    update: function() {
+                        this.particles = this.particles.filter(pt => {
+                            pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.95; pt.vy *= 0.95; pt.life--;
+                            return pt.life > 0;
+                        });
+                    },
+                    draw: function() {
+                        this.particles.forEach(pt => {
+                            ctx.globalAlpha = pt.life / pt.maxLife;
+                            ctx.fillStyle = pt.color;
+                            ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill();
+                        });
+                        ctx.globalAlpha = 1;
+                    }
+                });
+            }
+        }
+        // LUNATIC以上：ノーヒットでHP+1、ボム+2（上限超えあり）
+        if (currentDifficulty === 'LUNATIC' || currentDifficulty === 'LUNATICEXTRA') {
+            player.life = Math.min(player.maxLife, player.life + 1);
+            player.bomb += 2;
+            // LUNATIC専用回復エフェクト（赤/金色）
+            for (let i = 0; i < 14; i++) {
+                const angle = (Math.PI * 2 / 14) * i;
+                particles.push({
+                    particles: [{
+                        x: player.x + Math.cos(angle) * 25,
+                        y: player.y + Math.sin(angle) * 25,
+                        vx: Math.cos(angle) * 3,
+                        vy: Math.sin(angle) * 3,
+                        life: 40, maxLife: 40,
+                        color: i % 2 === 0 ? '#ffcc00' : '#ff4444', size: 4
+                    }],
+                    update: function() {
+                        this.particles = this.particles.filter(pt => {
+                            pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.92; pt.vy *= 0.92; pt.life--;
+                            return pt.life > 0;
+                        });
+                    },
+                    draw: function() {
+                        this.particles.forEach(pt => {
+                            ctx.globalAlpha = pt.life / pt.maxLife;
+                            ctx.fillStyle = pt.color;
+                            ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size * (pt.life / pt.maxLife), 0, Math.PI * 2); ctx.fill();
+                        });
+                        ctx.globalAlpha = 1;
+                    }
+                });
+            }
+        }
+    }
+    hitDuringSpell = false;
+}
+
+function nextSpellPhase() {
+    traceLog(`nextSpellPhase() called. Current: bossPhase=${bossPhase}, gamePhase=${gamePhase}, spellTimer=${spellTimer}, spellDamage=${spellDamage}`);
+    endSpellTracking();
+    applyNoHitHeal();
+    
+    const d = getDiff();
+    // スペル数制限チェック
+    if (!singlePhaseMode && bossPhase >= d.maxSpell && bossPhase > 0) {
+        // クリア扱い
+        spellTransitionTimer = 120;
+        enemyBullets = []; lasers = [];
+        gamePhase = 'clear';
+        boss = null; boss2 = null;
+        createExplosion(canvas.width / 2, canvas.height / 2, '#00ffff', 100);
+        score += 50000;
+        setTimeout(() => showResultScreen(), 1500);
+        return;
+    }
+    
+    // 単一フェーズプレイ → リザルト直行
+    if (singlePhaseMode && bossPhase === startFromPhase) {
+        spellTransitionTimer = 120;
+        enemyBullets = []; lasers = [];
+        gamePhase = 'clear';
+        boss = null; boss2 = null;
+        showResultScreen();
+        return;
+    }
+    
+    spellTransitionTimer = 120;
+    enemyBullets = [];
+    lasers = [];
+    saiHateLaserTimer = 0;
+    spell9LaserTimer = 0; spell9LaserBlurTimer = 0; spell9SpiralTimer = 0;
+    
+    // スペル3 → 爆発して退場 → 3秒後に下から登場 → スペル4
+    if (bossPhase === 3) {
+        const exitX = boss ? boss.x : canvas.width / 2;
+        const exitY = boss ? boss.y : 120;
+        createExplosion(exitX, exitY, '#ff00ff', 60);
+        createExplosion(exitX, exitY, '#ff0066', 40);
+        score += 3000;
+        boss = null;
+        bossInterlude = true;
+        getElement('bossUI').style.display = 'none';
+        setTimeout(() => {
+            bossInterlude = false; bossPhase = 4; spellDamage = 0; spellTimer = 0; hitDuringSpell = false;
+            boss = {
+                x: canvas.width / 2, y: canvas.height + 80, width: 50, height: 50,
+                hp: SPELL_CONFIG[4].hp, maxHp: SPELL_CONFIG[4].hp,
+                speed: 1, moveTimer: 0, targetX: canvas.width / 2, baseY: 120,
+                name: '深淵の魔法使い', invincible: true
+            };
+            getElement('bossName').textContent = boss.name;
+            getElement('bossUI').style.display = 'block';
+            updateBossUIColor(SPELL_CONFIG[4].color);
+            updateUI();
+            const enterInterval = setInterval(() => {
+                boss.y -= 3;
+                if (boss.y <= 120) {
+                    clearInterval(enterInterval);
+                    boss.baseY = 120; boss.y = 120; boss.invincible = false;
+                    traceLog(`Spell 4 started. bossPhase=${bossPhase}, boss.invincible=${boss.invincible}`);
+                    showSpellName(4);
+                    beginSpellTracking(4);
+                }
+            }, 16);
+        }, 3000);
+        return;
+    }
+    
+    // スペル4 → 爆発退場 → 道中フェーズ2 → 最果登場 → スペル5
+    if (bossPhase === 4) {
+        const exitX = boss ? boss.x : canvas.width / 2;
+        const exitY = boss ? boss.y : 120;
+        createExplosion(exitX, exitY, '#ff00ff', 60);
+        score += 5000;
+        boss = null;
+        bossInterlude = true;
+        getElement('bossUI').style.display = 'none';
+        setTimeout(() => {
+            bossInterlude = false;
+            traceLog('Stage2 started after spell 4');
+            // 道中フェーズ2開始
+            gamePhase = 'stage2';
+            enemiesDefeated = 0;
+            enemies = []; enemyBullets = []; lasers = [];
+        }, 3000);
+        return;
+    }
+    
+    // スペル7 → 深淵が下から再登場 → スペル8
+    if (bossPhase === 7) {
+        isFakeDefeat = true; fakeDefeatTimer = 180;
+        setTimeout(() => {
+            isFakeDefeat = false; bossPhase = 8; spellDamage = 0; spellTimer = 0; hitDuringSpell = false;
+            spell8Part = 1; spell8Merging = false; spell8MergeTimer = 0;
+            if (boss) {
+                boss.targetX = canvas.width / 2 + 80;
+                boss.baseY = 120;
+                boss.name = '最果の魔法使い';
+            }
+            boss2 = {
+                x: canvas.width / 2 - 80, y: canvas.height + 80, width: 50, height: 50,
+                hp: 99999, maxHp: 99999, speed: 1, moveTimer: 0,
+                targetX: canvas.width / 2 - 80, baseY: 120, name: '深淵の魔法使い', invincible: true
+            };
+            getElement('bossName').textContent = '深淵 & 最果';
+            updateBossUIColor(SPELL_CONFIG[8].color);
+            updateUI();
+            const enterInterval = setInterval(() => {
+                boss2.y -= 3;
+                if (boss2.y <= 120) {
+                    clearInterval(enterInterval);
+                    boss2.baseY = 120; boss2.y = 120; boss2.invincible = false;
+                    showSpellName(8);
+                    beginSpellTracking(8);
+                }
+            }, 16);
+        }, 3000);
+        return;
+    }
+    
+    // スペル8(全パート完了) → スペル9
+    if (bossPhase === 8) {
+        bossPhase = 9; spellDamage = 0; spellTimer = 0; hitDuringSpell = false;
+        if (boss) {
+            boss.hp = SPELL_CONFIG[9].hp;
+            boss.maxHp = SPELL_CONFIG[9].hp;
+            boss.name = '深淵 & 最果 — 究極形態';
+        }
+        getElement('bossName').textContent = boss ? boss.name : '深淵 & 最果';
+        updateBossUIColor(SPELL_CONFIG[9].color);
+        updateUI();
+        showSpellName(9);
+        beginSpellTracking(9);
+        return;
+    }
+    
+    // スペル9 → スペル10
+    if (bossPhase === 9) {
+        createExplosion(boss?.x || canvas.width / 2, boss?.y || 120, '#ffffff', 80);
+        if (boss) createExplosion(boss.x, boss.y, '#ff00ff', 50);
+        score += 100000;
+        bossPhase = 10; spellDamage = 0; spellTimer = 0; hitDuringSpell = false;
+        spell10SetCount = 1; spell10SubPhase = 0; spell10SubTimer = 0;
+        spell10FrozenBullets = [];
+        if (boss) {
+            boss.hp = SPELL_CONFIG[10].hp;
+            boss.maxHp = SPELL_CONFIG[10].hp;
+            boss.name = '深淵 & 最果 — 終焉の調べ';
+        }
+        getElement('bossName').textContent = boss ? boss.name : '深淵 & 最果';
+        updateBossUIColor(SPELL_CONFIG[10].color);
+        updateUI();
+        showSpellName(10);
+        beginSpellTracking(10);
+        return;
+    }
+
+    // スペル10 → クリア
+    if (bossPhase === 10) {
+        createExplosion(boss?.x || canvas.width / 2, boss?.y || 120, '#ffffff', 120);
+        if (boss) createExplosion(boss.x, boss.y, '#ff00ff', 80);
+        score += 300000;
+        boss = null; boss2 = null;
+        gamePhase = 'clear';
+        getElement('bossUI').style.display = 'none';
+        setTimeout(() => showResultScreen(), 1500);
+        return;
+    }
+    
+    // 通常のスペル進行
+    bossPhase++; spellDamage = 0; spellTimer = 0; hitDuringSpell = false;
+    
+    const config = SPELL_CONFIG[bossPhase];
+    boss = {
+        x: canvas.width / 2, y: 120, width: 50, height: 50,
+        hp: config.hp, maxHp: config.hp, speed: 1, moveTimer: 0,
+        targetX: canvas.width / 2, baseY: 120,
+        name: bossPhase >= 5 ? '最果の魔法使い' : '深淵の魔法使い',
+        invincible: false
+    };
+    updateBossUIColor(config.color);
+    showSpellName(bossPhase);
+    getElement('bossName').textContent = boss.name;
+    updateUI();
+    if (bossPhase >= 1) beginSpellTracking(bossPhase);
+}
+
+// ========== ボス攻撃パターン（難易度でレート調整） ==========
+function shouldFire(baseInterval) {
+    const rate = getDiff().rate;
+    // baseInterval / rate = 実際の間隔
+    const actualInterval = Math.max(1, Math.round(baseInterval / rate));
+    return spellTimer % actualInterval === 0;
+}
+
+function executeBossAttack() {
+    if (!boss || spellTransitionTimer > 0 || isFakeDefeat || bossInterlude || spellNameDisplaying) {
+        if (frame % 60 === 0 && bossPhase === 4) {
+            traceLog(`executeBossAttack skipped: boss=${!!boss}, transition=${spellTransitionTimer}, fake=${isFakeDefeat}, interlude=${bossInterlude}, naming=${spellNameDisplaying}`);
+        }
+        return;
+    }
+    if (bossPhase === 4 && spellTimer % 60 === 0) {
+        traceLog(`executeBossAttack running spell4: spellTimer=${spellTimer}/${SPELL_CONFIG[4].timeLimit * 60}`);
+    }
+    if (boss.invincible && bossPhase !== 8) return;
+    if (bossPhase === 8 && (!boss2 || boss2.invincible) && spell8Part === 1) return;
+    
+    if (bossPhase === 8) {
+        executeSpell8();
+        return;
+    }
+    
+    spellTimer++;
+    
+    const config = SPELL_CONFIG[bossPhase];
+    if (config.type === 'damage' && spellDamage >= config.hp) { nextSpellPhase(); return; }
+    if (config.type === 'time' && spellTimer >= config.timeLimit * 60) { nextSpellPhase(); return; }
+    
+    const d = getDiff();
+    const rate = d.rate;
+    
+    if (bossPhase === 0) {
+        if (shouldFire(40)) for (let i = -1; i <= 1; i++) enemyBullets.push({ x: boss.x, y: boss.y + 25, vx: i * 2, vy: 3.5, radius: 5, color: '#ff66ff' });
+        if (shouldFire(60)) { const angle = Math.atan2(player.y - boss.y, player.x - boss.x); enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * 3.5, vy: Math.sin(angle) * 3.5, radius: 6, color: '#ff4444' }); }
+        return;
+    }
+    
+    if (bossPhase === 1) {
+        if (shouldFire(6)) { const angle = Math.random() * Math.PI * 2, speed = 2.5 + Math.random() * 1.5; enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 5, color: '#ff00ff' }); }
+        if (shouldFire(20)) { const baseAngle = spellTimer * 0.1; for (let i = 0; i < 6; i++) { const a = baseAngle + i * Math.PI / 3; enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, radius: 4, color: '#ff66ff' }); } }
+        return;
+    }
+    
+    if (bossPhase === 2) {
+        if (shouldFire(3)) { const angle = Math.random() * Math.PI * 2, speed = 1.0 + Math.random() * 0.8; enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 6, color: '#ff4444' }); }
+        if (shouldFire(25)) { const baseAngle = spellTimer * 0.15; for (let i = 0; i < 12; i++) { const a = baseAngle + i * Math.PI / 6; enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 3.5, vy: Math.sin(a) * 3.5, radius: 5, color: '#ff8844' }); } }
+        if (shouldFire(60)) { const angle = Math.atan2(player.y - boss.y, player.x - boss.x); enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * 4, vy: Math.sin(angle) * 4, radius: 7, color: '#ff0000' }); }
+        return;
+    }
+    
+    if (bossPhase === 3) {
+        if (shouldFire(15)) {
+            const baseAngle = Math.atan2(player.y - boss.y, player.x - boss.x), offset = (Math.random() - 0.5) * 0.8, angle = baseAngle + offset, speed = 1.8 + Math.random() * 0.5;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 6, color: '#ff0066' });
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle + 0.3) * speed, vy: Math.sin(angle + 0.3) * speed, radius: 6, color: '#ff3366' });
+        }
+        if (shouldFire(10)) { const angle = Math.random() * Math.PI * 2, speed = 2.5 + Math.random(); enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 5, color: '#ff66cc' }); }
+        return;
+    }
+    
+    if (bossPhase === 4) {
+        const lexMul = (currentDifficulty === 'LUNATICEXTRA') ? 1.3 : 1;
+        const lexSpd = (currentDifficulty === 'LUNATICEXTRA') ? 0.9 : 1;
+        spell4Pattern(boss, lexMul, lexSpd);
+        // LUNATIC EX追加：全方位誘導弾
+        if (currentDifficulty === 'LUNATICEXTRA' && shouldFire(45)) {
+            const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+            for (let i = -2; i <= 2; i++) {
+                const a = angle + i * 0.15;
+                enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 2.5 * 0.9, vy: Math.sin(a) * 2.5 * 0.9, radius: 5, color: '#ff0000', homing: true, homingLife: 120 });
+            }
+        }
+        return;
+    }
+    
+    if (bossPhase === 5) {
+        if (shouldFire(4)) {
+            const angle = Math.random() * Math.PI * 2, speed = 0.5 + Math.random() * 4;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 4 + Math.random() * 3, color: `hsl(${Math.random() * 60 + 180}, 100%, 60%)` });
+        }
+        if (shouldFire(30)) { const baseAngle = spellTimer * 0.08; for (let i = 0; i < 8; i++) { const a = baseAngle + i * Math.PI / 4; enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, radius: 5, color: '#00ffff' }); } }
+        return;
+    }
+    
+    if (bossPhase === 6) {
+        if (shouldFire(5)) { const angle = Math.random() * Math.PI * 2, speed = 2.2 + Math.random() * 1.5; enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 5, color: `hsl(${Math.random() * 60 + 40}, 100%, 60%)` }); }
+        if (shouldFire(20)) {
+            const angle = Math.random() * Math.PI * 2, speed = 0.9 + Math.random() * 1.0;
+            enemyBullets.push(createFirework(boss.x, boss.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 6, `hsl(${Math.random() * 60 + 40}, 100%, 60%)`));
+        }
+        return;
+    }
+    
+    if (bossPhase === 7) {
+        if (shouldFire(4)) { const angle = Math.random() * Math.PI * 2, speed = 0.5 + Math.random() * 1.5; enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 5, color: `hsl(${Math.random() * 60 + 80}, 100%, 60%)` }); }
+        if (shouldFire(12)) {
+            const angle = Math.random() * Math.PI * 2, speed = 2.2 + Math.random() * 1.3;
+            enemyBullets.push(createFirework(boss.x, boss.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 6, `hsl(${Math.random() * 60 + 100}, 100%, 60%)`));
+        }
+        return;
+    }
+    
+    if (bossPhase === 9) {
+        executeSpell9();
+        return;
+    }
+
+    if (bossPhase === 10) {
+        executeSpell10();
+        return;
+    }
+}
+
+// ========== スペル8 ==========
+function executeSpell8() {
+    if (spell8Merging) {
+        spell8MergeTimer--;
+        const cx = canvas.width / 2;
+        if (boss) { boss.x += (cx - boss.x) * 0.06; boss.invincible = true; }
+        if (boss2) { boss2.x += (cx - boss2.x) * 0.06; boss2.invincible = true; }
+        if (spell8MergeTimer <= 0) {
+            const mx = boss ? boss.x : cx;
+            const my = boss ? boss.y : 120;
+            createExplosion(mx, my, '#ff00ff', 60);
+            createExplosion(mx, my, '#00ffff', 60);
+            boss = {
+                x: cx, y: my, width: 64, height: 64,
+                hp: 99999, maxHp: 99999, speed: 1, moveTimer: 0,
+                targetX: cx, baseY: 120, name: '深淵 & 最果', invincible: false, merged: true
+            };
+            boss2 = null;
+            spell8Merging = false;
+            spellDamage = 0;
+        }
+        return;
+    }
+    
+    spellTimer++;
+    
+    const partHp = getSpell8PartHp()[spell8Part - 1];
+    if (spellDamage >= partHp) {
+        applyNoHitHeal();
+        if (spell8Part === 1) {
+            snapshotSpell8Part();
+            spellAccTime += spellTimer;
+            spell8Part = 2; spellDamage = 0; spellTimer = 0; hitDuringSpell = false;
+            spellHitCount = 0;
+            saiHateLaserTimer = 0;
+            return;
+        } else if (spell8Part === 2) {
+            snapshotSpell8Part();
+            spellAccTime += spellTimer;
+            spell8Part = 3; spellDamage = 0; spellTimer = 0; hitDuringSpell = false;
+            spellHitCount = 0;
+            spell8Merging = true; spell8MergeTimer = 90;
+            enemyBullets = []; lasers = [];
+            return;
+        } else {
+            nextSpellPhase();
+            return;
+        }
+    }
+    
+    const s8Mul = (currentDifficulty === 'LUNATIC') ? 0.9 : 1;
+    if (spell8Part === 1) {
+        const target = boss2;
+        if (target && !target.invincible) spell4Pattern(target, 1.1 * s8Mul, (currentDifficulty === 'LUNATICEXTRA') ? 0.9 : 1);
+        // LUNATIC EX追加：深淵側から追加全方位弾
+        if (currentDifficulty === 'LUNATICEXTRA' && boss && !boss.invincible && shouldFire(18)) {
+            const baseAngle = spellTimer * 0.12;
+            for (let i = 0; i < 10; i++) {
+                const a = baseAngle + i * Math.PI / 5;
+                enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 2.8 * 0.9, vy: Math.sin(a) * 2.8 * 0.9, radius: 4, color: '#ff00aa' });
+            }
+        }
+    } else if (spell8Part === 2) {
+        const target = boss;
+        if (target && !target.invincible) saiHatePattern(target, s8Mul, 9, 180);
+        // LUNATIC EX追加：最果側から追加誘導弾
+        if (currentDifficulty === 'LUNATICEXTRA' && boss2 && !boss2.invincible && shouldFire(25)) {
+            const angle = Math.atan2(player.y - boss2.y, player.x - boss2.x);
+            for (let i = -1; i <= 1; i++) {
+                const a = angle + i * 0.2;
+                enemyBullets.push({ x: boss2.x, y: boss2.y, vx: Math.cos(a) * 3 * 0.9, vy: Math.sin(a) * 3 * 0.9, radius: 5, color: '#aa00ff', homing: true, homingLife: 90 });
+            }
+        }
+    } else {
+        if (boss && !boss.invincible) {
+            spell4Pattern(boss, 1.125 * s8Mul, (currentDifficulty === 'LUNATICEXTRA') ? 0.9 : 1);
+            saiHatePattern(boss, 1.125 * s8Mul, 9, 180);
+        }
+        // LUNATIC EX追加：合体後の追加高速弾幕
+        if (currentDifficulty === 'LUNATICEXTRA' && boss && !boss.invincible && shouldFire(10)) {
+            const angle = Math.random() * Math.PI * 2;
+            for (let i = 0; i < 5; i++) {
+                const a = angle + i * Math.PI * 2 / 5;
+                const speed = (3.5 + Math.random() * 1.5) * 0.9;
+                enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, radius: 4, color: '#ff0066' });
+            }
+        }
+    }
+}
+
+// ========== スペル9 ==========
+function executeSpell9() {
+    const config = SPELL_CONFIG[9];
+    if (spellTimer >= config.timeLimit * 60) { nextSpellPhase(); return; }
+
+    // LUNATIC EX：「終焉の輪舞曲」→「終焉の狂想曲」（完全変更）
+    if (currentDifficulty === 'LUNATICEXTRA') {
+        executeSpell9LunaticExtra();
+        return;
+    }
+
+    // 通常版スペル9
+    const s9Mul = (currentDifficulty === 'LUNATIC') ? 0.77 : 1;
+    if (shouldFire(Math.round(30 / s9Mul))) {
+        const baseAngle = spellTimer * 0.05;
+        for (let i = 0; i < 16; i++) {
+            const a = baseAngle + i * Math.PI / 8;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 1.7, vy: Math.sin(a) * 1.7, radius: 5, color: '#aa88ff' });
+        }
+    }
+    spell9LaserTimer++;
+    if (spell9LaserTimer >= Math.round(180 / s9Mul)) {
+        spell9LaserTimer = 0;
+        const baseAngle = Math.atan2(player.y - boss.y, player.x - boss.x);
+        for (let i = -1; i <= 1; i++) {
+            lasers.push({ x: boss.x, y: boss.y, angle: baseAngle + i * 0.3, warnTimer: 60, beamTimer: 0, fadeTimer: 0 });
+        }
+    }
+    if (shouldFire(Math.round(14 / s9Mul))) {
+        const angle = Math.random() * Math.PI * 2, speed = 3.5 + Math.random() * 1.2;
+        enemyBullets.push(createFirework(boss.x, boss.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 6, `hsl(${Math.random() * 60 + 200}, 100%, 60%)`));
+    }
+
+    if (spellTimer >= 65 * 60) {
+        if (shouldFire(Math.round(8 / s9Mul))) {
+            const baseAngle = Math.atan2(player.y - boss.y, player.x - boss.x);
+            const offset = (Math.random() - 0.5) * 0.18;
+            const speed = 2.2 + Math.random() * 0.6;
+            enemyBullets.push(createFirework(boss.x, boss.y,
+                Math.cos(baseAngle + offset) * speed,
+                Math.sin(baseAngle + offset) * speed,
+                6, `hsl(${Math.random() * 50 + 10}, 100%, 60%)`));
+        }
+    }
+
+    if (spellTimer >= 40 * 60) {
+        if (shouldFire(Math.round(22 / s9Mul))) {
+            const baseAngle = -spellTimer * 0.07;
+            for (let i = 0; i < 12; i++) {
+                const a = baseAngle + i * Math.PI / 6;
+                enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 3.2, vy: Math.sin(a) * 3.2, radius: 5, color: '#ff44aa' });
+            }
+        }
+        spell9LaserBlurTimer++;
+        if (spell9LaserBlurTimer >= Math.round(240 / s9Mul)) {
+            spell9LaserBlurTimer = 0;
+            const baseAngle = Math.atan2(player.y - boss.y, player.x - boss.x);
+            for (let i = -1; i <= 1; i++) {
+                const offset = i * 0.22 + (Math.random() - 0.5) * 0.12;
+                lasers.push({ x: boss.x, y: boss.y, angle: baseAngle + offset, warnTimer: 60, beamTimer: 0, fadeTimer: 0 });
+            }
+        }
+        spell9SpiralTimer++;
+        if (spell9SpiralTimer % Math.max(1, Math.round(4 / getDiff().rate / s9Mul)) === 0) {
+            const a = spell9SpiralTimer * 0.18;
+            for (let arm = 0; arm < 3; arm++) {
+                const angle = a + arm * (Math.PI * 2 / 3);
+                enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * 3, vy: Math.sin(angle) * 3, radius: 4, color: '#ffff00' });
+            }
+        }
+    }
+}
+
+// LUNATIC EX専用スペル9「終焉の狂想曲」
+function executeSpell9LunaticExtra() {
+    const denMul = 0.7;
+    const spdMul = 0.9; // LUNATIC EX弾速補正
+    const elapsedSec = spellTimer / 60;
+    const remaining = 30 - elapsedSec; // 30秒耐久
+
+    // 全方位弾
+    if (shouldFire(Math.round(20 / denMul))) {
+        const baseAngle = spellTimer * 0.08;
+        for (let i = 0; i < 20; i++) {
+            const a = baseAngle + i * Math.PI / 10;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 2.2 * spdMul, vy: Math.sin(a) * 2.2 * spdMul, radius: 5, color: '#ff00ff' });
+        }
+    }
+    if (shouldFire(Math.round(8 / denMul))) {
+        const baseAngle = -spellTimer * 0.1;
+        for (let i = 0; i < 8; i++) {
+            const a = baseAngle + i * Math.PI / 4;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 3.5 * spdMul, vy: Math.sin(a) * 3.5 * spdMul, radius: 4, color: '#ff44ff' });
+        }
+    }
+
+    // なぎ払いレーザー（扇形予告→なぎ払い）
+    // 残り30秒まで: 10秒間隔、30度移動
+    // 残り30秒から: 7秒間隔、45度移動
+    const sweepInterval = (remaining > 0) ? 10 : 7;
+    const sweepAngle = (remaining > 0) ? (30 * Math.PI / 180) : (45 * Math.PI / 180);
+
+    spell9LaserTimer++;
+    if (spell9LaserTimer >= sweepInterval * 60) {
+        spell9LaserTimer = 0;
+        // プレイヤー方向を狙う
+        const playerAngle = Math.atan2(player.y - boss.y, player.x - boss.x);
+        // なぎ払い方向: 右か左のランダム
+        const sweepDir = (Math.random() < 0.5) ? 1 : -1;
+        // プレイヤー方向から開始して、sweepDir方向にsweepAngleだけなぎ払う
+        const startAngle = playerAngle;
+        const endAngle = playerAngle + sweepAngle * sweepDir;
+
+        // なぎ払いレーザーを追加
+        lasers.push({
+            x: boss.x, y: boss.y,
+            startAngle: startAngle,
+            endAngle: endAngle,
+            currentAngle: startAngle,
+            isSweeping: true,
+            warnTimer: 90, // 1.5秒予告
+            beamTimer: 0,
+            fadeTimer: 0,
+            sweepDuration: 90, // 1.5秒でなぎ払い
+            sweepProgress: 0
+        });
+    }
+
+    if (shouldFire(Math.round(10 / denMul))) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 4 + Math.random() * 1.5;
+        enemyBullets.push(createFirework(boss.x, boss.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 8, `hsl(${Math.random() * 60 + 280}, 100%, 60%)`));
+    }
+    // 時限追加パターン：高速誘導弾
+    if (spellTimer >= 15 * 60 && shouldFire(Math.round(15 / denMul))) {
+        const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+        for (let i = -3; i <= 3; i++) {
+            const a = angle + i * 0.12;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 2.8 * spdMul, vy: Math.sin(a) * 2.8 * spdMul, radius: 4, color: '#ff0066', homing: true, homingLife: 100 });
+        }
+    }
+    // 螺旋追加パターン
+    if (spellTimer >= 10 * 60) {
+        spell9SpiralTimer++;
+        if (spell9SpiralTimer % Math.max(1, Math.round(3 / denMul)) === 0) {
+            const a = spell9SpiralTimer * 0.25;
+            for (let arm = 0; arm < 4; arm++) {
+                const angle = a + arm * (Math.PI * 2 / 4);
+                enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * 3.5 * spdMul, vy: Math.sin(angle) * 3.5 * spdMul, radius: 4, color: '#ffaa00' });
+            }
+        }
+    }
+}
+
+// ========== スペル10 ==========
+function executeSpell10() {
+    const bossObj = boss;
+    if (!bossObj) return;
+
+    // LUNATIC EX：「世界最後の魔法」→「世界最後の審判」（完全変更）
+    if (currentDifficulty === 'LUNATICEXTRA') {
+        executeSpell10LunaticExtra();
+        return;
+    }
+
+    if (spell10SetCount >= 6) {
+        nextSpellPhase();
+        return;
+    }
+
+    spell10SubTimer++;
+
+    if (spell10SubPhase === 0) {
+        const s10spd = (currentDifficulty === 'LUNATIC') ? 1.1 : 1;
+        if (shouldFire(3)) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = (0.6 + Math.random() * 0.6) * s10spd;
+            enemyBullets.push({
+                x: bossObj.x, y: bossObj.y,
+                vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                radius: 4, color: `hsl(${Math.random() * 60 + 280}, 100%, 70%)`
+            });
+        }
+        if (shouldFire(3)) {
+            const aimAngle = Math.atan2(player.y - bossObj.y, player.x - bossObj.x);
+            const spread = (Math.random() - 0.5) * 0.5;
+            const speed = (0.5 + Math.random() * 0.5) * s10spd;
+            enemyBullets.push({
+                x: bossObj.x, y: bossObj.y,
+                vx: Math.cos(aimAngle + spread) * speed,
+                vy: Math.sin(aimAngle + spread) * speed,
+                radius: 4, color: '#cc88ff'
+            });
+        }
+        if (spell10SubTimer >= 600) {
+            spell10SubPhase = 1;
+            spell10SubTimer = 0;
+            enemyBullets.forEach((b, idx) => {
+                if (!b.isFirework) {
+                    b._savedVx = b.vx; b._savedVy = b.vy;
+                    b.vx = 0; b.vy = 0;
+                    b.isSpell10Frozen = true;
+                    spell10FrozenBullets.push(idx);
+                }
+            });
+        }
+        return;
+    }
+
+    if (spell10SubPhase === 1) {
+        if (spell10SubTimer >= 30) {
+            spell10SubPhase = 2;
+            spell10SubTimer = 0;
+        }
+        return;
+    }
+
+    if (spell10SubPhase === 2) {
+        const fireworkCount = Math.floor(spell10SubTimer / 3);
+        if (spell10SubTimer % 3 === 0 && fireworkCount < 50) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.0 + Math.random() * 1.5;
+            enemyBullets.push(createFirework(
+                bossObj.x, bossObj.y,
+                Math.cos(angle) * speed, Math.sin(angle) * speed,
+                6, `hsl(${Math.random() * 60 + 320}, 100%, 65%)`
+            ));
+        }
+        if (fireworkCount >= 50) {
+            spell10SubPhase = 3;
+            spell10SubTimer = 0;
+        }
+        return;
+    }
+
+    if (spell10SubPhase === 3) {
+        const activeFireworks = enemyBullets.filter(b => b.isFirework && !b.exploded);
+        if (activeFireworks.length === 0) {
+            spell10SubPhase = 4;
+            spell10SubTimer = 0;
+            enemyBullets.forEach(b => {
+                if (b.isSpell10Frozen) {
+                    const savedSpeed = Math.hypot(b._savedVx || 0, b._savedVy || 0);
+                    const newSpeed = Math.max(savedSpeed * 2.5, 2.0);
+                    const angle = Math.atan2(b._savedVy || 0, b._savedVx || 0);
+                    b.vx = Math.cos(angle) * newSpeed;
+                    b.vy = Math.sin(angle) * newSpeed;
+                    delete b.isSpell10Frozen;
+                    delete b._savedVx;
+                    delete b._savedVy;
+                }
+            });
+            spell10FrozenBullets = [];
+        }
+        return;
+    }
+
+    if (spell10SubPhase === 4) {
+        const onScreen = enemyBullets.filter(b => {
+            return b.x > -50 && b.x < canvas.width + 50 &&
+                   b.y > -50 && b.y < canvas.height + 50;
+        });
+        if (onScreen.length === 0 || spell10SubTimer > 600) {
+            spell10SetCount++;
+            spell10SubPhase = 0;
+            spell10SubTimer = 0;
+            enemyBullets = [];
+        }
+        return;
+    }
+}
+
+// LUNATIC EX専用スペル10「世界最後の審判」
+function executeSpell10LunaticExtra() {
+    // 時間経過による段階的強化
+    const spdMul = 0.9; // LUNATIC EX弾速補正
+    const elapsedSec = spellTimer / 60; // 経過秒数
+    // 密度: スタート50% → 15秒ごとに12%アップ
+    const densityMul = 0.50 + Math.min(0.50, Math.floor(elapsedSec / 15) * 0.12);
+    // 弾速: スタート40% → 1秒ごとに1%アップ
+    const speedMul = 0.40 + Math.min(0.60, elapsedSec * 0.01);
+
+    // 全方位弾（密度可変）
+    if (shouldFire(Math.round(15 / densityMul))) {
+        const baseAngle = spellTimer * 0.06;
+        for (let i = 0; i < 24; i++) {
+            const a = baseAngle + i * Math.PI / 12;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 2.5 * speedMul * spdMul, vy: Math.sin(a) * 2.5 * speedMul * spdMul, radius: 5, color: '#ff00ff' });
+        }
+    }
+    // 追加全方位
+    if (shouldFire(Math.round(6 / densityMul))) {
+        const baseAngle = -spellTimer * 0.12;
+        for (let i = 0; i < 12; i++) {
+            const a = baseAngle + i * Math.PI / 6;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 4 * speedMul * spdMul, vy: Math.sin(a) * 4 * speedMul * spdMul, radius: 4, color: '#ff44ff' });
+        }
+    }
+    // レーザー: 残り45秒→1way、30秒→3way、15秒→5way
+    const remaining = 75 - elapsedSec;
+    spell9LaserTimer++;
+    let laserInterval = 9999;
+    let laserWays = 0;
+    if (remaining <= 15) { laserInterval = 50; laserWays = 5; }
+    else if (remaining <= 30) { laserInterval = 70; laserWays = 3; }
+    else if (remaining <= 45) { laserInterval = 90; laserWays = 1; }
+    if (laserWays > 0 && spell9LaserTimer >= laserInterval) {
+        spell9LaserTimer = 0;
+        const baseAngle = Math.atan2(player.y - boss.y, player.x - boss.x);
+        const spreadStep = 0.3;
+        const startOffset = -(laserWays - 1) * spreadStep / 2;
+        for (let i = 0; i < laserWays; i++) {
+            lasers.push({ x: boss.x, y: boss.y, angle: baseAngle + startOffset + i * spreadStep, warnTimer: 40, beamTimer: 0, fadeTimer: 0 });
+        }
+    }
+    // 高速花火
+    if (shouldFire(Math.round(8 / densityMul))) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (4.5 + Math.random() * 2) * speedMul;
+        enemyBullets.push(createFirework(boss.x, boss.y, Math.cos(angle) * speed * spdMul, Math.sin(angle) * speed * spdMul, 10, `hsl(${Math.random() * 60 + 300}, 100%, 60%)`));
+    }
+    // 高速誘導弾
+    if (shouldFire(Math.round(12 / densityMul))) {
+        const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+        for (let i = -4; i <= 4; i++) {
+            const a = angle + i * 0.1;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * 3.5 * speedMul * spdMul, vy: Math.sin(a) * 3.5 * speedMul * spdMul, radius: 4, color: '#ff0066', homing: true, homingLife: 80 });
+        }
+    }
+    // 時限追加：超高速弾幕
+    if (elapsedSec >= 15 && shouldFire(Math.round(20 / densityMul))) {
+        const angle = Math.random() * Math.PI * 2;
+        for (let i = 0; i < 6; i++) {
+            const a = angle + i * Math.PI * 3;
+            const speed = (5 + Math.random() * 2) * speedMul;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a) * speed * spdMul, vy: Math.sin(a) * speed * spdMul, radius: 3, color: '#ffffff' });
+        }
+    }
+}
+
+// 深淵スペル4パターン
+function spell4Pattern(b, mul, spdMul) {
+    const sm = spdMul || 1;
+    if (shouldFire(20)) { const angle = Math.atan2(player.y - b.y, player.x - b.x); enemyBullets.push({ x: b.x, y: b.y, vx: Math.cos(angle) * 4 * mul * sm, vy: Math.sin(angle) * 4 * mul * sm, radius: 6, color: '#ff0000' }); }
+    if (shouldFire(25)) { const baseAngle = Math.atan2(player.y - b.y, player.x - b.x); for (let i = -2; i <= 2; i++) { const angle = baseAngle + i * 0.25; enemyBullets.push({ x: b.x, y: b.y, vx: Math.cos(angle) * 3.5 * mul * sm, vy: Math.sin(angle) * 3.5 * mul * sm, radius: 5, color: '#ff4444' }); } }
+    if (shouldFire(2)) { const angle = Math.random() * Math.PI * 2, speed = (1.5 + Math.random() * 3) * mul * sm; enemyBullets.push({ x: b.x, y: b.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 3 + Math.random() * 4, color: `hsl(${Math.random() * 60 + 300}, 100%, 60%)` }); }
+    if (shouldFire(3)) { const angle = Math.random() * Math.PI * 2, speed = (2 + Math.random() * 2.5) * mul * sm; enemyBullets.push({ x: b.x + (Math.random() - 0.5) * 40, y: b.y + (Math.random() - 0.5) * 40, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 4 + Math.random() * 3, color: `hsl(${Math.random() * 60 + 280}, 100%, 65%)` }); }
+    if (shouldFire(30)) { const ways = [3, 4, 5][Math.floor(Math.random() * 3)], baseAngle = Math.atan2(player.y - b.y, player.x - b.x), spread = Math.PI / 4; for (let i = 0; i < ways; i++) { const angle = baseAngle - spread / 2 + (spread / Math.max(1, ways - 1)) * i; enemyBullets.push({ x: b.x, y: b.y, vx: Math.cos(angle) * 3.5 * mul * sm, vy: Math.sin(angle) * 3.5 * mul * sm, radius: 6, color: '#ff8800' }); } }
+}
+
+// 最果攻撃パターン
+function saiHatePattern(b, mul, fireworkInterval, laserInterval) {
+    const d = getDiff();
+    fireworkInterval = Math.max(1, Math.round((fireworkInterval || 12) / d.rate));
+    laserInterval = laserInterval || 240;
+    if (spellTimer % fireworkInterval === 0) {
+        const angle = Math.random() * Math.PI * 2, speed = (1.0 + Math.random() * 2.5) * mul;
+        enemyBullets.push(createFirework(b.x, b.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 6, `hsl(${Math.random() * 60 + 160}, 100%, 60%)`));
+    }
+    if (shouldFire(8)) {
+        const angle = Math.random() * Math.PI * 2, speed = (1.5 + Math.random() * 2) * mul;
+        enemyBullets.push({ x: b.x, y: b.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 4, color: '#88ffff' });
+    }
+    saiHateLaserTimer++;
+    if (saiHateLaserTimer >= laserInterval) {
+        saiHateLaserTimer = 0;
+        const angle = Math.atan2(player.y - b.y, player.x - b.x);
+        lasers.push({ x: b.x, y: b.y, angle, warnTimer: 60, beamTimer: 0, fadeTimer: 0 });
+    }
+}
+
+// ========== 花火弾作成 ==========
+function createFirework(x, y, vx, vy, radius, color) {
+    return {
+        x: x, y: y, vx: vx, vy: vy, radius: radius, color: color,
+        isFirework: true, exploded: false, timer: 0, maxTimer: 600,
+        update: function(pending) {
+            this.x += this.vx; this.y += this.vy; this.timer++;
+            const margin = this.radius + 4;
+            const willOffScreen =
+                this.x < margin || this.x > canvas.width - margin ||
+                this.y < margin || this.y > canvas.height - margin;
+            const reachedBottom = this.y >= canvas.height / 2;
+            if (!this.exploded && (reachedBottom || willOffScreen || this.timer > this.maxTimer)) {
+                this.exploded = true;
+                for (let i = 0; i < 7; i++) {
+                    const angle = (Math.PI * 2 / 7) * i + Math.random() * 0.15;
+                    const speed = 3.2 + Math.random() * 0.6;
+                    pending.push({ x: this.x, y: this.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 4, color: '#ff8800' });
+                }
+                return false;
+            }
+            if (player.invincible <= 0) {
+                const dist = Math.hypot(this.x - player.x, this.y - player.y);
+                const hitR = getHitRadius();
+                if (dist < 25 + this.radius - 5 && dist > hitR + this.radius - 5) { player.grazeCount++; score++; }
+                if (dist < hitR + this.radius - 5) { playerHit(); return false; }
+            }
+            return true;
+        }
+    };
+}
+
+// ========== レーザー更新 ==========
+function updateLasers() {
+    lasers = lasers.filter(l => {
+        // なぎ払いレーザー処理
+        if (l.isSweeping) {
+            if (l.warnTimer > 0) {
+                l.warnTimer--;
+                if (l.warnTimer === 0) {
+                    l.beamTimer = l.sweepDuration;
+                    l.sweepProgress = 0;
+                }
+                return true;
+            }
+            if (l.beamTimer > 0) {
+                l.beamTimer--;
+                l.sweepProgress++;
+                // 角度を補間（微加速: ease-in quadratic）
+                const t = l.sweepProgress / l.sweepDuration;
+                const easeT = t * t; // 微加速: 開始時ゆっくり、終了時速く
+                l.currentAngle = l.startAngle + (l.endAngle - l.startAngle) * easeT;
+                l.angle = l.currentAngle;
+
+                if (player.invincible <= 0) {
+                    const dx = Math.cos(l.currentAngle), dy = Math.sin(l.currentAngle);
+                    const px = player.x - l.x, py = player.y - l.y;
+                    const proj = px * dx + py * dy;
+                    if (proj > 0) {
+                        const perpX = px - proj * dx, perpY = py - proj * dy;
+                        const perpDist = Math.hypot(perpX, perpY);
+                        if (perpDist < 12) playerHit();
+                    }
+                }
+                if (l.beamTimer <= 0) l.fadeTimer = 24;
+                return true;
+            }
+            if (l.fadeTimer > 0) {
+                l.fadeTimer--;
+                return l.fadeTimer > 0;
+            }
+            return false;
+        }
+
+        // 通常レーザー処理
+        if (l.warnTimer > 0) {
+            l.warnTimer--;
+            if (l.warnTimer === 0) l.beamTimer = 12;
+            return true;
+        }
+        if (l.beamTimer > 0) {
+            l.beamTimer--;
+            if (player.invincible <= 0) {
+                const dx = Math.cos(l.angle), dy = Math.sin(l.angle);
+                const px = player.x - l.x, py = player.y - l.y;
+                const proj = px * dx + py * dy;
+                if (proj > 0) {
+                    const perpX = px - proj * dx, perpY = py - proj * dy;
+                    const perpDist = Math.hypot(perpX, perpY);
+                    if (perpDist < 12) playerHit();
+                }
+            }
+            if (l.beamTimer <= 0) l.fadeTimer = 24;
+            return true;
+        }
+        if (l.fadeTimer > 0) {
+            l.fadeTimer--;
+            return l.fadeTimer > 0;
+        }
+        return false;
+    });
+}
+
+// ========== 移動範囲外レーザー ==========
+function updateOutOfBoundsLasers() {
+    if (gamePhase !== 'boss' || (bossPhase !== 5 && bossPhase !== 8)) {
+        oobInsidePrev = true;
+        oobLaserQueue = 0;
+        return;
+    }
+    if (spellTransitionTimer > 0 || isFakeDefeat || bossInterlude || spellNameDisplaying) {
+        oobInsidePrev = true;
+        oobLaserQueue = 0;
+        return;
+    }
+    if (bossPhase === 5 && boss && boss.invincible) { oobInsidePrev = true; oobLaserQueue = 0; return; }
+    if (bossPhase === 8 && (!boss2 || boss2.invincible) && spell8Part === 1) { oobInsidePrev = true; oobLaserQueue = 0; return; }
+    const bounds = getPlayerYBounds();
+    const inside = player.y >= bounds[0] && player.y <= bounds[1];
+    if (!inside && oobInsidePrev) {
+        oobLaserQueue = 3;
+        oobLaserTimer = 20;
+    }
+    oobInsidePrev = inside;
+    if (oobLaserQueue > 0) {
+        oobLaserTimer--;
+        if (oobLaserTimer <= 0) {
+            const fromBoss = boss || boss2;
+            const fx = fromBoss ? fromBoss.x : canvas.width / 2;
+            const fy = fromBoss ? fromBoss.y : 80;
+            const angle = Math.atan2(player.y - fy, player.x - fx);
+            lasers.push({ x: fx, y: fy, angle, warnTimer: 60, beamTimer: 0, fadeTimer: 0 });
+            oobLaserQueue--;
+            oobLaserTimer = 50;
+        }
+    }
+}
+
+// ========== 鑑賞モード自動操作 ==========
+function updateWatchModeAI() {
+    if (!isWatchMode) return;
+    // 観賞モード: 被弾判定無効のみ（自動移動なし）
+    player.invincible = 9999;
+}
+
+// ========== メイン更新 ==========
+function update() {
+    if (isPaused) return;
+    if (frame % 300 === 0) {
+        traceLog(`update tick: gameState=${gameState}, gamePhase=${gamePhase}, bossPhase=${bossPhase}, enemies=${enemies.length}, enemyBullets=${enemyBullets.length}`);
+    }
+
+if (gameState === 'dying') {
+        playerDeathTimer--;
+        if (playerDeathTimer % 6 === 0) {
+            const angle = Math.random() * Math.PI * 2, dist = Math.random() * 25 + 8;
+            const colors = ['#ffff00', '#ff8800', '#ff0066', '#00ffff', '#ffffff'];
+            createExplosion(player.x + Math.cos(angle) * dist, player.y + Math.sin(angle) * dist,
+                colors[Math.floor(Math.random() * colors.length)], 18);
+        }
+        particles = particles.filter(p => { p.update(); return p.particles.length > 0; });
+        if (playerDeathTimer <= 0) {
+            playerDying = false;
+            endSpellTracking();
+            showResultScreen();
+        }
+        return;
+    }
+    if (gameState !== 'playing') return;
+    frame++;
+    
+    player.grazeLevel = getGrazeLevel();
+    if (bombCooldown > 0) bombCooldown--;
+    if (player.invincible > 0) player.invincible--;
+    if (player.noShootTimer > 0) player.noShootTimer--;
+    if (spellTransitionTimer > 0) spellTransitionTimer--;
+    if (fakeDefeatTimer > 0) fakeDefeatTimer--;
+    
+    updateWatchModeAI();
+    if (isWatchMode) {
+        player.invincible = 9999;
+        player.grazeCount = GRAZE_LEVELS[GRAZE_LEVELS.length - 1].threshold;
+        player.grazeLevel = GRAZE_LEVELS.length - 1;
+    } else if (singlePhaseMode) {
+        player.grazeCount = GRAZE_LEVELS[practiceGrazeLevel].threshold;
+        player.grazeLevel = practiceGrazeLevel;
+    }
+    if (isShooting && player.noShootTimer <= 0) shoot();
+    if (gamePhase === 'stage' || gamePhase === 'stage2') spawnEnemy();
+    
+    clampPlayer();
+    
+    stars.forEach(star => {
+        star.y += star.speed;
+        if (star.y > canvas.height) { star.y = 0; star.x = Math.random() * canvas.width; }
+        star.brightness = 0.5 + Math.sin(frame * 0.05 + star.x) * 0.5;
+    });
+    
+    bullets = bullets.filter(bullet => {
+        bullet.x += bullet.vx; bullet.y += bullet.vy;
+        if (bullet.y < -20) return false;
+        let hit = false;
+        enemies.forEach(enemy => {
+            if (Math.abs(bullet.x - enemy.x) < (bullet.width / 2 + enemy.width / 2) && Math.abs(bullet.y - enemy.y) < (bullet.height / 2 + enemy.height / 2)) {
+                enemy.hp -= bullet.damage;
+                hit = true; createExplosion(bullet.x, bullet.y, bullet.color, 3);
+                if (enemy.hp <= 0) {
+                    score += 100; enemiesDefeated++;
+                    createExplosion(enemy.x, enemy.y, enemy.color, 25);
+                    if (enemiesDefeated >= getDiff().stage.totalEnemies && gamePhase === 'stage') { enemies = []; enemyBullets = []; spawnBoss(); }
+                    if (enemiesDefeated >= Math.floor(getDiff().stage.totalEnemies * 0.6) && gamePhase === 'stage2') { enemies = []; enemyBullets = []; spawnBossAfterStage2(); }
+                }
+            }
+        });
+        if (boss && !boss.invincible && Math.abs(bullet.x - boss.x) < (bullet.width / 2 + boss.width / 2) && Math.abs(bullet.y - boss.y) < (bullet.height / 2 + boss.height / 2) && !isFakeDefeat) {
+            const dmg = bullet.damage * getDamageMultiplier(); spellDamage += dmg; hit = true;
+            createExplosion(bullet.x, bullet.y, SPELL_CONFIG[bossPhase].color, 2); score += 10;
+        }
+        if (boss2 && !boss2.invincible && Math.abs(bullet.x - boss2.x) < (bullet.width / 2 + boss2.width / 2) && Math.abs(bullet.y - boss2.y) < (bullet.height / 2 + boss2.height / 2) && !isFakeDefeat) {
+            const dmg = bullet.damage * getDamageMultiplier(); spellDamage += dmg; hit = true;
+            createExplosion(bullet.x, bullet.y, SPELL_CONFIG[bossPhase].color, 2); score += 10;
+        }
+        return !hit;
+    });
+    
+    homingBullets = homingBullets.filter(h => {
+        h.life--;
+        if (h.life <= 0) return false;
+        if (h.target && h.target.hp > 0 && !h.target.invincible) {
+            const angle = Math.atan2(h.target.y - h.y, h.target.x - h.x);
+            const speed = 12;
+            h.vx += (Math.cos(angle) * speed - h.vx) * 0.15;
+            h.vy += (Math.sin(angle) * speed - h.vy) * 0.15;
+        }
+        h.x += h.vx; h.y += h.vy;
+        if (h.x < -20 || h.x > canvas.width + 20 || h.y < -20 || h.y > canvas.height + 20) return false;
+        let hit = false;
+        enemies.forEach(enemy => {
+            if (Math.hypot(h.x - enemy.x, h.y - enemy.y) < enemy.width / 2 + h.radius) {
+                enemy.hp -= h.damage; hit = true; createExplosion(h.x, h.y, h.color, 5);
+                if (enemy.hp <= 0) {
+                    score += 100; enemiesDefeated++; createExplosion(enemy.x, enemy.y, enemy.color, 25);
+                    if (enemiesDefeated >= getDiff().stage.totalEnemies && gamePhase === 'stage') { enemies = []; enemyBullets = []; spawnBoss(); }
+                    if (enemiesDefeated >= Math.floor(getDiff().stage.totalEnemies * 0.6) && gamePhase === 'stage2') { enemies = []; enemyBullets = []; spawnBossAfterStage2(); }
+                }
+            }
+        });
+        if (boss && !boss.invincible && Math.hypot(h.x - boss.x, h.y - boss.y) < boss.width / 2 + h.radius && !isFakeDefeat) {
+            spellDamage += h.damage * getDamageMultiplier(); hit = true; createExplosion(h.x, h.y, h.color, 5); score += 10;
+        }
+        if (boss2 && !boss2.invincible && Math.hypot(h.x - boss2.x, h.y - boss2.y) < boss2.width / 2 + h.radius && !isFakeDefeat) {
+            spellDamage += h.damage * getDamageMultiplier(); hit = true; createExplosion(h.x, h.y, h.color, 5); score += 10;
+        }
+        return !hit;
+    });
+    
+    enemies = enemies.filter(enemy => {
+        enemy.y += enemy.speed;
+        enemyShoot(enemy);
+        if (enemy.y > canvas.height + 50 || enemy.hp <= 0) return false;
+        if (player.invincible <= 0 &&
+            Math.abs(player.x - enemy.x) < (player.width / 2 + enemy.width / 2) &&
+            Math.abs(player.y - enemy.y) < (player.height / 2 + enemy.height / 2)) {
+            playerHit();
+        }
+        return true;
+    });
+    
+    updateBossMovement(boss);
+    updateBossMovement(boss2);
+    if (boss) executeBossAttack();
+    
+    updateOutOfBoundsLasers();
+    updateLasers();
+    
+    const pendingBullets = [];
+    const hitR = getHitRadius();
+    enemyBullets = enemyBullets.filter(bullet => {
+        if (bullet.isFirework) return bullet.update(pendingBullets);
+        bullet.x += bullet.vx; bullet.y += bullet.vy;
+        if (bullet.x < -50 || bullet.x > canvas.width + 50 || bullet.y < -50 || bullet.y > canvas.height + 50) return false;
+        if (player.invincible <= 0) {
+            const dist = Math.hypot(bullet.x - player.x, bullet.y - player.y);
+            if (dist < 25 && dist > hitR) { player.grazeCount++; score++; }
+            if (dist < hitR) { playerHit(); return false; }
+        }
+        return true;
+    });
+    if (pendingBullets.length) enemyBullets.push(...pendingBullets);
+    
+    particles = particles.filter(p => { p.update(); return p.particles.length > 0; });
+    
+    if (bombEffect) { bombEffect.radius += 20; bombEffect.alpha -= 0.02; if (bombEffect.alpha <= 0) bombEffect = null; }
+    
+    if (clearEnemyBulletsOnHit) {
+        enemyBullets = [];
+        lasers = [];
+        clearEnemyBulletsOnHit = false;
+    }
+    updateUI();
+}
+
+// ========== 描画 ==========
+function draw() {
+    ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (gameState !== 'playing' && gameState !== 'dying') return;
+    stars.forEach(star => {
+        ctx.globalAlpha = star.brightness; ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2); ctx.fill();
+    }); ctx.globalAlpha = 1;
+    
+    if (gamePhase === 'boss' && (bossPhase === 5 || bossPhase === 8)) {
+        const bounds = getPlayerYBounds();
+        ctx.fillStyle = 'rgba(255,0,128,0.08)';
+        ctx.fillRect(0, 0, canvas.width, bounds[0]);
+        ctx.fillRect(0, bounds[1], canvas.width, canvas.height - bounds[1]);
+        ctx.strokeStyle = 'rgba(255,0,128,0.55)';
+        ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, bounds[0]); ctx.lineTo(canvas.width, bounds[0]); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, bounds[1]); ctx.lineTo(canvas.width, bounds[1]); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+    
+    if (bombEffect) {
+        ctx.globalAlpha = bombEffect.alpha;
+        const gradient = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, bombEffect.radius);
+        gradient.addColorStop(0, 'rgba(255,255,255,0)'); gradient.addColorStop(0.3, 'rgba(255,200,0,0.3)');
+        gradient.addColorStop(0.7, 'rgba(255,100,0,0.5)'); gradient.addColorStop(1, 'rgba(255,0,0,0)');
+        ctx.fillStyle = gradient; ctx.beginPath(); ctx.arc(player.x, player.y, bombEffect.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+    
+    if (!playerDying) {
+    ctx.save(); ctx.translate(player.x, player.y);
+    // ボス接近時: 攻撃力アップオーラ
+    let closeToBoss = false;
+    if (boss && !isFakeDefeat && Math.hypot(player.x - boss.x, player.y - boss.y) < 200) closeToBoss = true;
+    if (boss2 && !isFakeDefeat && Math.hypot(player.x - boss2.x, player.y - boss2.y) < 200) closeToBoss = true;
+    if (closeToBoss) {
+        ctx.globalAlpha = 0.15 + Math.sin(frame * 0.2) * 0.1;
+        ctx.fillStyle = '#ffaa00';
+        ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (player.invincible > 0 && !isWatchMode) {
+        ctx.globalAlpha = 0.3 + Math.sin(frame * 0.3) * 0.3; ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (isWatchMode) {
+        ctx.strokeStyle = '#ff00ff'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.fillStyle = player.noShootTimer > 0 ? '#6666ff' : '#00ccff';
+    ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(-12, 15); ctx.lineTo(0, 10); ctx.lineTo(12, 15); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = player.noShootTimer > 0 ? '#4444ff' : '#ff6600';
+    ctx.beginPath(); ctx.moveTo(-5, 12); ctx.lineTo(0, 12 + Math.random() * 10); ctx.lineTo(5, 12); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    }
+    
+    ctx.globalAlpha = 0.55;
+    // 自機弾透明度: 時間耐久型スペル→鑑賞モード同等(0.1)、HP型スペル→30%(0.3)、それ以外→通常
+    let bulletAlpha;
+    if (isWatchMode) {
+        bulletAlpha = 0.1;
+    } else if (gamePhase === 'boss' && bossPhase >= 1 && bossPhase < SPELL_CONFIG.length) {
+        const spellType = SPELL_CONFIG[bossPhase].type;
+        bulletAlpha = (spellType === 'time') ? 0.1 : 0.3;
+    } else {
+        bulletAlpha = 0.4;
+    }
+    bullets.forEach(bullet => {
+        ctx.globalAlpha = bulletAlpha;
+        ctx.fillStyle = bullet.color; ctx.shadowBlur = 6; ctx.shadowColor = bullet.color;
+        ctx.fillRect(bullet.x - bullet.width / 2, bullet.y - bullet.height / 2, bullet.width, bullet.height); ctx.shadowBlur = 0;
+    });
+    homingBullets.forEach(h => {
+        ctx.globalAlpha = bulletAlpha;
+        ctx.fillStyle = h.color; ctx.shadowBlur = 8; ctx.shadowColor = h.color;
+        ctx.beginPath(); ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    });
+    ctx.globalAlpha = 1;
+    
+    enemies.forEach(enemy => {
+        ctx.save(); ctx.translate(enemy.x, enemy.y);
+        const hpRatio = enemy.hp / enemy.maxHp;
+        ctx.fillStyle = '#333'; ctx.fillRect(-enemy.width / 2, -enemy.height / 2 - 10, enemy.width, 4);
+        ctx.fillStyle = hpRatio > 0.5 ? '#00ff00' : '#ff0000'; ctx.fillRect(-enemy.width / 2, -enemy.height / 2 - 10, enemy.width * hpRatio, 4);
+        ctx.fillStyle = enemy.color; ctx.shadowBlur = 15; ctx.shadowColor = enemy.color;
+        if (enemy.bulletType === 'spread') {
+            ctx.beginPath(); for (let i = 0; i < 6; i++) { const angle = (Math.PI / 3) * i; ctx.lineTo(Math.cos(angle) * enemy.width / 2, Math.sin(angle) * enemy.height / 2); } ctx.closePath(); ctx.fill();
+        } else if (enemy.bulletType === 'aim') {
+            ctx.beginPath(); ctx.moveTo(0, enemy.height / 2); ctx.lineTo(-enemy.width / 2, -enemy.height / 2); ctx.lineTo(enemy.width / 2, -enemy.height / 2); ctx.closePath(); ctx.fill();
+        } else ctx.fillRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+        ctx.shadowBlur = 0; ctx.restore();
+    });
+    
+    if (boss) {
+        ctx.save(); ctx.translate(boss.x, boss.y);
+        const config = SPELL_CONFIG[bossPhase];
+        let bossColor = isFakeDefeat ? '#ff0000' : (bossPhase >= 5 && bossPhase <= 7 ? '#00ffff' : config.color);
+        if (boss.merged) bossColor = `hsl(${(frame * 2) % 360}, 100%, 65%)`;
+        const auraGradient = ctx.createRadialGradient(0, 0, 20, 0, 0, 90);
+        auraGradient.addColorStop(0, bossPhase >= 5 ? 'rgba(0,255,255,0.3)' : 'rgba(255,0,255,0.3)');
+        auraGradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = auraGradient; ctx.beginPath(); ctx.arc(0, 0, 90, 0, Math.PI * 2); ctx.fill();
+        if (spellTransitionTimer > 0 || boss.invincible) ctx.globalAlpha = 0.5 + Math.sin(frame * 0.2) * 0.5;
+        if (isFakeDefeat) ctx.globalAlpha = 0.3 + Math.sin(frame * 0.5) * 0.2;
+        if (spell8Merging) ctx.globalAlpha = 0.5 + Math.sin(frame * 0.4) * 0.4;
+        ctx.fillStyle = bossColor; ctx.shadowBlur = 25; ctx.shadowColor = bossColor;
+        const r1 = boss.merged ? 42 : 35, r2 = boss.merged ? 30 : 25;
+        ctx.beginPath(); for (let i = 0; i < 8; i++) { const angle = (Math.PI / 4) * i + frame * 0.02; const r = (i % 2 === 0) ? r1 : r2; ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r); } ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, boss.merged ? 14 : 10, 0, Math.PI * 2); ctx.fill();
+        if (bossPhase >= 1 && !isFakeDefeat) {
+            ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.textAlign = 'center';
+            const tag = bossPhase === 8 ? `S8-P${spell8Part}` : `S${bossPhase}`;
+            ctx.fillText(tag, 0, boss.merged ? 60 : 50);
+        }
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
+    }
+    
+    if (boss2) {
+        ctx.save(); ctx.translate(boss2.x, boss2.y);
+        const auraGradient = ctx.createRadialGradient(0, 0, 20, 0, 0, 80);
+        auraGradient.addColorStop(0, 'rgba(255,0,255,0.3)'); auraGradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = auraGradient; ctx.beginPath(); ctx.arc(0, 0, 80, 0, Math.PI * 2); ctx.fill();
+        if (boss2.invincible) ctx.globalAlpha = 0.5 + Math.sin(frame * 0.2) * 0.5;
+        if (spell8Merging) ctx.globalAlpha = 0.5 + Math.sin(frame * 0.4) * 0.4;
+        ctx.fillStyle = '#ff00ff'; ctx.shadowBlur = 25; ctx.shadowColor = '#ff00ff';
+        ctx.beginPath(); for (let i = 0; i < 6; i++) { const angle = (Math.PI / 3) * i - frame * 0.03; const r = (i % 2 === 0) ? 30 : 20; ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r); } ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
+    }
+    
+    enemyBullets.forEach(bullet => {
+        if (bullet.isFirework && !bullet.exploded) {
+            ctx.fillStyle = bullet.color; ctx.shadowBlur = 10; ctx.shadowColor = bullet.color;
+            ctx.beginPath(); ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+            ctx.strokeStyle = bullet.color; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(bullet.x, bullet.y, bullet.radius + 3, 0, Math.PI * 2); ctx.stroke();
+        } else if (bullet.isSpell10Frozen) {
+            ctx.fillStyle = '#888888';
+            ctx.beginPath(); ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#aaaaaa'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(bullet.x, bullet.y, bullet.radius + 1, 0, Math.PI * 2); ctx.stroke();
+        } else {
+            ctx.fillStyle = bullet.color; ctx.shadowBlur = 8; ctx.shadowColor = bullet.color;
+            ctx.beginPath(); ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+        }
+    });
+    
+    lasers.forEach(l => {
+        // なぎ払いレーザー描画
+        if (l.isSweeping) {
+            if (l.warnTimer > 0) {
+                // 扇形予告: 開始位置(実線) → 終了位置(点線)
+                const warnAlpha = 0.3 + Math.sin(frame * 0.5) * 0.2;
+                ctx.strokeStyle = `rgba(255,0,0,${warnAlpha})`;
+                ctx.lineWidth = 3;
+                // 開始位置（実線）
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(l.x, l.y);
+                ctx.lineTo(l.x + Math.cos(l.startAngle) * 1500, l.y + Math.sin(l.startAngle) * 1500);
+                ctx.stroke();
+                // 終了位置（点線）
+                ctx.setLineDash([4, 8]);
+                ctx.strokeStyle = `rgba(255,0,0,${warnAlpha * 0.6})`;
+                ctx.beginPath();
+                ctx.moveTo(l.x, l.y);
+                ctx.lineTo(l.x + Math.cos(l.endAngle) * 1500, l.y + Math.sin(l.endAngle) * 1500);
+                ctx.stroke();
+                // 扇形範囲（薄い塗り）
+                ctx.fillStyle = `rgba(255,0,0,${warnAlpha * 0.15})`;
+                ctx.beginPath();
+                ctx.moveTo(l.x, l.y);
+                const sweepDir = l.endAngle > l.startAngle ? 1 : -1;
+                const sweepRange = Math.abs(l.endAngle - l.startAngle);
+                const steps = Math.max(3, Math.floor(sweepRange / 0.05));
+                for (let i = 0; i <= steps; i++) {
+                    const a = l.startAngle + sweepDir * sweepRange * (i / steps);
+                    ctx.lineTo(l.x + Math.cos(a) * 1500, l.y + Math.sin(a) * 1500);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.setLineDash([]);
+            } else if (l.beamTimer > 0 || l.fadeTimer > 0) {
+                const alpha = l.beamTimer > 0 ? 1 : l.fadeTimer / 24;
+                ctx.globalAlpha = alpha;
+                ctx.shadowBlur = 25; ctx.shadowColor = '#ff0000';
+                ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 18;
+                ctx.beginPath();
+                ctx.moveTo(l.x, l.y);
+                ctx.lineTo(l.x + Math.cos(l.currentAngle) * 1500, l.y + Math.sin(l.currentAngle) * 1500);
+                ctx.stroke();
+                ctx.strokeStyle = '#ff0000'; ctx.lineWidth = 8;
+                ctx.beginPath();
+                ctx.moveTo(l.x, l.y);
+                ctx.lineTo(l.x + Math.cos(l.currentAngle) * 1500, l.y + Math.sin(l.currentAngle) * 1500);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1;
+            }
+            return;
+        }
+
+        // 通常レーザー描画
+        if (l.warnTimer > 0) {
+            ctx.strokeStyle = `rgba(255,0,0,${0.3 + Math.sin(frame * 0.5) * 0.2})`;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+            ctx.moveTo(l.x, l.y);
+            ctx.lineTo(l.x + Math.cos(l.angle) * 1500, l.y + Math.sin(l.angle) * 1500);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        } else if (l.beamTimer > 0 || l.fadeTimer > 0) {
+            const alpha = l.beamTimer > 0 ? 1 : l.fadeTimer / 24;
+            ctx.globalAlpha = alpha;
+            ctx.shadowBlur = 25; ctx.shadowColor = '#ff0000';
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 18;
+            ctx.beginPath();
+            ctx.moveTo(l.x, l.y);
+            ctx.lineTo(l.x + Math.cos(l.angle) * 1500, l.y + Math.sin(l.angle) * 1500);
+            ctx.stroke();
+            ctx.strokeStyle = '#ff0000'; ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.moveTo(l.x, l.y);
+            ctx.lineTo(l.x + Math.cos(l.angle) * 1500, l.y + Math.sin(l.angle) * 1500);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+        }
+    });
+    
+    if (isWatchMode && gameState === 'playing') {
+        ctx.strokeStyle = 'rgba(255,0,255,0.6)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(watchTouch.x, watchTouch.y, 14, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,0,255,0.25)';
+        ctx.beginPath(); ctx.arc(watchTouch.x, watchTouch.y, 14, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    particles.forEach(p => p.draw());
+}
+
+// ========== ゲームループ ==========
+function loop() { 
+    if (window._updatePhaseBtnPress) window._updatePhaseBtnPress();
+    update(); draw(); requestAnimationFrame(loop); 
+}
+
+// Fullscreen変更時にcanvasサイズを再調整
+document.addEventListener('fullscreenchange', resizeCanvas);
+document.addEventListener('webkitfullscreenchange', resizeCanvas);
+document.addEventListener('mozfullscreenchange', resizeCanvas);
+document.addEventListener('MSFullscreenChange', resizeCanvas);
+
+function updatePauseBtnVisibility() {
+    const pauseBtn = getElement('pauseBtn');
+    if (!pauseBtn) return;
+    if (gameState === 'playing' || gameState === 'dying') {
+        pauseBtn.style.display = 'flex';
+    } else {
+        pauseBtn.style.display = 'none';
+    }
+}
+
+const origUpdateUI = updateUI;
+updateUI = function() {
+    origUpdateUI();
+    updatePauseBtnVisibility();
+};
+
+// ========== ポーズ機能 ==========
+let isPaused = false;
+let pausedGameState = '';
+
+function togglePause() {
+    if (gameState !== 'playing' && gameState !== 'dying') return;
+    if (isPaused) {
+        resumeGame();
+    } else {
+        isPaused = true;
+        pausedGameState = gameState;
+        getElement('pauseMenu').style.display = 'block';
+    }
+}
+
+function resumeGame() {
+    isPaused = false;
+    getElement('pauseMenu').style.display = 'none';
+}
+
+function restartFromPause() {
+    isPaused = false;
+    getElement('pauseMenu').style.display = 'none';
+    const retryPhase = singlePhaseMode ? startFromPhase : 0;
+    const wasWatchMode = isWatchMode;
+    if (!singlePhaseMode) {
+        startFromPhase = 0; singlePhaseMode = false;
+        isWatchMode = false;
+        getElement('watchModeIndicator').style.display = 'none';
+    }
+    resetGame();
+    if (singlePhaseMode && retryPhase > 0) {
+        jumpToPhase(retryPhase);
+    }
+    gameState = 'playing';
+}
+
+function quitToTitle() {
+    isPaused = false;
+    getElement('pauseMenu').style.display = 'none';
+    getElement('pauseBtn').style.display = 'none';
+    exitFullscreen();
+    getElement('startScreen').style.display = 'block';
+    getElement('watchModeIndicator').style.display = 'none';
+    isWatchMode = false;
+    startFromPhase = 0; singlePhaseMode = false;
+    resetGame();
+    gameState = 'start';
+}
+
+// ========== 難易度選択 ==========
+function selectDifficulty(diff) {
+    currentDifficulty = diff;
+    enterFullscreen();
+    getElement('difficultyScreen').style.display = 'none';
+    getElement('watchModeIndicator').style.display = isWatchMode ? 'block' : 'none';
+    startFromPhase = 0; singlePhaseMode = false;
+    resetGame();
+    gameState = 'playing';
+}
+
+function backToTitleFromDifficulty() {
+    getElement('difficultyScreen').style.display = 'none';
+    getElement('startScreen').style.display = 'block';
+}
+
+// ========== 練習モード画面 ==========
+function openPracticeScreen() {
+    getElement('startScreen').style.display = 'none';
+    getElement('practiceScreen').style.display = 'block';
+    updatePracticeDifficultyDisplay();
+    updateGrazeDisplay();
+}
+
+function backToTitleFromPractice() {
+    getElement('practiceScreen').style.display = 'none';
+    getElement('startScreen').style.display = 'block';
+    getElement('pauseBtn').style.display = 'none';
+}
+
+// ========== 練習モードボタン長押し処理 ==========
+(function setupPracticeBtnLongPress() {
+    const PRACTICE_HOLD_FRAMES = 180;
+    const PRACTICE_SHORT_FRAMES = 60;
+    const practiceBtns = document.querySelectorAll('.practiceBtn');
+
+    practiceBtns.forEach(btn => {
+        let pressActive = false;
+        let pressFrame = 0;
+        let pressFired = false;
+        const phase = parseInt(btn.dataset.phase);
+        const pf = btn.querySelector('.pressFill');
+
+        btn._practicePress = { active: false, frame: 0, fired: false, pf: pf, phase: phase };
+
+        btn.addEventListener('mousedown', (e) => {
+            if (e && e.cancelable) e.preventDefault();
+            btn._practicePress.active = true;
+            btn._practicePress.frame = 0;
+            btn._practicePress.fired = false;
+        });
+        btn.addEventListener('touchstart', (e) => {
+            if (e && e.cancelable) e.preventDefault();
+            btn._practicePress.active = true;
+            btn._practicePress.frame = 0;
+            btn._practicePress.fired = false;
+        }, { passive: false });
+        btn.addEventListener('mouseup', (e) => {
+            const held = btn._practicePress.frame;
+            btn._practicePress.active = false;
+            if (btn._practicePress.pf) btn._practicePress.pf.style.width = '0%';
+            btn._practicePress.frame = 0;
+            if (btn._practicePress.fired) { btn._practicePress.fired = false; return; }
+            if (held < PRACTICE_SHORT_FRAMES) startPractice(phase, false);
+        });
+        btn.addEventListener('mouseleave', (e) => {
+            btn._practicePress.active = false;
+            if (btn._practicePress.pf) btn._practicePress.pf.style.width = '0%';
+            btn._practicePress.frame = 0;
+        });
+        btn.addEventListener('touchend', (e) => {
+            const held = btn._practicePress.frame;
+            btn._practicePress.active = false;
+            if (btn._practicePress.pf) btn._practicePress.pf.style.width = '0%';
+            btn._practicePress.frame = 0;
+            if (btn._practicePress.fired) { btn._practicePress.fired = false; return; }
+            if (held < PRACTICE_SHORT_FRAMES) startPractice(phase, false);
+        });
+        btn.addEventListener('touchcancel', (e) => {
+            btn._practicePress.active = false;
+            if (btn._practicePress.pf) btn._practicePress.pf.style.width = '0%';
+            btn._practicePress.frame = 0;
+        });
+    });
+
+    const origUpdatePhaseBtnPress = window._updatePhaseBtnPress || function(){};
+    window._updatePhaseBtnPress = function() {
+        origUpdatePhaseBtnPress();
+        practiceBtns.forEach(btn => {
+            const p = btn._practicePress;
+            if (!p || !p.active) return;
+            p.frame++;
+            const pct = Math.min(100, (p.frame / PRACTICE_HOLD_FRAMES) * 100);
+            if (p.pf) p.pf.style.width = pct + '%';
+            if (p.frame >= PRACTICE_HOLD_FRAMES && !p.fired) {
+                p.fired = true;
+                p.active = false;
+                if (p.pf) p.pf.style.width = '0%';
+                p.frame = 0;
+                startPractice(p.phase, true);
+            }
+        });
+    };
+})();
+
+function startPractice(phase, watchMode) {
+    // 難易度によるスペル制限チェック
+    const diffName = PRACTICE_DIFFICULTIES[practiceDifficultyIndex];
+    const maxSpell = DIFFICULTY[diffName].maxSpell;
+    if (phase > maxSpell) return;
+    enterFullscreen();
+    isWatchMode = watchMode;
+    startFromPhase = phase;
+    singlePhaseMode = true;
+    // 練習モードの難易度を適用
+    currentDifficulty = PRACTICE_DIFFICULTIES[practiceDifficultyIndex];
+    getElement('practiceScreen').style.display = 'none';
+    getElement('watchModeIndicator').style.display = watchMode ? 'block' : 'none';
+    resetGame();
+    player.grazeCount = GRAZE_LEVELS[practiceGrazeLevel].threshold;
+    player.grazeLevel = practiceGrazeLevel;
+    gameState = 'playing';
+    jumpToPhase(phase);
+}
+
+// ========== グレイズレベル選択処理 ==========
+const grazeDescriptions = [
+    '1way 通常射撃',
+    '1way 連射強化',
+    '2way 通常射撃',
+    '2way 連射強化',
+    '3way 通常射撃',
+    '3way 連射強化',
+    '4way 通常射撃',
+    '5way 通常射撃',
+    '5way + 誘導弾'
+];
+
+function updateGrazeDisplay() {
+    const valueEl = document.getElementById('grazeValue');
+    const descEl = document.getElementById('grazeDesc');
+    if (valueEl) valueEl.textContent = 'Lv' + practiceGrazeLevel;
+    if (descEl) descEl.textContent = grazeDescriptions[practiceGrazeLevel];
+}
+
+function changeGrazeLevel(delta) {
+    practiceGrazeLevel = Math.max(0, Math.min(8, practiceGrazeLevel + delta));
+    updateGrazeDisplay();
+}
+
+function toggleHitEnabled() {
+    practiceHitEnabled = !practiceHitEnabled;
+    const btn = document.getElementById('hitToggleBtn');
+    if (btn) {
+        if (practiceHitEnabled) {
+            btn.textContent = '有効';
+            btn.classList.remove('off');
+        } else {
+            btn.textContent = '無効';
+            btn.classList.add('off');
+        }
+    }
+}
+
+// ========== 練習モード難易度選択処理 ==========
+const PRACTICE_DIFFICULTIES = ['EASY', 'NORMAL', 'HARD', 'EXTRA', 'LUNATIC', 'LUNATICEXTRA'];
+const PRACTICE_DIFF_DESC = {
+    EASY:         'HP7 / BOMB10 / 弾速0.4倍 / 判定0.5倍 / スペル4まで',
+    NORMAL:       'HP5 / BOMB7 / 弾速0.5倍 / 判定0.6倍 / スペル4まで',
+    HARD:         'HP4 / BOMB5 / 弾速0.7倍 / 判定0.8倍 / スペル6まで',
+    EXTRA:        'HP3 / BOMB4 / 弾速1.0倍 / 判定1.0倍 / スペル8まで',
+    LUNATIC:      'HP3 / BOMB3 / 弾速1.0倍 / 判定1.0倍 / スペル10まで',
+    LUNATICEXTRA: 'HP3 / BOMB3 / 弾速1.0倍 / 判定1.0倍 / スペル10まで / 独自弾幕'
+};
+let practiceDifficultyIndex = 3; // デフォルト EXTRA
+
+function updatePracticeDifficultyDisplay() {
+    const diffName = PRACTICE_DIFFICULTIES[practiceDifficultyIndex];
+    const valueEl = document.getElementById('practiceDiffValue');
+    const descEl = document.getElementById('practiceDiffDesc');
+    if (valueEl) {
+        valueEl.textContent = diffName === 'LUNATICEXTRA' ? 'LUNATIC EX' : diffName;
+        valueEl.style.color = DIFFICULTY[diffName].color;
+        valueEl.style.textShadow = '0 0 8px ' + DIFFICULTY[diffName].color;
+    }
+    if (descEl) descEl.textContent = PRACTICE_DIFF_DESC[diffName];
+    updatePracticeSpellButtons();
+}
+
+function changePracticeDifficulty(delta) {
+    practiceDifficultyIndex = Math.max(0, Math.min(PRACTICE_DIFFICULTIES.length - 1, practiceDifficultyIndex + delta));
+    updatePracticeDifficultyDisplay();
+}
+
+function updatePracticeSpellButtons() {
+    const diffName = PRACTICE_DIFFICULTIES[practiceDifficultyIndex];
+    const maxSpell = DIFFICULTY[diffName].maxSpell;
+    const isLunaticEx = (diffName === 'LUNATICEXTRA');
+    const btns = document.querySelectorAll('.practiceBtn');
+
+    // スペル名の定義（難易度別）
+    const spellNames = {
+        1: '「群星の散開」',
+        2: '「静寂の波紋」',
+        3: '「忍び寄る影」',
+        4: '「混沌の奔流」',
+        5: '「彗星の乱舞」',
+        6: '「煌めく夜空」',
+        7: '「閃光の華」',
+        8: '「深淵と最果の二重奏」',
+        9: isLunaticEx ? '「終焉の狂想曲」' : '「終焉の輪舞曲」',
+        10: isLunaticEx ? '「世界最後の審判」' : '「世界最後の魔法」'
+    };
+
+    btns.forEach(btn => {
+        const phase = parseInt(btn.dataset.phase);
+        if (phase > maxSpell) {
+            btn.classList.add('disabled');
+            btn.disabled = true;
+            btn.textContent = `${phase}. ---`;
+            // pressFill spanを復元
+            const fill = document.createElement('span');
+            fill.className = 'pressFill';
+            btn.appendChild(fill);
+        } else {
+            btn.classList.remove('disabled');
+            btn.disabled = false;
+            const name = spellNames[phase] || '???';
+            btn.innerHTML = `${phase}${name}<span class="pressFill"></span>`;
+        }
+    });
+}
+
+// ========== フルスクリーン制御 ==========
+function enterFullscreen() {
+    try {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+            elem.mozRequestFullScreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        }
+        // Fullscreen後にcanvasサイズを再調整
+        setTimeout(resizeCanvas, 100);
+    } catch (e) {}
+}
+
+function exitFullscreen() {
+    try {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+    } catch (e) {}
+}
+
+// ========== 開始/再起動 ==========
+
+
+function startGame() {
+    // 難易度選択画面を表示（通常モード）
+    isWatchMode = false;
+    getElement('startScreen').style.display = 'none';
+    getElement('difficultyScreen').style.display = 'block';
+}
+
+function startWatchMode() {
+    // 難易度選択画面を表示（鑑賞モード）
+    isWatchMode = true;
+    getElement('startScreen').style.display = 'none';
+    getElement('difficultyScreen').style.display = 'block';
+}
+
+function jumpToPhase(n) {
+    enemies = []; enemyBullets = []; lasers = [];
+    enemiesDefeated = ENEMIES_TO_BOSS;
+    gamePhase = 'boss';
+    isFakeDefeat = false; bossInterlude = false;
+    bossPhase = n; spellDamage = 0; spellTimer = 0; spellAccTime = 0; hitDuringSpell = false;
+    spell10SetCount = 1;
+    spell10SubPhase = 0;
+    spell10SubTimer = 0;
+    spell10FrozenBullets = [];
+    SPELL_CONFIG = getSpellConfig();
+    const cx = canvas.width / 2;
+    if (n === 8) {
+        spell8Part = 1; spell8Merging = false; spell8MergeTimer = 0;
+        boss = { x: cx + 80, y: 120, width: 50, height: 50,
+            hp: 99999, maxHp: 99999, speed: 1, moveTimer: 0,
+            targetX: cx + 80, baseY: 120, name: '最果の魔法使い', invincible: false };
+        boss2 = { x: cx - 80, y: 120, width: 50, height: 50,
+            hp: 99999, maxHp: 99999, speed: 1, moveTimer: 0,
+            targetX: cx - 80, baseY: 120, name: '深淵の魔法使い', invincible: false };
+        getElement('bossName').textContent = '深淵 & 最果';
+    } else if (n === 9) {
+        boss = { x: cx, y: 120, width: 64, height: 64,
+            hp: SPELL_CONFIG[9].hp, maxHp: SPELL_CONFIG[9].hp,
+            speed: 1, moveTimer: 0, targetX: cx, baseY: 120,
+            name: '深淵 & 最果 — 究極形態', invincible: false, merged: true };
+        boss2 = null;
+        getElement('bossName').textContent = boss.name;
+    } else if (n === 10) {
+        boss = { x: cx, y: 120, width: 64, height: 64,
+            hp: SPELL_CONFIG[10].hp, maxHp: SPELL_CONFIG[10].hp,
+            speed: 1, moveTimer: 0, targetX: cx, baseY: 120,
+            name: '深淵 & 最果 — 終焉の調べ', invincible: false, merged: true };
+        boss2 = null;
+        getElement('bossName').textContent = boss.name;
+    } else {
+        const cfg = SPELL_CONFIG[n];
+        boss = { x: cx, y: 120, width: 50, height: 50,
+            hp: cfg.hp, maxHp: cfg.hp, speed: 1, moveTimer: 0,
+            targetX: cx, baseY: 120,
+            name: n >= 5 ? '最果の魔法使い' : '深淵の魔法使い', invincible: false };
+        boss2 = null;
+        getElement('bossName').textContent = boss.name;
+    }
+    updateBossUIColor(SPELL_CONFIG[n].color);
+    getElement('bossUI').style.display = 'block';
+    showSpellName(n);
+    beginSpellTracking(n);
+    updateUI();
+}
+
+function restartGame() {
+    getElement('gameOver').style.display = 'none';
+    resetGame();
+    gameState = 'playing';
+}
+
+function resetGame() {
+    traceLog('resetGame() called');
+    resizeCanvas();
+    const d = getDiff();
+    score = 0; frame = 0; gamePhase = 'stage';
+    player.x = canvas.width / 2; player.y = canvas.height - 100;
+    if (singlePhaseMode) {
+        player.life = 99; player.maxLife = 99;
+        player.bomb = 99; player.maxBomb = 99;
+        player.grazeCount = GRAZE_LEVELS[practiceGrazeLevel].threshold;
+        player.grazeLevel = practiceGrazeLevel;
+    } else {
+        player.life = d.hp; player.maxLife = d.hp;
+        player.bomb = d.bomb; player.maxBomb = d.bomb;
+        player.grazeCount = GRAZE_LEVELS[d.graze].threshold;
+        player.grazeLevel = d.graze;
+    }
+    player.invincible = 0; player.noShootTimer = 0;
+    bullets = []; homingBullets = []; enemies = []; enemyBullets = []; particles = []; lasers = [];
+    boss = null; boss2 = null; bossPhase = 0;
+    spellDamage = 0; spellTimer = 0; spellTransitionTimer = 0;
+    fakeDefeatTimer = 0; isFakeDefeat = false; spellNameDisplaying = false;
+    enemiesDefeated = 0; bombCooldown = 0;
+    saiHateLaserTimer = 0;
+    spell9LaserTimer = 0; spell9LaserBlurTimer = 0; spell9SpiralTimer = 0;
+    spell10SetCount = 1;
+    spell10SubPhase = 0;
+    spell10SubTimer = 0;
+    spell10FrozenBullets = [];
+    spell8Part = 1; spell8Merging = false; spell8MergeTimer = 0;
+    bossInterlude = false; hitDuringSpell = false;
+    oobLaserQueue = 0; oobLaserTimer = 0; oobInsidePrev = true;
+    watchTouch.x = canvas.width / 2; watchTouch.y = canvas.height - 140;
+    spellStats = {}; spellStartScore = 0; spellHitCount = 0;
+    currentTrackedSpell = 0; spellAccTime = 0; totalActiveFrames = 0;
+    spell8Parts = []; spell8PartStart = { score: 0, hits: 0, bombs: 0 };
+    playerDying = false; playerDeathTimer = 0;
+    clearEnemyBulletsOnHit = false;
+    bombEffect = null;
+    SPELL_CONFIG = getSpellConfig();
+    getElement('bossUI').style.display = 'none';
+    getElement('resultScreen').style.display = 'none';
+    updateUI();
+}
+
+// ========== STARTボタン / 鑑賞モードボタン ==========
+// onclick属性で直接関数を呼び出す
+
+resetGame();
+loop();
+</script>
+</body>
+</html>

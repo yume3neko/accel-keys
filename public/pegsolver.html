@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ペグソリティア探索ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            max-width: 350px;
+            margin: 0 auto;
+        }
+        .cell {
+            aspect-ratio: 1;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .cell-invalid { background-color: transparent; cursor: default; }
+        .cell-peg { 
+            background-color: #4f46e5; 
+            border: 2px solid #3730a3; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), inset 0 2px 4px rgba(255, 255, 255, 0.2); 
+        }
+        .cell-empty { 
+            background-color: #f1f5f9; 
+            border: 2px dashed #cbd5e1; 
+        }
+        /* ハイライト色 */
+        .cell-highlight { background-color: #10b981 !important; border-color: #059669 !important; transform: scale(1.1); z-index: 10; }
+        .cell-source { background-color: #f59e0b !important; border-color: #d97706 !important; opacity: 0.6; }
+
+        /* スクロールバーのカスタマイズ */
+        #history::-webkit-scrollbar { width: 6px; }
+        #history::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-2 md:p-8 font-sans">
+    <div class="max-w-md mx-auto bg-white rounded-3xl shadow-2xl p-6 overflow-hidden">
+        <header class="text-center mb-6">
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight">PEG SOLITAIRE</h1>
+            <p class="text-xs text-slate-500 font-medium uppercase tracking-widest mt-1">Solver Tool</p>
+        </header>
+
+        <!-- 1. Board Section -->
+        <div id="board" class="board-grid mb-6"></div>
+
+        <!-- 2. Playback Controls (Immediately under board) -->
+        <div id="resultContainer" class="hidden opacity-0 transition-opacity duration-300 mb-6">
+            <div class="bg-indigo-50 rounded-2xl p-4 border border-indigo-100">
+                <div class="flex items-center justify-between mb-3 px-1">
+                    <span class="text-xs font-bold text-indigo-400 uppercase tracking-tighter">解決手順: <span id="currentStepText">0</span> / <span id="stepCount">0</span></span>
+                    <span id="animateStatus" class="text-[10px] bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full font-bold hidden">再生中</span>
+                </div>
+                
+                <div class="flex items-center justify-center gap-2 mb-4">
+                    <button id="prevBtn" class="flex-1 bg-white text-indigo-600 border-2 border-indigo-100 hover:border-indigo-600 h-12 rounded-xl flex items-center justify-center transition active:scale-95 shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <button id="animateBtn" class="w-16 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center transition active:scale-95 shadow-lg shadow-indigo-200">
+                        <svg id="playIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <svg id="pauseIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </button>
+                    <button id="nextBtn" class="flex-1 bg-white text-indigo-600 border-2 border-indigo-100 hover:border-indigo-600 h-12 rounded-xl flex items-center justify-center transition active:scale-95 shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                </div>
+
+                <div id="history" class="text-[10px] text-indigo-800 bg-white/50 p-3 rounded-lg max-h-24 overflow-y-auto font-mono border border-indigo-100/50"></div>
+            </div>
+        </div>
+
+        <!-- 3. Main Action Buttons -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <button id="solveBtn" class="col-span-2 bg-slate-800 hover:bg-black text-white py-4 rounded-2xl font-black text-lg shadow-xl transition active:scale-95 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                探索開始
+            </button>
+            <button id="standardBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold text-sm transition">標準配置</button>
+            <button id="resetBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold text-sm transition">リセット</button>
+        </div>
+
+        <!-- Status Footer -->
+        <div id="status" class="text-center text-[11px] text-slate-400 font-bold uppercase h-4 tracking-widest"></div>
+    </div>
+
+    <script>
+        const INITIAL_SHAPE = [
+            [0,0,1,1,1,0,0],
+            [0,0,1,1,1,0,0],
+            [1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1],
+            [0,0,1,1,1,0,0],
+            [0,0,1,1,1,0,0]
+        ];
+
+        let board = JSON.parse(JSON.stringify(INITIAL_SHAPE));
+        let solution = [];
+        let currentStep = -1;
+        let isSolving = false;
+        let animationInterval = null;
+
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        const historyEl = document.getElementById('history');
+        const resultContainer = document.getElementById('resultContainer');
+        const currentStepText = document.getElementById('currentStepText');
+
+        function initBoard() {
+            boardEl.innerHTML = '';
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    if (board[r][c] === 0) {
+                        cell.classList.add('cell-invalid');
+                    } else {
+                        cell.classList.add(board[r][c] === 2 ? 'cell-peg' : 'cell-empty');
+                        cell.onclick = () => toggleCell(r, c);
+                    }
+                    cell.id = `cell-${r}-${c}`;
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function toggleCell(r, c) {
+            if (isSolving) return;
+            stopAnimation();
+            board[r][c] = board[r][c] === 2 ? 1 : 2;
+            updateDisplay();
+            hideResult();
+        }
+
+        function updateDisplay(highlightMove = null) {
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    if (!cell || board[r][c] === 0) continue;
+                    cell.className = 'cell ' + (board[r][c] === 2 ? 'cell-peg' : 'cell-empty');
+                    
+                    if (highlightMove) {
+                        const {fromR, fromC, toR, toC, midR, midC} = highlightMove;
+                        if (r === fromR && c === fromC) cell.classList.add('cell-source');
+                        if (r === toR && c === toC) cell.classList.add('cell-highlight');
+                    }
+                }
+            }
+            currentStepText.innerText = currentStep + 1;
+        }
+
+        function hideResult() {
+            resultContainer.classList.add('hidden', 'opacity-0');
+            solution = [];
+            currentStep = -1;
+        }
+
+        async function solve() {
+            if (isSolving) return;
+            stopAnimation();
+            const startPegs = [];
+            for(let r=0; r<7; r++) {
+                for(let c=0; c<7; c++) {
+                    if(board[r][c] === 2) startPegs.push({r, c});
+                }
+            }
+
+            if (startPegs.length <= 1) {
+                statusEl.innerText = "ペグを2つ以上配置してください";
+                return;
+            }
+
+            statusEl.innerText = "探索中...";
+            isSolving = true;
+            document.getElementById('solveBtn').classList.add('opacity-50');
+            
+            // Give UI time to update
+            await new Promise(r => setTimeout(r, 50));
+
+            const startTime = performance.now();
+            const result = findSolution(board, startPegs.length);
+            const endTime = performance.now();
+
+            if (result) {
+                solution = result;
+                currentStep = -1;
+                resultContainer.classList.remove('hidden');
+                setTimeout(() => resultContainer.classList.remove('opacity-0'), 10);
+                document.getElementById('stepCount').innerText = solution.length;
+                historyEl.innerHTML = solution.map((m, i) => 
+                    `<span>[${i+1}] (${m.fromC},${m.fromR}) → (${m.toC},${m.toR})</span>`
+                ).join('<br>');
+                statusEl.innerText = `完了: ${((endTime - startTime)/1000).toFixed(2)}s`;
+            } else {
+                statusEl.innerText = "解が見つかりませんでした";
+                hideResult();
+            }
+            
+            isSolving = false;
+            document.getElementById('solveBtn').classList.remove('opacity-50');
+        }
+
+        function findSolution(currentBoard, pegCount) {
+            if (pegCount === 1) return [];
+
+            const moves = getAllValidMoves(currentBoard);
+            for (const move of moves) {
+                const nextBoard = currentBoard.map(row => [...row]);
+                nextBoard[move.fromR][move.fromC] = 1;
+                nextBoard[move.midR][move.midC] = 1;
+                nextBoard[move.toR][move.toC] = 2;
+
+                const res = findSolution(nextBoard, pegCount - 1);
+                if (res) return [move, ...res];
+            }
+            return null;
+        }
+
+        function getAllValidMoves(b) {
+            const moves = [];
+            const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (b[r][c] === 2) {
+                        for (const [dr, dc] of dirs) {
+                            const midR = r + dr, midC = c + dc;
+                            const toR = r + dr * 2, toC = c + dc * 2;
+                            if (toR >= 0 && toR < 7 && toC >= 0 && toC < 7 &&
+                                b[toR][toC] === 1 && b[midR][midC] === 2) {
+                                moves.push({fromR: r, fromC: c, midR, midC, toR, toC});
+                            }
+                        }
+                    }
+                }
+            }
+            // Shuffle or sort moves could be added here for heuristic
+            return moves;
+        }
+
+        function stopAnimation() {
+            if (animationInterval) {
+                clearInterval(animationInterval);
+                animationInterval = null;
+                document.getElementById('playIcon').classList.remove('hidden');
+                document.getElementById('pauseIcon').classList.add('hidden');
+                document.getElementById('animateStatus').classList.add('hidden');
+            }
+        }
+
+        function stepForward() {
+            if (currentStep < solution.length - 1) {
+                currentStep++;
+                const move = solution[currentStep];
+                board[move.fromR][move.fromC] = 1;
+                board[move.midR][move.midC] = 1;
+                board[move.toR][move.toC] = 2;
+                updateDisplay(move);
+                return true;
+            }
+            return false;
+        }
+
+        function stepBackward() {
+            if (currentStep >= 0) {
+                const move = solution[currentStep];
+                board[move.fromR][move.fromC] = 2;
+                board[move.midR][move.midC] = 2;
+                board[move.toR][move.toC] = 1;
+                currentStep--;
+                updateDisplay(currentStep >= 0 ? solution[currentStep] : null);
+                return true;
+            }
+            return false;
+        }
+
+        // --- Controls ---
+        document.getElementById('solveBtn').onclick = solve;
+        document.getElementById('nextBtn').onclick = () => { stopAnimation(); stepForward(); };
+        document.getElementById('prevBtn').onclick = () => { stopAnimation(); stepBackward(); };
+
+        document.getElementById('resetBtn').onclick = () => {
+            stopAnimation();
+            board = JSON.parse(JSON.stringify(INITIAL_SHAPE));
+            hideResult();
+            statusEl.innerText = "リセットしました";
+            updateDisplay();
+        };
+
+        document.getElementById('standardBtn').onclick = () => {
+            stopAnimation();
+            board = JSON.parse(JSON.stringify(INITIAL_SHAPE));
+            for(let r=0; r<7; r++) {
+                for(let c=0; c<7; c++) {
+                    if(board[r][c] === 1) board[r][c] = 2;
+                }
+            }
+            board[3][3] = 1;
+            hideResult();
+            statusEl.innerText = "標準配置にセットしました";
+            updateDisplay();
+        };
+
+        document.getElementById('animateBtn').onclick = () => {
+            if (animationInterval) {
+                stopAnimation();
+                return;
+            }
+
+            if (currentStep === solution.length - 1) {
+                while(stepBackward());
+            }
+
+            document.getElementById('playIcon').classList.add('hidden');
+            document.getElementById('pauseIcon').classList.remove('hidden');
+            document.getElementById('animateStatus').classList.remove('hidden');
+
+            animationInterval = setInterval(() => {
+                if (!stepForward()) stopAnimation();
+            }, 600);
+        };
+
+        initBoard();
+    </script>
+</body>
+</html>

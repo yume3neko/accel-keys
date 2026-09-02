@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>連続計算ゲーム</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the progress bar and general layout */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevent scroll bars */
+        }
+        .game-container {
+            background-color: #ffffff; /* White background for the game area */
+            border-radius: 1.5rem; /* More rounded corners */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); /* Stronger shadow */
+            padding: 2.5rem; /* Increased padding */
+            text-align: center;
+            width: 90%; /* Responsive width */
+            max-width: 500px; /* Max width for desktop */
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem; /* Space between elements */
+        }
+        .progress-bar-container {
+            width: 100%;
+            background-color: #e2e8f0; /* Light gray for empty bar */
+            border-radius: 0.75rem; /* Rounded corners for progress bar */
+            height: 1.5rem; /* Height of the progress bar */
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #3b82f6; /* Blue for filled bar */
+            width: 100%; /* Initial width */
+            border-radius: 0.75rem;
+            transition: width 0.1s linear; /* Smooth transition for timer */
+        }
+        .input-field {
+            -webkit-appearance: none; /* Remove default iOS styling */
+            margin: 0; /* Remove margin for number input */
+            -moz-appearance: textfield; /* Remove default Firefox styling */
+        }
+        .input-field::-webkit-outer-spin-button,
+        .input-field::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .clickable-text {
+            cursor: pointer;
+            user-select: none; /* Prevent text selection */
+            transition: color 0.2s;
+        }
+        .clickable-text:hover {
+            color: #1d4ed8; /* Darker blue on hover */
+        }
+        /* 81問モード中は桁数クリックを無効化 */
+        .mode-locked {
+            cursor: default !important;
+            opacity: 0.6;
+        }
+        .start-button {
+            transition: transform 0.1s;
+        }
+        .start-button:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- モード選択・スコア表示エリア -->
+        <div id="stats-container">
+            <!-- モード切り替えとハイスコア表示 -->
+            <div class="flex justify-around text-xl font-semibold text-gray-700 mb-4">
+                <!-- 桁数モードと計算モードを統合した表示。クリックで切り替え -->
+                <div id="digit-mode-text" class="clickable-text flex flex-col items-center">
+                    <span class="text-sm text-gray-500">桁数モード</span>
+                    <span id="digit-mode" class="text-blue-600 text-2xl">1桁</span>
+                </div>
+                
+                <div id="calc-mode-text" class="clickable-text flex flex-col items-center">
+                    <span class="text-sm text-gray-500">計算モード</span>
+                    <span id="operation-mode" class="text-blue-600 text-2xl">+</span>
+                </div>
+            </div>
+
+            <!-- スコアとハイスコア -->
+            <div class="flex justify-around text-2xl font-bold text-gray-700">
+                <div>スコア: <span id="desktop-score" class="text-blue-600">0</span></div>
+                <div>ハイスコア: <span id="desktop-high-score" class="text-purple-600">0</span></div>
+            </div>
+
+            <!-- タイマー/残り個数とコンボ -->
+            <div class="flex items-center justify-between text-xl font-semibold text-gray-700 mt-4">
+                <div class="flex flex-col items-start">
+                    <span id="mode-text" class="clickable-text text-sm text-gray-500">残り時間:</span>
+                    <span id="timer-text" class="text-blue-600 clickable-text text-2xl">30.0s</span>
+                </div>
+                <div class="flex flex-col items-end">
+                    <span class="text-sm text-gray-500">コンボ</span>
+                    <span id="combo-display" class="text-green-600 text-2xl">0</span>
+                </div>
+            </div>
+
+            <!-- プログレスバー（制限時間モードのみ） -->
+            <div class="progress-bar-container mt-4">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+        </div>
+
+        <!-- ゲームオーバーメッセージ（表示位置は固定） -->
+        <div id="game-over-message" class="text-3xl font-bold text-red-600 mt-4 hidden">
+            ゲームオーバー！<br>最終スコア: <span id="final-score">0</span>
+            <div id="high-score-update-message" class="text-xl text-purple-700 mt-2 hidden">ハイスコア更新！🎉</div>
+        </div>
+        
+        <!-- 中断メッセージ -->
+        <div id="abort-message" class="text-3xl font-bold text-gray-500 mt-4 hidden">
+            ゲームを中断しました
+        </div>
+
+        <!-- ペナルティメッセージ（表示位置は固定） -->
+        <div id="penalty-message" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative hidden mt-4">
+            <strong class="font-bold">ミス！</strong>
+            <span class="block sm:inline">1秒間入力ロックされます。</span>
+        </div>
+
+
+        <!-- ゲーム開始ボタン (待機中に表示) -->
+        <button id="start-button" class="start-button w-full py-4 text-3xl font-bold text-white bg-green-500 rounded-xl hover:bg-green-600 transition duration-150 ease-in-out">
+            ゲームスタート
+        </button>
+
+
+        <!-- 計算式表示エリア -->
+        <div id="current-calculation-display" class="text-5xl md:text-6xl font-extrabold text-gray-800 my-8 min-h-[4rem] hidden">
+            <span id="operand1"></span> <span id="operator"></span> <span id="operand2"></span>
+        </div>
+
+        <!-- ユーザー入力欄 -->
+        <input
+            type="number"
+            id="user-input"
+            class="input-field w-full p-4 text-center text-4xl border-4 border-blue-300 rounded-xl focus:outline-none focus:border-blue-500 transition duration-200 ease-in-out placeholder:text-2xl hidden"
+            placeholder="答えを入力"
+            inputmode="numeric"
+            pattern="[0-9]*"
+        />
+    </div>
+
+    <script>
+        // ゲームの状態を管理する変数
+        let score = 0;
+        let highScore = 0;
+        let correctStreak = 0;
+        let basePoints = 1;
+        let correctResult = 0; // 正しい計算結果
+        let timeLeft = 30;
+        
+        let gameMode = 'timeLimit'; // 'timeLimit', 'timeAttack', '81challenge'
+        let timeLimitMode = 30; // 30s or 60s
+        const timeLimitModes = [30, 60];
+        let timeAttackMode = 10; // 10, 30, 60, 100問
+        const timeAttackModes = [10, 30, 60, 100];
+        let remainingCount; // タイムアタック/81問モード用の残り個数
+        let currentProblemList = []; // 81問モード用の問題リスト
+        
+        let digitMode = 1; // 1 or 2 (桁数) - 81問モードでは常に1
+        const digitModes = [1, 2];
+        
+        // 処理内部では '*' を使用し、表示時には '×' に変換する
+        let operationMode = '+'; // '+', '-', '*' (計算の種類)
+        const operationModes = ['+', '-', '*'];
+
+        let gameInterval;
+        let countdownInterval;
+        let penaltyTimeout;
+        let isInputLocked = false;
+        let gameState = 'waiting'; // 'waiting', 'countdown', 'playing', 'gameOver'
+
+        // DOM要素の取得
+        const scoreDisplay = document.getElementById('desktop-score');
+        const highScoreDisplay = document.getElementById('desktop-high-score');
+        const timerText = document.getElementById('timer-text');
+        const modeText = document.getElementById('mode-text');
+        const progressBarContainer = document.querySelector('.progress-bar-container');
+        const progressBar = document.getElementById('progress-bar');
+        const comboDisplay = document.getElementById('combo-display');
+        
+        const digitModeDisplay = document.getElementById('digit-mode');
+        const operationModeDisplay = document.getElementById('operation-mode');
+        const digitModeClickable = document.getElementById('digit-mode-text');
+        const operationModeClickable = document.getElementById('calc-mode-text');
+
+        const calculationDisplay = document.getElementById('current-calculation-display');
+        const operand1Display = document.getElementById('operand1');
+        const operatorDisplay = document.getElementById('operator');
+        const operand2Display = document.getElementById('operand2');
+        
+        const userInput = document.getElementById('user-input');
+        const gameOverMessage = document.getElementById('game-over-message');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const penaltyMessage = document.getElementById('penalty-message');
+        const highScoreUpdateMessage = document.getElementById('high-score-update-message');
+        const abortMessage = document.getElementById('abort-message');
+        const startButton = document.getElementById('start-button'); // スタートボタン
+
+        // 表示用の演算子を返す関数
+        function getDisplayOperator(op) {
+            return op === '*' ? '&times;' : op;
+        }
+
+        // 配列をシャッフルする関数 (フィッシャー・イェーツ法)
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // 81問連続モード用の問題を生成する関数
+        function generate81ChallengeProblems(op) {
+            let problems = [];
+            for (let x = 1; x <= 9; x++) {
+                for (let y = 1; y <= 9; y++) {
+                    let result;
+                    switch (op) {
+                        case '+':
+                            result = x + y;
+                            break;
+                        case '-':
+                            result = x - y;
+                            break;
+                        case '*':
+                            result = x * y;
+                            break;
+                    }
+                    problems.push({ num1: x, num2: y, result: result });
+                }
+            }
+            shuffleArray(problems);
+            return problems;
+        }
+
+        // ハイスコアのキーを生成する関数 (モードの組み合わせごとに保存)
+        function getHighScoreKey() {
+            if (gameMode === 'timeLimit') {
+                return `highScore_${digitMode}D_${operationMode}_${timeLimitMode}s`;
+            } else if (gameMode === 'timeAttack') {
+                return `highScore_${digitMode}D_${operationMode}_${timeAttackMode}count`;
+            } else { // 81challenge
+                return `highScore_81C_${operationMode}`;
+            }
+        }
+        
+        // ゲーム初期化
+        function initializeGame() {
+            score = 0;
+            correctStreak = 0;
+            basePoints = 1;
+            correctResult = 0;
+            isInputLocked = false;
+            gameState = 'waiting';
+
+            // 81問モードの場合は桁数を1に固定
+            if (gameMode === '81challenge') {
+                digitMode = 1;
+                remainingCount = 81;
+                currentProblemList = generate81ChallengeProblems(operationMode);
+            } else {
+                // 通常モードはモードに応じた初期値
+                timeLeft = (gameMode === 'timeLimit') ? timeLimitMode : 0;
+                remainingCount = (gameMode === 'timeAttack') ? timeAttackMode : 0;
+                // 桁数モードは最後に設定されていたものを使用
+            }
+
+
+            // ハイスコアの読み込み
+            const key = getHighScoreKey();
+            if (gameMode === 'timeLimit') {
+                highScore = parseInt(localStorage.getItem(key) || '0', 10);
+            } else {
+                // タイムアタック/81問モードは「クリアタイム」なので、小さいほど良い
+                highScore = parseFloat(localStorage.getItem(key) || '99999', 10);
+            }
+            
+            updateDisplays();
+
+            userInput.value = '';
+            userInput.disabled = true; // 待機中は入力不可
+            updatePlaceholder();
+            
+            // UIの表示/非表示を切り替え
+            startButton.style.display = 'block';
+            userInput.classList.add('hidden');
+            calculationDisplay.classList.add('hidden');
+
+            gameOverMessage.style.display = 'none';
+            penaltyMessage.style.display = 'none';
+            highScoreUpdateMessage.style.display = 'none';
+            abortMessage.style.display = 'none';
+
+            // 計算式を空にする
+            operand1Display.textContent = '';
+            operatorDisplay.innerHTML = '';
+            operand2Display.textContent = '';
+
+            // 桁数モードのクリック可否と表示を更新
+            if (gameMode === '81challenge') {
+                digitModeClickable.classList.add('mode-locked');
+            } else {
+                digitModeClickable.classList.remove('mode-locked');
+            }
+
+            // プログレスバーの表示・非表示を切り替え
+            if (gameMode === 'timeLimit') {
+                progressBarContainer.style.display = 'block';
+            } else {
+                progressBarContainer.style.display = 'none';
+            }
+
+            clearInterval(gameInterval);
+            clearInterval(countdownInterval);
+            clearTimeout(penaltyTimeout);
+        }
+        
+        // プレースホルダーのテキストを更新する関数
+        function updatePlaceholder() {
+            if (gameState === 'playing') {
+                const modeText = (digitMode === 1 && operationMode === '-' && gameMode === '81challenge') 
+                    ? '答えを入力 (負の数に注意) / 中断: 99'
+                    : '答えを入力 / 中断: 99';
+                userInput.placeholder = modeText;
+            } else if (gameState === 'waiting') {
+                // スタートボタンが表示されているため、placeholderは不要
+                userInput.placeholder = '';
+            } else {
+                userInput.placeholder = '';
+            }
+        }
+
+        // 全ての表示を更新するヘルパー関数
+        function updateDisplays() {
+            // モード表示
+            digitModeDisplay.textContent = `${digitMode}桁`;
+            // 掛け算の表示を '×' に変更
+            operationModeDisplay.innerHTML = getDisplayOperator(operationMode);
+            
+            if (gameMode === 'timeLimit') {
+                modeText.textContent = '残り時間:';
+                timerText.textContent = `${timeLeft.toFixed(1)}s`;
+                highScoreDisplay.textContent = highScore;
+                scoreDisplay.textContent = score; // timeLimitはスコアを表示
+            } else if (gameMode === 'timeAttack') {
+                modeText.textContent = '残り個数:';
+                timerText.textContent = `${remainingCount}問`;
+                // タイムアタックのハイスコアはクリアタイム
+                highScoreDisplay.textContent = (highScore === 99999) ? '---' : `${highScore.toFixed(2)}s`;
+                scoreDisplay.textContent = score; // timeAttackはスコア（正解数）を表示
+            } else { // 81challenge
+                modeText.textContent = '81問連続:';
+                timerText.textContent = `${remainingCount}問`; // 残り問題数を表示
+                // 81問連続のハイスコアはクリアタイム
+                highScoreDisplay.textContent = (highScore === 99999) ? '---' : `${highScore.toFixed(2)}s`;
+                scoreDisplay.textContent = 81 - remainingCount; // 解いた問題数を表示
+            }
+            
+            comboDisplay.textContent = correctStreak;
+
+            if (gameMode === 'timeLimit') {
+                const progress = (timeLeft / timeLimitMode) * 100;
+                progressBar.style.width = `${progress}%`;
+                const progressBarColor = progress < 25 ? '#ef4444' : progress < 50 ? '#f97316' : '#3b82f6';
+                progressBar.style.backgroundColor = progressBarColor;
+            }
+        }
+
+        // 計算問題を生成する関数
+        function generateCalculation() {
+            if (gameMode === '81challenge') {
+                // 81問モード: リストから次の問題を取り出す
+                if (currentProblemList.length === 0) return; 
+
+                const problem = currentProblemList.shift();
+                operand1Display.textContent = problem.num1;
+                operatorDisplay.innerHTML = getDisplayOperator(operationMode);
+                operand2Display.textContent = problem.num2;
+                correctResult = problem.result;
+
+            } else {
+                // 通常モード: ランダムに問題を生成
+                let num1, num2;
+                const min = digitMode === 1 ? 1 : 10;
+                const max = digitMode === 1 ? 9 : 99;
+
+                // ランダムにオペランドを生成
+                num1 = Math.floor(Math.random() * (max - min + 1)) + min;
+                num2 = Math.floor(Math.random() * (max - min + 1)) + min;
+                
+                // 引き算と掛け算は、結果が大きくなりすぎないように調整
+                if (operationMode === '-') {
+                    // 1桁モードでは結果が負にならないようにする（1-9モード以外）
+                    if (digitMode === 1) {
+                         // 81問モード以外の1桁引き算は、結果が負にならないように、必ず num1 > num2
+                        if (num1 < num2) {
+                            [num1, num2] = [num2, num1]; // スワップ
+                        }
+                    } else {
+                        // 2桁モードでは負の数を許容する
+                        // 特に制約は設けない
+                    }
+
+                } else if (operationMode === '*') {
+                    // 2桁モードの場合、num2を1〜9にする
+                    if (digitMode === 2) {
+                        num2 = Math.floor(Math.random() * 9) + 1;
+                    }
+                }
+                
+                let result;
+                switch (operationMode) {
+                    case '+':
+                        result = num1 + num2;
+                        break;
+                    case '-':
+                        result = num1 - num2;
+                        break;
+                    case '*':
+                        result = num1 * num2;
+                        break;
+                    default:
+                        result = 0;
+                }
+
+                operand1Display.textContent = num1;
+                operatorDisplay.innerHTML = getDisplayOperator(operationMode);
+                operand2Display.textContent = num2;
+                correctResult = result;
+            }
+        }
+
+        // カウントダウンを開始する関数
+        function startCountdown() {
+            gameState = 'countdown';
+            gameOverMessage.style.display = 'none';
+            penaltyMessage.style.display = 'none';
+            abortMessage.style.display = 'none';
+
+            startButton.style.display = 'none'; // スタートボタンを非表示
+            calculationDisplay.classList.remove('hidden'); // 計算式エリアを表示
+
+            userInput.disabled = true;
+            userInput.placeholder = '';
+
+            let count = 3;
+            operand1Display.textContent = '';
+            operatorDisplay.innerHTML = '';
+            operand2Display.textContent = count; // カウントダウンは中央に大きく表示
+
+            countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    operand2Display.textContent = count;
+                } else {
+                    clearInterval(countdownInterval);
+                    operand2Display.textContent = 'スタート！';
+                    setTimeout(() => {
+                        startGame();
+                    }, 500);
+                }
+            }, 1000);
+        }
+
+        // ゲームを開始する関数
+        function startGame() {
+            gameState = 'playing';
+            generateCalculation();
+            userInput.value = '';
+            userInput.disabled = false;
+            userInput.classList.remove('hidden'); // 入力フィールドを表示
+            userInput.focus();
+            updatePlaceholder();
+
+            if (gameMode === 'timeLimit') {
+                gameInterval = setInterval(() => {
+                    timeLeft -= 0.1;
+                    if (timeLeft <= 0) {
+                        timeLeft = 0;
+                        endGame(false); // 通常終了
+                    }
+                    updateDisplays();
+                }, 100);
+            } else { // timeAttack, 81challenge
+                timeLeft = 0; // タイムアタック/81問モードでは時間を計測
+                gameInterval = setInterval(() => {
+                    timeLeft += 0.01;
+                    updateDisplays();
+                }, 10);
+            }
+        }
+
+        // ゲームを終了する関数
+        function endGame(aborted) {
+            gameState = 'gameOver';
+            clearInterval(gameInterval);
+            clearInterval(countdownInterval);
+            clearTimeout(penaltyTimeout);
+            
+            userInput.disabled = true;
+            userInput.classList.add('hidden'); // 入力フィールドを非表示
+            calculationDisplay.classList.add('hidden'); // 計算式エリアを非表示
+            
+            penaltyMessage.style.display = 'none';
+
+            operand1Display.textContent = '';
+            operatorDisplay.innerHTML = '';
+            operand2Display.textContent = '';
+
+            if (aborted) {
+                // 中断の場合
+                gameOverMessage.style.display = 'none';
+                abortMessage.style.display = 'block';
+            } else {
+                // 通常終了の場合
+                abortMessage.style.display = 'none';
+                gameOverMessage.style.display = 'block';
+
+                const key = getHighScoreKey();
+                const isCleared = (gameMode !== 'timeLimit' && remainingCount === 0);
+
+                if (gameMode === 'timeLimit') {
+                    finalScoreDisplay.textContent = score;
+                    const currentHighScore = parseInt(localStorage.getItem(key) || '0', 10);
+                    if (score > currentHighScore) {
+                        highScore = score;
+                        localStorage.setItem(key, highScore.toString());
+                        updateDisplays();
+                        highScoreUpdateMessage.style.display = 'block';
+                    } else {
+                        highScoreUpdateMessage.style.display = 'none';
+                    }
+                } else { // timeAttack or 81challenge
+                    if (isCleared) {
+                        finalScoreDisplay.textContent = timeLeft.toFixed(2) + 's';
+                        const currentHighScore = parseFloat(localStorage.getItem(key) || '99999', 10);
+                        // クリアタイムを記録
+                        if (timeLeft < currentHighScore) {
+                            highScore = timeLeft;
+                            localStorage.setItem(key, highScore.toString());
+                            updateDisplays();
+                            highScoreUpdateMessage.style.display = 'block';
+                        } else {
+                            highScoreUpdateMessage.style.display = 'none';
+                        }
+                    } else {
+                        // 未クリアの場合（タイムアタック/81問で時間切れになった場合など）
+                        finalScoreDisplay.textContent = '---';
+                        highScoreUpdateMessage.style.display = 'none';
+                    }
+                }
+            }
+
+            // 2秒後に初期化
+            setTimeout(() => {
+                initializeGame();
+            }, 2000);
+        }
+
+        // ユーザー入力の処理
+        userInput.addEventListener('input', (event) => {
+            // ゲーム開始ボタンの代わりに、入力フィールドの入力でゲーム開始するロジックは削除された
+            // if (gameState === 'waiting') { startCountdown(); event.target.value = ''; return; }
+
+            if (gameState !== 'playing' || isInputLocked) {
+                event.preventDefault();
+                // gameStateがwaitingの時は、入力フィールドが表示されていないため、この分岐に入ることは通常ないが、念のため
+                if (gameState === 'playing') userInput.value = ''; 
+                return;
+            }
+            
+            const inputString = event.target.value.trim();
+
+            // 99入力でゲーム中断
+            if (inputString === '99') {
+                endGame(true); // 中断フラグを立てて終了
+                return;
+            }
+
+
+            // 入力を整数として扱う
+            const input = parseInt(inputString, 10);
+            
+            // 正しい結果と比較
+            if (input === correctResult) {
+                if (gameMode === 'timeLimit') {
+                    score += basePoints;
+                } else { // timeAttack or 81challenge
+                    score++;
+                    remainingCount--;
+                    if (remainingCount <= 0) {
+                        endGame(false); // 通常終了
+                        return;
+                    }
+                }
+                correctStreak++;
+                updateDisplays();
+                updatePlaceholder();
+
+                // 5問正解ごとにポイント増 (timeLimitモードのみ有効だが、他のモードでもコンボは表示)
+                if (gameMode === 'timeLimit' && correctStreak > 0 && correctStreak % 5 === 0) {
+                    basePoints++;
+                }
+
+                generateCalculation();
+                userInput.value = '';
+            } else if (inputString !== '' && inputString !== '-' && (inputString.length >= correctResult.toString().length || (correctResult < 0 && inputString.startsWith('-') && inputString.length >= correctResult.toString().length))) {
+                // 正解の桁数以上の文字が入力され、それが正解と一致しない場合（ミス判定）
+                
+                correctStreak = 0;
+                basePoints = 1;
+                updateDisplays();
+
+                isInputLocked = true;
+                userInput.disabled = true;
+                penaltyMessage.style.display = 'block';
+                
+                penaltyTimeout = setTimeout(() => {
+                    isInputLocked = false;
+                    userInput.disabled = false;
+                    userInput.focus();
+                    penaltyMessage.style.display = 'none';
+                }, 1000);
+
+                userInput.value = '';
+            }
+        });
+
+        // スタートボタンのイベントリスナー
+        startButton.addEventListener('click', () => {
+            if (gameState === 'waiting') {
+                startCountdown();
+            }
+        });
+
+        // =======================================================
+        // モード切り替え関数
+        // =======================================================
+
+        // 桁数モードを切り替える関数 (1桁 <-> 2桁)
+        function toggleDigitMode() {
+            if (gameState !== 'waiting' || gameMode === '81challenge') return;
+            const currentIndex = digitModes.indexOf(digitMode);
+            const nextIndex = (currentIndex + 1) % digitModes.length;
+            digitMode = digitModes[nextIndex];
+            initializeGame();
+        }
+
+        // 計算モードを切り替える関数 (+ -> - -> * -> +)
+        function toggleOperationMode() {
+            if (gameState !== 'waiting') return;
+            const currentIndex = operationModes.indexOf(operationMode);
+            const nextIndex = (currentIndex + 1) % operationModes.length;
+            operationMode = operationModes[nextIndex];
+            initializeGame();
+        }
+
+        // 制限時間/タイムアタック/81問連続を切り替える関数
+        function toggleGameMode() {
+            if (gameState !== 'waiting') return;
+            
+            const modes = ['timeLimit', 'timeAttack', '81challenge'];
+            const currentIndex = modes.indexOf(gameMode);
+            const nextIndex = (currentIndex + 1) % modes.length;
+            gameMode = modes[nextIndex];
+            
+            initializeGame();
+        }
+
+        // タイムリミットモードの数字を切り替える関数 (30s <-> 60s)
+        function toggleTimeLimitMode() {
+            if (gameState !== 'waiting' || gameMode !== 'timeLimit') return;
+            const currentIndex = timeLimitModes.indexOf(timeLimitMode);
+            const nextIndex = (currentIndex + 1) % timeLimitModes.length;
+            timeLimitMode = timeLimitModes[nextIndex];
+            initializeGame();
+        }
+
+        // タイムアタックモードの数字を切り替える関数 (10問 <-> 30問 <-> ...)
+        function toggleTimeAttackMode() {
+            if (gameState !== 'waiting' || gameMode !== 'timeAttack') return;
+            const currentIndex = timeAttackModes.indexOf(timeAttackMode);
+            const nextIndex = (currentIndex + 1) % timeAttackModes.length;
+            timeAttackMode = timeAttackModes[nextIndex];
+            initializeGame();
+        }
+
+        // =======================================================
+        // イベントリスナーの設定
+        // =======================================================
+        digitModeClickable.addEventListener('click', toggleDigitMode);
+        operationModeClickable.addEventListener('click', toggleOperationMode);
+        
+        // タイマー/残り個数の表示部分をクリックで、モード内設定、またはモード自体を切り替える
+        timerText.addEventListener('click', () => {
+            if (gameMode === 'timeLimit') {
+                toggleTimeLimitMode();
+            } else if (gameMode === 'timeAttack') {
+                toggleTimeAttackMode();
+            } else { // 81challengeモードの場合、クリックでモード切り替え (toggleGameMode)
+                 toggleGameMode();
+            }
+        });
+        
+        // モードテキストをクリックでモード自体を切り替え (timeLimit <-> timeAttack <-> 81challenge)
+        modeText.addEventListener('click', toggleGameMode);
+
+
+        window.onload = initializeGame;
+    </script>
+</body>
+</html>
+

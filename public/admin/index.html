@@ -26,7 +26,8 @@
         min-height: 100vh;
       }
       button,
-      input {
+      input,
+      select {
         font: inherit;
       }
       .wrap {
@@ -75,7 +76,8 @@
         display: flex;
         gap: 8px;
       }
-      input {
+      input,
+      select {
         min-width: 0;
         flex: 1;
         background: #090d0f;
@@ -197,6 +199,78 @@
         border: 1px solid var(--line);
         padding: 7px 11px;
       }
+      .edit-screen {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      .edit-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+      .edit-head h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .back-button {
+        background: transparent;
+        border: 1px solid var(--line);
+        color: #fff;
+        padding: 9px 13px;
+      }
+      .edit-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 22px;
+      }
+      .record-meta {
+        color: var(--muted);
+        font-size: 13px;
+        border-bottom: 1px solid var(--line);
+        margin: 0 0 20px;
+        padding-bottom: 14px;
+      }
+      .edit-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px 14px;
+      }
+      .field {
+        display: grid;
+        gap: 7px;
+      }
+      .field.wide {
+        grid-column: 1 / -1;
+      }
+      .field label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+      .field input,
+      .field select {
+        width: 100%;
+        padding: 13px;
+      }
+      .edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+        margin-top: 22px;
+      }
+      .cancel-button {
+        background: #263036;
+        color: #fff;
+      }
+      .save-message {
+        min-height: 20px;
+        color: var(--lime);
+        font-size: 13px;
+        margin: 14px 0 0;
+      }
       @media (max-width: 600px) {
         .wrap {
           padding-top: 15px;
@@ -219,6 +293,15 @@
         }
         .login {
           margin-top: 10vh;
+        }
+        .edit-grid {
+          grid-template-columns: 1fr;
+        }
+        .field.wide {
+          grid-column: auto;
+        }
+        .edit-card {
+          padding: 17px;
         }
       }
     </style>
@@ -268,7 +351,6 @@
                 <th>登録日時（UTC）</th>
                 <th>プレイヤー</th>
                 <th>スコア</th>
-                <th>モード</th>
                 <th>最高速度</th>
                 <th>最高コンボ</th>
                 <th></th>
@@ -279,6 +361,64 @@
           <div class="empty" id="empty" hidden>登録記録はありません。</div>
         </div>
         <p><button class="logout" id="logout">ログアウト</button></p>
+      </main>
+      <main class="panel edit-screen" id="editPanel">
+        <div class="edit-head">
+          <button class="back-button" id="editBack" type="button">
+            ← 戻る
+          </button>
+          <h1>記録を編集</h1>
+        </div>
+        <form class="edit-card" id="editForm">
+          <p class="record-meta" id="editMeta"></p>
+          <input id="editId" type="hidden" />
+          <div class="edit-grid">
+            <div class="field wide">
+              <label for="editName">プレイヤー名</label>
+              <input id="editName" maxlength="12" required />
+            </div>
+            <div class="field">
+              <label for="editScore">スコア</label>
+              <input
+                id="editScore"
+                type="number"
+                min="1"
+                max="100000000"
+                step="1"
+                required
+              />
+            </div>
+            <div class="field">
+              <label for="editMaxSpeed">最高速度</label>
+              <input
+                id="editMaxSpeed"
+                type="number"
+                min="1"
+                max="8.1"
+                step="0.01"
+                required
+              />
+            </div>
+            <div class="field">
+              <label for="editBestCombo">最高コンボ</label>
+              <input
+                id="editBestCombo"
+                type="number"
+                min="0"
+                max="1000000"
+                step="1"
+                required
+              />
+            </div>
+          </div>
+          <p class="save-message" id="editMessage"></p>
+          <div class="edit-actions">
+            <button class="cancel-button" id="editCancel" type="button">
+              キャンセル
+            </button>
+            <button id="editSave" type="submit">変更を保存</button>
+          </div>
+        </form>
       </main>
     </div>
     <script>
@@ -316,7 +456,7 @@
             q("#rows").innerHTML = d.scores
               .map(
                 (x) =>
-                  `<tr><td>${x.id}</td><td>${esc(x.createdAt)}</td><td>${esc(x.name)}</td><td class="score">${Number(x.score).toLocaleString()}</td><td>${x.mode === "hits" ? "打数" : "時間"}</td><td>×${Number(x.maxSpeed).toFixed(2)}</td><td>${x.bestCombo}</td><td><button class="edit" data-id="${x.id}">編集</button><button class="del" data-id="${x.id}" data-name="${esc(x.name)}">削除</button></td></tr>`,
+                  `<tr><td>${x.id}</td><td>${esc(x.createdAt)}</td><td>${esc(x.name)}</td><td class="score">${Number(x.score).toLocaleString()}</td><td>×${Number(x.maxSpeed).toFixed(2)}</td><td>${x.bestCombo}</td><td><button class="edit" data-id="${x.id}">編集</button><button class="del" data-id="${x.id}" data-name="${esc(x.name)}">削除</button></td></tr>`,
               )
               .join("");
             q("#empty").hidden = d.scores.length > 0;
@@ -343,34 +483,51 @@
         async function edit(id) {
           const record = currentScores.find((x) => Number(x.id) === id);
           if (!record) return alert("記録が見つかりません。");
-          const name = prompt("プレイヤー名", record.name);
-          if (name === null) return;
-          const score = prompt("スコア", record.score);
-          if (score === null) return;
-          const mode = prompt("モード（time または hits）", record.mode);
-          if (mode === null) return;
-          const maxSpeed = prompt("最高速度", record.maxSpeed);
-          if (maxSpeed === null) return;
-          const bestCombo = prompt("最高コンボ", record.bestCombo);
-          if (bestCombo === null) return;
-          if (!confirm("この内容で記録を更新しますか？")) return;
+          q("#editId").value = record.id;
+          q("#editName").value = record.name;
+          q("#editScore").value = record.score;
+          q("#editMaxSpeed").value = record.maxSpeed;
+          q("#editBestCombo").value = record.bestCombo;
+          q("#editMeta").textContent =
+            `記録ID: ${record.id} ／ 登録日時: ${record.createdAt}`;
+          q("#editMessage").textContent = "";
+          q("#panel").style.display = "none";
+          q("#editPanel").style.display = "block";
+          scrollTo({ top: 0, behavior: "smooth" });
+        }
+        function closeEditor() {
+          q("#editPanel").style.display = "none";
+          q("#panel").style.display = "block";
+          q("#editMessage").textContent = "";
+        }
+        q("#editForm").onsubmit = async (e) => {
+          e.preventDefault();
+          const saveButton = q("#editSave");
+          saveButton.disabled = true;
+          q("#editMessage").textContent = "保存中…";
           const r = await fetch(api, {
               method: "PATCH",
               headers: headers(),
               body: JSON.stringify({
-                id,
-                name,
-                score: Number(score),
-                mode,
-                maxSpeed: Number(maxSpeed),
-                bestCombo: Number(bestCombo),
+                id: Number(q("#editId").value),
+                name: q("#editName").value,
+                score: Number(q("#editScore").value),
+                maxSpeed: Number(q("#editMaxSpeed").value),
+                bestCombo: Number(q("#editBestCombo").value),
               }),
             }),
             d = await r.json();
-          if (!r.ok) return alert(d.error);
-          alert("記録を更新しました。");
-          load();
-        }
+          saveButton.disabled = false;
+          if (!r.ok) {
+            q("#editMessage").textContent = d.error || "保存できませんでした。";
+            return;
+          }
+          await load();
+          closeEditor();
+          q("#status").textContent = "記録を更新しました。";
+        };
+        q("#editBack").onclick = closeEditor;
+        q("#editCancel").onclick = closeEditor;
         async function remove(id, name) {
           if (!confirm(`${name} の記録を削除しますか？`)) return;
           const r = await fetch(api, {

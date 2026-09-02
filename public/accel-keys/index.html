@@ -275,17 +275,8 @@
         font-size: 9px;
       }
       .controls {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 9px;
         margin-top: 7px;
       }
-      .modes {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-      }
-      .modes button,
       .start {
         border: 1px solid var(--line);
         border-radius: 6px;
@@ -295,18 +286,8 @@
         text-align: left;
         font-weight: 850;
       }
-      .modes small {
-        display: block;
-        color: #657176;
-        margin-top: 3px;
-      }
-      .modes .on {
-        color: var(--lime);
-        border-color: var(--lime);
-        background: #101b0e;
-      }
       .start {
-        min-width: 165px;
+        width: 100%;
         text-align: center;
         background: var(--lime);
         color: #071006;
@@ -555,13 +536,6 @@
             ></output>
           </section>
           <section class="controls" id="controls">
-            <div class="modes">
-              <button class="on" data-mode="time">
-                時間で加速<small>20秒ごとに約＋1倍</small></button
-              ><button data-mode="hits">
-                打数で加速<small>12打ごとに＋0.25倍</small>
-              </button>
-            </div>
             <button class="start" id="start">スタート</button>
           </section>
           <form class="submit" id="submit">
@@ -592,8 +566,7 @@
           overlay = q("#overlay"),
           keys = q("#keys"),
           BASE = 0.145;
-        let mode = "time",
-          phase = "idle",
+        let phase = "idle",
           notes = [],
           score = 0,
           combo = 0,
@@ -601,7 +574,6 @@
           miss = 0,
           speed = 1,
           maxSpeed = 1,
-          hits = 0,
           startAt = 0,
           lastAt = 0,
           lastSpawn = 0,
@@ -635,15 +607,6 @@
           };
           keys.append(b);
         });
-        document.querySelectorAll("[data-mode]").forEach(
-          (b) =>
-            (b.onclick = () => {
-              mode = b.dataset.mode;
-              document
-                .querySelectorAll("[data-mode]")
-                .forEach((x) => x.classList.toggle("on", x === b));
-            }),
-        );
         function resize() {
           const r = canvas.getBoundingClientRect(),
             d = Math.min(devicePixelRatio || 1, 2);
@@ -792,13 +755,10 @@
             cls = "good";
           }
           combo++;
-          hits++;
           bestCombo = Math.max(bestCombo, combo);
           score += Math.round(
             value * speed * (1 + Math.min(combo, 50) * 0.01) * hsScore(),
           );
-          if (mode === "hits")
-            speed = Math.min(8, 1 + Math.floor(hits / 12) * 0.25);
           maxSpeed = Math.max(maxSpeed, speed);
           showJudge(label, cls);
           paint();
@@ -807,7 +767,7 @@
           if (phase !== "playing") return;
           const dt = Math.min(34, now - lastAt);
           lastAt = now;
-          if (mode === "time") speed = Math.min(8, 1 + (now - startAt) / 20000);
+          speed = Math.min(8, 1 + (now - startAt) / 20000);
           maxSpeed = Math.max(maxSpeed, speed);
           const interval = Math.max(180, 1050 / speed);
           if (now - lastSpawn >= interval) {
@@ -832,7 +792,7 @@
           phase = "count";
           document.body.classList.add("playing");
           notes = [];
-          score = combo = bestCombo = miss = hits = 0;
+          score = combo = bestCombo = miss = 0;
           speed = maxSpeed = 1;
           activeLane = -1;
           paint();
@@ -855,7 +815,6 @@
         function end() {
           phase = "over";
           cancelAnimationFrame(raf);
-          document.body.classList.remove("playing");
           const old = Number(localStorage.getItem("accel-keys-best") || 0),
             best = Math.max(old, score);
           localStorage.setItem("accel-keys-best", best);
@@ -872,9 +831,13 @@
             "</b></span></div></div>";
           q("#start").textContent = "タイトルに戻る";
           q("#start").onclick = () => location.reload();
-          q("#submit").style.display = score > 0 ? "grid" : "none";
           resize();
           paint();
+          setTimeout(() => {
+            document.body.classList.remove("playing");
+            q("#submit").style.display = score > 0 ? "grid" : "none";
+            resize();
+          }, 1000);
         }
         q("#start").onclick = start;
         addEventListener("keydown", (e) => {
@@ -911,9 +874,7 @@
                       esc(x.name) +
                       "</span><b>" +
                       Number(x.score).toLocaleString() +
-                      "</b><small>" +
-                      (x.mode === "hits" ? "打数" : "時間") +
-                      " ×" +
+                      "</b><small>最高速度 ×" +
                       Number(x.maxSpeed).toFixed(2) +
                       "</small></li>",
                   )
@@ -960,7 +921,6 @@
                 body: JSON.stringify({
                   name: enteredName,
                   score,
-                  mode,
                   maxSpeed,
                   bestCombo,
                 }),

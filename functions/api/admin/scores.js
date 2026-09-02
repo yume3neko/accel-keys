@@ -18,7 +18,7 @@ export async function onRequestGet({ request, env }) {
     return json({ error: "認証に失敗しました。" }, 401);
   try {
     const { results } = await env.DB.prepare(
-      `SELECT id, player_name AS name, score, mode, max_speed AS maxSpeed,
+      `SELECT id, player_name AS name, score, max_speed AS maxSpeed,
               best_combo AS bestCombo, created_at AS createdAt
        FROM scores ORDER BY created_at DESC, id DESC LIMIT 500`,
     ).all();
@@ -47,15 +47,12 @@ export async function onRequestPatch({ request, env }) {
       normalizedName === "ゆめみねこ(製作者)";
     const name = creatorName ? "ゆめみねこ（製作者）" : rawName.slice(0, 12);
     const score = Number(body.score);
-    const mode =
-      body.mode === "hits" ? "hits" : body.mode === "time" ? "time" : "";
     const maxSpeed = Number(body.maxSpeed);
     const bestCombo = Number(body.bestCombo);
     if (
       !Number.isInteger(id) ||
       id < 1 ||
       !name ||
-      !mode ||
       !Number.isInteger(score) ||
       score < 1 ||
       score > 100000000 ||
@@ -69,9 +66,9 @@ export async function onRequestPatch({ request, env }) {
       return json({ error: "編集内容が正しくありません。" }, 400);
     }
     const result = await env.DB.prepare(
-      `UPDATE scores SET player_name = ?, score = ?, mode = ?, max_speed = ?, best_combo = ? WHERE id = ?`,
+      `UPDATE scores SET player_name = ?, score = ?, max_speed = ?, best_combo = ? WHERE id = ?`,
     )
-      .bind(name, score, mode, maxSpeed, bestCombo, id)
+      .bind(name, score, maxSpeed, bestCombo, id)
       .run();
     if (!result.meta?.changes)
       return json({ error: "該当する記録がありません。" }, 404);

@@ -10,7 +10,7 @@ const json = (data, status = 200) =>
 export async function onRequestGet({ env }) {
   try {
     const { results } = await env.DB.prepare(
-      `SELECT player_name AS name, score, mode, max_speed AS maxSpeed, best_combo AS bestCombo, created_at AS createdAt
+      `SELECT player_name AS name, score, max_speed AS maxSpeed, best_combo AS bestCombo, created_at AS createdAt
        FROM scores ORDER BY score DESC, created_at ASC LIMIT 10`,
     ).all();
     return json({ scores: results ?? [], worldBest: results?.[0]?.score ?? 0 });
@@ -44,7 +44,6 @@ export async function onRequestPost({ request, env }) {
     const score = Number(body.score),
       maxSpeed = Number(body.maxSpeed),
       bestCombo = Number(body.bestCombo);
-    const mode = body.mode === "hits" ? "hits" : "time";
     if (
       !name ||
       !Number.isInteger(score) ||
@@ -62,7 +61,7 @@ export async function onRequestPost({ request, env }) {
     await env.DB.prepare(
       `INSERT INTO scores (player_name, score, mode, max_speed, best_combo) VALUES (?, ?, ?, ?, ?)`,
     )
-      .bind(name, score, mode, maxSpeed, bestCombo)
+      .bind(name, score, "time", maxSpeed, bestCombo)
       .run();
     await env.DB.prepare(
       `DELETE FROM scores WHERE id NOT IN (SELECT id FROM scores ORDER BY score DESC, created_at ASC LIMIT 500)`,

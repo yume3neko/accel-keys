@@ -564,6 +564,18 @@
               ><span id="hsText"></span><small id="hsBonus"></small
             ></output>
           </section>
+          <section class="hsbox">
+            <label for="linePosition">判定ライン位置</label
+            ><input
+              id="linePosition"
+              type="range"
+              min="-15"
+              max="160"
+              step="5"
+            /><output class="hsvalue"
+              ><span id="lineText"></span><small>右ほど上へ移動</small
+            ></output>
+          </section>
           <section class="controls" id="controls">
             <label class="demo-toggle">
               <input id="demoMode" type="checkbox" />
@@ -626,6 +638,15 @@
               ) / 10,
             ),
           ),
+          lineOffset = Math.min(
+            160,
+            Math.max(
+              -15,
+              Math.round(
+                Number(localStorage.getItem("accel-keys-line-offset") || 0) / 5,
+              ) * 5,
+            ),
+          ),
           previewAt = 0;
         const hsScore = () =>
             highSpeed < 1
@@ -642,6 +663,23 @@
         }
         q("#hs").oninput = updateHs;
         updateHs();
+        q("#linePosition").value = String(lineOffset);
+        function updateLinePosition() {
+          lineOffset = Number(q("#linePosition").value);
+          localStorage.setItem(
+            "accel-keys-line-offset",
+            String(lineOffset),
+          );
+          q("#lineText").textContent =
+            lineOffset === 0
+              ? "標準"
+              : lineOffset > 0
+                ? "上へ " + lineOffset + "px"
+                : "下へ " + Math.abs(lineOffset) + "px";
+          draw();
+        }
+        q("#linePosition").oninput = updateLinePosition;
+        updateLinePosition();
         K.forEach((k, i) => {
           const b = document.createElement("button");
           b.textContent = k;
@@ -671,11 +709,15 @@
         addEventListener("resize", resize);
         new ResizeObserver(resize).observe(canvas);
         function dims() {
-          const h = canvas.clientHeight;
+          const h = canvas.clientHeight,
+            lineBottom = phase === "playing" ? 25 : 45;
           return {
             w: canvas.clientWidth,
             h,
-            line: h - (phase === "playing" ? 25 : 45),
+            line: Math.min(
+              h - 8,
+              Math.max(70, h - lineBottom - lineOffset),
+            ),
             lane: canvas.clientWidth / 4,
           };
         }

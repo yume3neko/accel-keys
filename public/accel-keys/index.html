@@ -126,6 +126,10 @@
         width: 100%;
         height: 100%;
         touch-action: none;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
       }
       .overlay {
         position: absolute;
@@ -647,6 +651,15 @@
           };
           keys.append(b);
         });
+        canvas.onpointerdown = (e) => {
+          e.preventDefault();
+          const r = canvas.getBoundingClientRect(),
+            lane = Math.min(
+              3,
+              Math.max(0, Math.floor((e.clientX - r.left) / (r.width / 4))),
+            );
+          press(lane);
+        };
         function resize() {
           const r = canvas.getBoundingClientRect(),
             d = Math.min(devicePixelRatio || 1, 2);
@@ -722,7 +735,7 @@
         }
         function spawn() {
           let lane = Math.floor(Math.random() * 4);
-          if (lane === lastLane && Math.random() < 0.72)
+          if (lane === lastLane)
             lane = (lane + 1 + Math.floor(Math.random() * 3)) % 4;
           lastLane = lane;
           notes.push({ lane, y: -28 });
@@ -820,11 +833,18 @@
           if (phase !== "playing") return;
           const dt = Math.min(34, now - lastAt);
           lastAt = now;
-          speed = Math.min(8, 1 + (now - startAt) / 20000);
+          speed = Math.min(8, 1 + (now - startAt) / 30000);
           maxSpeed = Math.max(maxSpeed, speed);
           if (!demoEnding) {
-            const densityBoost = 1 + Math.max(0, speed - 4) * 0.18,
-              interval = Math.max(70, 1050 / (speed * densityBoost));
+            const densityIntervals = [
+                1050, 900, 760, 640, 530, 440, 360, 290, 230, 180, 140, 110, 90,
+                75, 65,
+              ],
+              densityLevel = Math.min(
+                densityIntervals.length - 1,
+                Math.floor((speed - 1) / 0.5),
+              ),
+              interval = densityIntervals[densityLevel];
             if (now - lastSpawn >= interval) {
               spawn();
               lastSpawn = now;

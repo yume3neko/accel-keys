@@ -823,7 +823,8 @@
           speed = Math.min(8, 1 + (now - startAt) / 20000);
           maxSpeed = Math.max(maxSpeed, speed);
           if (!demoEnding) {
-            const interval = Math.max(180, 1050 / speed);
+            const densityBoost = 1 + Math.max(0, speed - 4) * 0.18,
+              interval = Math.max(70, 1050 / (speed * densityBoost));
             if (now - lastSpawn >= interval) {
               spawn();
               lastSpawn = now;

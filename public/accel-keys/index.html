@@ -277,6 +277,31 @@
       .controls {
         margin-top: 7px;
       }
+      .demo-toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 7px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #0b1114;
+        color: #c7d0d3;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .demo-toggle input {
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        accent-color: var(--lime);
+      }
+      .demo-toggle small {
+        margin-left: auto;
+        color: #778388;
+        font-size: 10px;
+      }
       .start {
         border: 1px solid var(--line);
         border-radius: 6px;
@@ -536,6 +561,11 @@
             ></output>
           </section>
           <section class="controls" id="controls">
+            <label class="demo-toggle">
+              <input id="demoMode" type="checkbox" />
+              おてほんモード
+              <small>オートプレイ・記録対象外</small>
+            </label>
             <button class="start" id="start">スタート</button>
           </section>
           <form class="submit" id="submit">
@@ -581,6 +611,8 @@
           raf = 0,
           judgeTimer = 0,
           activeLane = -1,
+          demoMode = false,
+          demoEnding = false,
           highSpeed = Math.min(
             2,
             Math.max(
@@ -724,8 +756,8 @@
           paint();
           if (miss >= 3) end();
         }
-        function press(lane) {
-          if (phase !== "playing") return;
+        function press(lane, automatic = false) {
+          if (phase !== "playing" || (demoMode && !automatic)) return;
           activeLane = lane;
           paint();
           setTimeout(() => {
@@ -746,7 +778,8 @@
               }
             }
           });
-          if (best < 0 || dist > 76) return;
+          if (best < 0 || (!automatic && dist > 76)) return;
+          if (automatic) dist = 0;
           notes.splice(best, 1);
           let value, label, cls;
           if (dist <= 20) {
@@ -770,6 +803,18 @@
           maxSpeed = Math.max(maxSpeed, speed);
           showJudge(label, cls);
           paint();
+          if (demoMode && score >= 1000000 && !demoEnding) finishDemo();
+        }
+        function finishDemo() {
+          demoEnding = true;
+          notes = [];
+          activeLane = -1;
+          draw();
+          [350, 750, 1150].forEach((delay) => {
+            setTimeout(() => {
+              if (phase === "playing") addMiss();
+            }, delay);
+          });
         }
         function loop(now) {
           if (phase !== "playing") return;
@@ -777,18 +822,36 @@
           lastAt = now;
           speed = Math.min(8, 1 + (now - startAt) / 20000);
           maxSpeed = Math.max(maxSpeed, speed);
-          const interval = Math.max(180, 1050 / speed);
-          if (now - lastSpawn >= interval) {
-            spawn();
-            lastSpawn = now;
-          }
-          const { line } = dims();
-          notes.forEach((n) => (n.y += BASE * speed * highSpeed * dt));
-          for (let i = notes.length - 1; i >= 0; i--) {
-            if (notes[i].y > line + 58) {
-              notes.splice(i, 1);
-              addMiss();
-              if (phase !== "playing") break;
+          if (!demoEnding) {
+            const interval = Math.max(180, 1050 / speed);
+            if (now - lastSpawn >= interval) {
+              spawn();
+              lastSpawn = now;
+            }
+            const { line } = dims();
+            notes.forEach((n) => {
+              n.previousY = n.y;
+              n.y += BASE * speed * highSpeed * dt;
+            });
+            if (demoMode) {
+              const autoLanes = notes
+                .filter(
+                  (n) =>
+                    Math.abs(n.y + 11 - line) <= 20 ||
+                    (n.previousY + 11 < line && n.y + 11 >= line),
+                )
+                .map((n) => n.lane);
+              for (const lane of autoLanes) {
+                if (demoEnding) break;
+                press(lane, true);
+              }
+            }
+            for (let i = notes.length - 1; i >= 0; i--) {
+              if (notes[i].y > line + 58) {
+                notes.splice(i, 1);
+                addMiss();
+                if (phase !== "playing") break;
+              }
             }
           }
           draw();
@@ -803,6 +866,8 @@
           score = combo = bestCombo = miss = 0;
           speed = maxSpeed = 1;
           activeLane = -1;
+          demoMode = q("#demoMode").checked;
+          demoEnding = false;
           paint();
           q("#submit").style.display = "none";
           let n = 3;
@@ -823,10 +888,12 @@
         function end() {
           phase = "over";
           cancelAnimationFrame(raf);
-          const old = Number(localStorage.getItem("accel-keys-best") || 0),
-            best = Math.max(old, score);
-          localStorage.setItem("accel-keys-best", best);
-          q("#myBest").textContent = best.toLocaleString();
+          const old = Number(localStorage.getItem("accel-keys-best") || 0);
+          if (!demoMode) {
+            const best = Math.max(old, score);
+            localStorage.setItem("accel-keys-best", best);
+            q("#myBest").textContent = best.toLocaleString();
+          }
           overlay.innerHTML =
             '<div class="result"><div class="eyebrow">RUN COMPLETE</div><h2>' +
             score.toLocaleString() +
@@ -843,7 +910,11 @@
           paint();
           setTimeout(() => {
             document.body.classList.remove("playing");
-            q("#submit").style.display = score > 0 ? "grid" : "none";
+            q("#submit").style.display =
+              score > 0 && !demoMode ? "grid" : "none";
+            q("#message").textContent = demoMode
+              ? "おてほんモードのスコアは記録されません。"
+              : "";
             resize();
           }, 1000);
         }

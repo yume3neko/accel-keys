@@ -24,7 +24,9 @@ export async function onRequestGet({ request, env }) {
     ).all();
     const summary = await env.DB.prepare(
       `SELECT COUNT(*) AS total, COALESCE(MAX(score), 0) AS worldBest,
-              COUNT(DISTINCT player_name) AS players FROM scores`,
+              COUNT(DISTINCT player_id) +
+              COALESCE(SUM(CASE WHEN player_id IS NULL THEN 1 ELSE 0 END), 0)
+              AS players FROM scores`,
     ).first();
     return json({ scores: results ?? [], summary });
   } catch {

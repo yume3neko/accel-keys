@@ -207,22 +207,6 @@
       .resultline b {
         color: #fff;
       }
-      .life {
-        height: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 7px;
-      }
-      .life i {
-        width: 23px;
-        height: 4px;
-        background: #3b474c;
-      }
-      .life i.lost {
-        background: var(--red);
-        box-shadow: 0 0 8px var(--red);
-      }
       .keys {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -380,6 +364,15 @@
         padding: 8px 9px;
         font-size: 12px;
       }
+      .ranking li[data-id] {
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      .ranking li[data-id]:hover,
+      .ranking li[data-id]:active {
+        border-color: #759f3b;
+        background: #101a16;
+      }
       .ranking li b {
         color: var(--lime);
       }
@@ -392,6 +385,103 @@
         margin-top: 18px;
         color: #707d83;
         font-size: 12px;
+      }
+      .replay-modal {
+        position: fixed;
+        z-index: 100;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 14px;
+        background: #020506dd;
+        backdrop-filter: blur(6px);
+      }
+      .replay-modal[hidden] {
+        display: none;
+      }
+      .replay-card {
+        width: min(680px, 100%);
+        max-height: calc(100svh - 28px);
+        overflow: auto;
+        border: 1px solid #334238;
+        border-radius: 10px;
+        background: #081013;
+        box-shadow: 0 18px 80px #000;
+      }
+      .replay-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .replay-head h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .replay-close,
+      .replay-play {
+        border: 0;
+        border-radius: 6px;
+        background: var(--lime);
+        color: #071006;
+        padding: 8px 13px;
+        font-weight: 900;
+      }
+      .replay-close {
+        background: #202b2f;
+        color: #dce4e0;
+      }
+      .replay-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: var(--line);
+      }
+      .replay-stats div {
+        padding: 9px 6px;
+        background: #0b1114;
+        text-align: center;
+      }
+      .replay-stats small {
+        display: block;
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .replay-stats b {
+        color: #fff;
+        font-size: 15px;
+      }
+      .replay-wrap {
+        position: relative;
+        height: min(48svh, 390px);
+        min-height: 280px;
+        background: #060b0d;
+      }
+      #replayCanvas {
+        width: 100%;
+        height: 100%;
+      }
+      .replay-judge {
+        position: absolute;
+        inset: auto 0 25px;
+        text-align: center;
+        font-size: 32px;
+        font-weight: 950;
+        text-shadow: 0 0 18px currentColor;
+        pointer-events: none;
+      }
+      .replay-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+      }
+      .replay-status {
+        color: #8f9a9e;
+        font-size: 11px;
       }
       body.playing {
         overflow: hidden;
@@ -431,15 +521,6 @@
         height: auto;
         min-height: 0;
         border: 0;
-      }
-      body.playing .life {
-        position: absolute;
-        z-index: 8;
-        top: 59px;
-        right: 10px;
-        background: #071012bb;
-        padding: 7px;
-        border-radius: 9px;
       }
       body.playing .keys {
         position: absolute;
@@ -510,6 +591,9 @@
         .ranking li small {
           display: none;
         }
+        .replay-stats {
+          grid-template-columns: repeat(2, 1fr);
+        }
         body.playing .stat {
           display: flex;
           padding: 4px 9px;
@@ -549,12 +633,11 @@
               <div class="eyebrow">LIVE PREVIEW</div>
               <h1>落ちてくるほど、<br /><em>加速する。</em></h1>
               <p>
-                判定ラインに重なった瞬間、D・F・J・Kを叩こう。<br />3回ミスでゲームオーバー。
+                判定ラインに重なった瞬間、D・F・J・Kを叩こう。<br />4回ミスでゲームオーバー。
               </p>
             </div>
           </div>
         </section>
-        <div class="life"><i></i><i></i><i></i></div>
         <div class="keys" id="keys"></div>
         <div class="normal-ui">
           <section class="hsbox">
@@ -603,6 +686,23 @@
         </div>
       </main>
     </div>
+    <div class="replay-modal" id="replayModal" hidden>
+      <section class="replay-card" role="dialog" aria-modal="true">
+        <div class="replay-head">
+          <h2 id="replayTitle">記録詳細</h2>
+          <button class="replay-close" id="replayClose" type="button">閉じる</button>
+        </div>
+        <div class="replay-stats" id="replayStats"></div>
+        <div class="replay-wrap">
+          <canvas id="replayCanvas"></canvas>
+          <div class="replay-judge" id="replayJudge"></div>
+        </div>
+        <div class="replay-foot">
+          <span class="replay-status" id="replayStatus">記録を読み込んでいます…</span>
+          <button class="replay-play" id="replayPlay" type="button">最初から再生</button>
+        </div>
+      </section>
+    </div>
     <script>
       (() => {
         const K = ["D", "F", "J", "K"],
@@ -618,6 +718,9 @@
           combo = 0,
           bestCombo = 0,
           miss = 0,
+          perfectCount = 0,
+          greatCount = 0,
+          goodCount = 0,
           speed = 1,
           maxSpeed = 1,
           startAt = 0,
@@ -629,6 +732,9 @@
           activeLane = -1,
           demoMode = false,
           demoEnding = false,
+          replayEvents = [],
+          nextNoteId = 1,
+          runDuration = 0,
           highSpeed = Math.min(
             2,
             Math.max(
@@ -721,6 +827,21 @@
             lane: canvas.clientWidth / 4,
           };
         }
+        function drawLifeLine(context, width, line, laneWidth, misses, blur) {
+          const lostFromLane = 4 - Math.min(4, misses);
+          context.lineWidth = 3;
+          for (let lane = 0; lane < 4; lane++) {
+            const color = lane >= lostFromLane ? "#ff4964" : "#adff2f";
+            context.strokeStyle = color;
+            context.shadowColor = color;
+            context.shadowBlur = blur;
+            context.beginPath();
+            context.moveTo(lane * laneWidth, line);
+            context.lineTo((lane + 1) * laneWidth, line);
+            context.stroke();
+          }
+          context.shadowBlur = 0;
+        }
         function draw() {
           const { w, h, line, lane } = dims();
           ctx.clearRect(0, 0, w, h);
@@ -735,15 +856,7 @@
             ctx.lineTo(i * lane, h);
             ctx.stroke();
           }
-          ctx.strokeStyle = "#adff2f";
-          ctx.lineWidth = 3;
-          ctx.shadowColor = "#adff2f";
-          ctx.shadowBlur = 13;
-          ctx.beginPath();
-          ctx.moveTo(0, line);
-          ctx.lineTo(w, line);
-          ctx.stroke();
-          ctx.shadowBlur = 0;
+          drawLifeLine(ctx, w, line, lane, miss, 13);
           notes.forEach((n) => {
             const x = n.lane * lane + 7,
               y = n.y,
@@ -768,9 +881,6 @@
           q("#combo").textContent = combo;
           q("#speed").textContent = "×" + speed.toFixed(2);
           q("#speedFill").style.width = Math.min(100, (speed / 8) * 100) + "%";
-          document
-            .querySelectorAll(".life i")
-            .forEach((x, i) => x.classList.toggle("lost", i < miss));
           [...keys.children].forEach((x, i) =>
             x.classList.toggle("active", i === activeLane),
           );
@@ -780,7 +890,15 @@
           if (lane === lastLane)
             lane = (lane + 1 + Math.floor(Math.random() * 3)) % 4;
           lastLane = lane;
-          notes.push({ lane, y: -28 });
+          const id = phase === "playing" ? nextNoteId++ : 0;
+          notes.push({ id, lane, y: -28 });
+          if (phase === "playing" && replayEvents.length < 12000)
+            replayEvents.push([
+              0,
+              Math.max(0, Math.round(performance.now() - startAt)),
+              id,
+              lane,
+            ]);
         }
         function preview(now) {
           if (phase !== "idle") return;
@@ -804,12 +922,18 @@
             if (phase === "playing") overlay.innerHTML = "";
           }, 250);
         }
-        function addMiss() {
+        function addMiss(noteId = null) {
           miss++;
           combo = 0;
+          if (noteId && replayEvents.length < 12000)
+            replayEvents.push([
+              2,
+              Math.max(0, Math.round(performance.now() - startAt)),
+              noteId,
+            ]);
           showJudge("MISS", "miss");
           paint();
-          if (miss >= 3) end();
+          if (miss >= 4) end();
         }
         function press(lane, automatic = false) {
           if (phase !== "playing" || (demoMode && !automatic)) return;
@@ -835,21 +959,31 @@
           });
           if (best < 0 || (!automatic && dist > 76)) return;
           if (automatic) dist = 0;
-          notes.splice(best, 1);
+          const hitNote = notes.splice(best, 1)[0];
           let value, label, cls;
           if (dist <= 20) {
             value = 100;
             label = "PERFECT";
             cls = "perfect";
+            perfectCount++;
           } else if (dist <= 42) {
             value = 80;
             label = "GREAT";
             cls = "great";
+            greatCount++;
           } else {
             value = 50;
             label = "GOOD";
             cls = "good";
+            goodCount++;
           }
+          if (replayEvents.length < 12000)
+            replayEvents.push([
+              1,
+              Math.max(0, Math.round(performance.now() - startAt)),
+              hitNote.id,
+              value === 100 ? 0 : value === 80 ? 1 : 2,
+            ]);
           combo++;
           bestCombo = Math.max(bestCombo, combo);
           score += Math.round(
@@ -865,7 +999,7 @@
           notes = [];
           activeLane = -1;
           draw();
-          [350, 750, 1150].forEach((delay) => {
+          [350, 700, 1050, 1400].forEach((delay) => {
             setTimeout(() => {
               if (phase === "playing") addMiss();
             }, delay);
@@ -922,8 +1056,8 @@
             }
             for (let i = notes.length - 1; i >= 0; i--) {
               if (notes[i].y > line + 58) {
-                notes.splice(i, 1);
-                addMiss();
+                const missedNote = notes.splice(i, 1)[0];
+                addMiss(missedNote.id);
                 if (phase !== "playing") break;
               }
             }
@@ -938,8 +1072,12 @@
           document.body.classList.add("playing");
           notes = [];
           score = combo = bestCombo = miss = 0;
+          perfectCount = greatCount = goodCount = 0;
           speed = maxSpeed = 1;
           activeLane = -1;
+          replayEvents = [];
+          nextNoteId = 1;
+          runDuration = 0;
           demoMode = q("#demoMode").checked;
           demoEnding = false;
           paint();
@@ -960,6 +1098,7 @@
           }, 700);
         }
         function end() {
+          runDuration = Math.max(0, Math.round(performance.now() - startAt));
           phase = "over";
           cancelAnimationFrame(raf);
           notes = [];
@@ -1011,6 +1150,194 @@
           d.textContent = s;
           return d.innerHTML;
         }
+        const replayCanvas = q("#replayCanvas"),
+          replayCtx = replayCanvas.getContext("2d");
+        let replayRaf = 0,
+          currentReplay = null;
+        function closeReplay() {
+          cancelAnimationFrame(replayRaf);
+          currentReplay = null;
+          q("#replayModal").hidden = true;
+          document.body.style.overflow = "";
+        }
+        q("#replayClose").onclick = closeReplay;
+        q("#replayModal").onclick = (e) => {
+          if (e.target === q("#replayModal")) closeReplay();
+        };
+        addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && !q("#replayModal").hidden) closeReplay();
+        });
+        function setReplayCanvasSize() {
+          const rect = replayCanvas.getBoundingClientRect(),
+            d = Math.min(devicePixelRatio || 1, 2);
+          replayCanvas.width = Math.max(1, Math.round(rect.width * d));
+          replayCanvas.height = Math.max(1, Math.round(rect.height * d));
+          replayCtx.setTransform(d, 0, 0, d, 0, 0);
+        }
+        function drawReplayFrame(replay, elapsed) {
+          const w = replayCanvas.clientWidth,
+            h = replayCanvas.clientHeight,
+            laneWidth = w / 4,
+            line = Math.min(
+              h - 8,
+              Math.max(70, h - 45 - Number(replay.lineOffset || 0)),
+            );
+          replayCtx.clearRect(0, 0, w, h);
+          replayCtx.fillStyle = "#070d0f";
+          replayCtx.fillRect(0, 0, w, h);
+          for (let lane = 0; lane < 4; lane++) {
+            replayCtx.fillStyle = lane % 2 ? "#0b1316" : "#081013";
+            replayCtx.fillRect(lane * laneWidth, 0, laneWidth, h);
+            replayCtx.strokeStyle = "#28343a";
+            replayCtx.beginPath();
+            replayCtx.moveTo(lane * laneWidth, 0);
+            replayCtx.lineTo(lane * laneWidth, h);
+            replayCtx.stroke();
+          }
+          let replayMisses = replay.notes.filter(
+            (note) => note.type === 2 && note.end <= elapsed,
+          ).length;
+          if ((replay.missLimit ?? 3) < 4 && elapsed >= replay.duration)
+            replayMisses = 4;
+          drawLifeLine(
+            replayCtx,
+            w,
+            line,
+            laneWidth,
+            replayMisses,
+            10,
+          );
+          for (const note of replay.notes) {
+            if (elapsed < note.spawn || elapsed > note.end) continue;
+            const span = Math.max(1, note.end - note.spawn),
+              progress = Math.min(1, (elapsed - note.spawn) / span),
+              target = note.type === 2 ? line + 58 : line - 11,
+              y = -28 + (target + 28) * progress,
+              x = note.lane * laneWidth + 7,
+              nw = laneWidth - 14,
+              gradient = replayCtx.createLinearGradient(x, y, x + nw, y);
+            gradient.addColorStop(0, "#73dfff");
+            gradient.addColorStop(0.5, "#eaffff");
+            gradient.addColorStop(1, "#adff2f");
+            replayCtx.fillStyle = gradient;
+            replayCtx.shadowColor = "#adff2f";
+            replayCtx.shadowBlur = 8;
+            replayCtx.fillRect(x, y, nw, 22);
+            replayCtx.fillStyle = "#071006";
+            replayCtx.font = "900 13px Arial";
+            replayCtx.textAlign = "center";
+            replayCtx.fillText(K[note.lane], x + nw / 2, y + 16);
+            replayCtx.shadowBlur = 0;
+          }
+          const recent = [...replay.notes]
+            .reverse()
+            .find(
+              (note) =>
+                note.type !== null &&
+                elapsed >= note.end &&
+                elapsed - note.end < 280,
+            );
+          const labels = ["PERFECT", "GREAT", "GOOD"];
+          q("#replayJudge").textContent = recent
+            ? recent.type === 2
+              ? "MISS"
+              : labels[recent.judgement]
+            : "";
+          q("#replayJudge").className =
+            "replay-judge " +
+            (recent
+              ? recent.type === 2
+                ? "miss"
+                : ["perfect", "great", "good"][recent.judgement]
+              : "");
+        }
+        function buildReplay(data) {
+          const notes = new Map();
+          for (const event of data.events) {
+            if (event[0] === 0) {
+              notes.set(event[2], {
+                id: event[2],
+                lane: event[3],
+                spawn: event[1],
+                end: data.duration,
+                type: null,
+                judgement: null,
+              });
+            } else {
+              const note = notes.get(event[2]);
+              if (!note) continue;
+              note.end = event[1];
+              note.type = event[0];
+              note.judgement = event[0] === 1 ? event[3] : null;
+            }
+          }
+          return { ...data, notes: [...notes.values()] };
+        }
+        function playReplay() {
+          if (!currentReplay) return;
+          cancelAnimationFrame(replayRaf);
+          setReplayCanvasSize();
+          const started = performance.now();
+          q("#replayStatus").textContent = "リプレイ再生中";
+          function frame(now) {
+            const elapsed = Math.min(
+              currentReplay.duration,
+              Math.round(now - started),
+            );
+            drawReplayFrame(currentReplay, elapsed);
+            q("#replayStatus").textContent =
+              `リプレイ ${Math.floor(elapsed / 1000)}秒 / ${Math.ceil(currentReplay.duration / 1000)}秒`;
+            if (elapsed < currentReplay.duration)
+              replayRaf = requestAnimationFrame(frame);
+            else q("#replayStatus").textContent = "リプレイ終了";
+          }
+          replayRaf = requestAnimationFrame(frame);
+        }
+        q("#replayPlay").onclick = playReplay;
+        async function openRecord(id) {
+          cancelAnimationFrame(replayRaf);
+          currentReplay = null;
+          q("#replayModal").hidden = false;
+          document.body.style.overflow = "hidden";
+          q("#replayTitle").textContent = "記録詳細";
+          q("#replayStats").innerHTML = "";
+          q("#replayStatus").textContent = "記録を読み込んでいます…";
+          q("#replayPlay").disabled = true;
+          setReplayCanvasSize();
+          replayCtx.clearRect(0, 0, replayCanvas.clientWidth, replayCanvas.clientHeight);
+          try {
+            const response = await fetch("/api/scores?id=" + id),
+              data = await response.json();
+            if (!response.ok) throw Error(data.error);
+            const record = data.record,
+              hasReplay = Boolean(record.replay);
+            q("#replayTitle").textContent = record.name;
+            const stats = [
+              ["スコア", Number(record.score).toLocaleString()],
+              ["最大コンボ", record.bestCombo],
+              ["最大速度", "×" + Number(record.maxSpeed).toFixed(2)],
+              ["HIGH SPEED", hasReplay ? "HS " + Number(record.highSpeed).toFixed(2) : "—"],
+              ["PERFECT", hasReplay ? record.perfect : "—"],
+              ["GREAT", hasReplay ? record.great : "—"],
+              ["GOOD", hasReplay ? record.good : "—"],
+              ["MISS", hasReplay ? record.miss : "—"],
+            ];
+            q("#replayStats").innerHTML = stats
+              .map(([label, value]) => `<div><small>${label}</small><b>${value}</b></div>`)
+              .join("");
+            if (!hasReplay) {
+              q("#replayStatus").textContent =
+                "この記録には判定内訳・リプレイデータがありません。";
+              return;
+            }
+            currentReplay = buildReplay(record.replay);
+            q("#replayPlay").disabled = false;
+            playReplay();
+          } catch (error) {
+            q("#replayStatus").textContent =
+              error.message || "記録を読み込めませんでした。";
+          }
+        }
         async function rankings() {
           try {
             const r = await fetch("/api/scores"),
@@ -1023,7 +1350,9 @@
               ? d.scores
                   .map(
                     (x, i) =>
-                      "<li><span>" +
+                      '<li data-id="' +
+                      Number(x.id) +
+                      '" tabindex="0" role="button"><span>' +
                       (i + 1) +
                       "</span><span>" +
                       esc(x.name) +
@@ -1035,6 +1364,17 @@
                   )
                   .join("")
               : "<li><span>—</span><span>まだ記録がありません</span></li>";
+            q("#ranking")
+              .querySelectorAll("li[data-id]")
+              .forEach((item) => {
+                item.onclick = () => openRecord(Number(item.dataset.id));
+                item.onkeydown = (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openRecord(Number(item.dataset.id));
+                  }
+                };
+              });
           } catch {
             q("#ranking").innerHTML =
               "<li><span>!</span><span>ランキングに接続できません</span></li>";
@@ -1078,11 +1418,25 @@
                   score,
                   maxSpeed,
                   bestCombo,
+                  perfect: perfectCount,
+                  great: greatCount,
+                  good: goodCount,
+                  miss,
+                  highSpeed,
+                  replay: {
+                    version: 1,
+                    duration: runDuration,
+                    lineOffset,
+                    missLimit: 4,
+                    events: replayEvents,
+                  },
                 }),
               }),
               d = await r.json();
             if (!r.ok) throw Error(d.error);
-            q("#message").textContent = "ランキングに登録しました！";
+            q("#message").textContent = d.updated
+              ? "ランキング記録を更新しました！"
+              : "自己ベスト未更新のため、ランキング記録はそのままです。";
             q("#submit").style.display = "none";
             await rankings();
           } catch (x) {

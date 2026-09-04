@@ -871,22 +871,33 @@
             }, delay);
           });
         }
+        function getDensityInterval() {
+          const densityIntervals = [1050, 900, 760, 640, 530, 440, 360];
+          if (speed <= 4) {
+            const level = Math.min(6, Math.floor((speed - 1) / 0.5));
+            return densityIntervals[level];
+          }
+          if (speed <= 6) return densityIntervals[6];
+          const lateIntervals = [290, 230, 180, 140];
+          const lateLevel = Math.min(
+            lateIntervals.length - 1,
+            Math.floor((speed - 6.1) / 0.5),
+          );
+          return lateIntervals[Math.max(0, lateLevel)];
+        }
+        function getScrollSpeed() {
+          if (speed <= 4) return 1;
+          return 1 + (speed - 4);
+        }
         function loop(now) {
           if (phase !== "playing") return;
           const dt = Math.min(34, now - lastAt);
           lastAt = now;
-          speed = Math.min(8, 1 + (now - startAt) / 30000);
+          const rawSpeed = Math.min(8, 1 + (now - startAt) / 30000);
+          speed = Math.floor(rawSpeed * 10 + 0.000001) / 10;
           maxSpeed = Math.max(maxSpeed, speed);
           if (!demoEnding) {
-            const densityIntervals = [
-                1050, 900, 760, 640, 530, 440, 360, 290, 230, 180, 140, 110, 90,
-                75, 65,
-              ],
-              densityLevel = Math.min(
-                densityIntervals.length - 1,
-                Math.floor((speed - 1) / 0.5),
-              ),
-              interval = densityIntervals[densityLevel];
+            const interval = getDensityInterval();
             if (now - lastSpawn >= interval) {
               spawn();
               lastSpawn = now;
@@ -894,7 +905,7 @@
             const { line } = dims();
             notes.forEach((n) => {
               n.previousY = n.y;
-              n.y += BASE * speed * highSpeed * dt;
+              n.y += BASE * getScrollSpeed() * highSpeed * dt;
             });
             if (demoMode) {
               const autoLanes = notes
@@ -951,6 +962,8 @@
         function end() {
           phase = "over";
           cancelAnimationFrame(raf);
+          notes = [];
+          activeLane = -1;
           const old = Number(localStorage.getItem("accel-keys-best") || 0);
           if (!demoMode) {
             const best = Math.max(old, score);

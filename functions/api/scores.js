@@ -84,10 +84,38 @@ function normalizeReplay(value) {
   return { version: 1, duration, lineOffset, missLimit, events };
 }
 
+// The original scores table restricts mode to time/hits. Keep all existing
+// records intact and provision the independent cosmos leaderboard on first use.
+export async function scoreTable(env, mode) {
+  if (mode !== "cosmos") return "scores";
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS scores_cosmos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_name TEXT NOT NULL,
+    score INTEGER NOT NULL CHECK(score > 0),
+    mode TEXT NOT NULL DEFAULT 'cosmos',
+    max_speed REAL NOT NULL,
+    best_combo INTEGER NOT NULL,
+    player_id TEXT UNIQUE,
+    perfect_count INTEGER NOT NULL DEFAULT 0,
+    great_count INTEGER NOT NULL DEFAULT 0,
+    good_count INTEGER NOT NULL DEFAULT 0,
+    miss_count INTEGER NOT NULL DEFAULT 0,
+    high_speed REAL NOT NULL DEFAULT 1,
+    replay_data TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`).run();
+  return "scores_cosmos";
+}
+
 export async function onRequestGet({ request, env }) {
   const player = getPlayer(request);
   try {
-    const id = Number(new URL(request.url).searchParams.get("id"));
+    const params = new URL(request.url).searchParams;
+    const mode = params.get("mode") ?? "time";
+    if (!["time", "cosmos"].includes(mode))
+      return json({ error: "モードが正しくありません。" }, 400, player.headers);
+    const table = await scoreTable(env, mode);
+    const id = Number(params.get("id"));
     if (Number.isInteger(id) && id > 0) {
       const record = await env.DB.prepare(
         `SELECT id, player_name AS name, score, max_speed AS maxSpeed,
@@ -95,7 +123,7 @@ export async function onRequestGet({ request, env }) {
                 great_count AS great, good_count AS good, miss_count AS miss,
                 high_speed AS highSpeed, replay_data AS replay,
                 created_at AS createdAt
-         FROM scores WHERE id = ?`,
+         FROM ${table} WHERE id = ?`,
       )
         .bind(id)
         .first();
@@ -110,7 +138,7 @@ export async function onRequestGet({ request, env }) {
     const { results } = await env.DB.prepare(
       `SELECT id, player_name AS name, score, max_speed AS maxSpeed,
               best_combo AS bestCombo, created_at AS createdAt
-       FROM scores ORDER BY score DESC, created_at ASC LIMIT 10`,
+       FROM ${table} ORDER BY score DESC, created_at ASC LIMIT 10`,
     ).all();
     return json(
       { scores: results ?? [], worldBest: results?.[0]?.score ?? 0 },
@@ -130,6 +158,9 @@ export async function onRequestPost({ request, env }) {
   const player = getPlayer(request);
   try {
     const body = await request.json();
+    const mode = body.mode ?? "time";
+    if (!["time", "cosmos"].includes(mode))
+      return json({ error: "モードが正しくありません。" }, 400, player.headers);
     const rawName = String(body.name ?? "")
       .trim()
       .replace(/[<>]/g, "");
@@ -190,8 +221,9 @@ export async function onRequestPost({ request, env }) {
         player.headers,
       );
     }
+    const table = await scoreTable(env, mode);
     const result = await env.DB.prepare(
-      `INSERT INTO scores (
+      `INSERT INTO ${table} (
          player_name, score, mode, max_speed, best_combo, player_id,
          perfect_count, great_count, good_count, miss_count, high_speed, replay_data
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -208,12 +240,12 @@ export async function onRequestPost({ request, env }) {
          high_speed = excluded.high_speed,
          replay_data = excluded.replay_data,
          created_at = datetime('now')
-       WHERE excluded.score > scores.score`,
+       WHERE excluded.score > ${table}.score`,
     )
       .bind(
         name,
         score,
-        "time",
+        mode,
         maxSpeed,
         bestCombo,
         player.id,
@@ -226,10 +258,10 @@ export async function onRequestPost({ request, env }) {
       )
       .run();
     await env.DB.prepare(
-      `DELETE FROM scores WHERE id NOT IN (SELECT id FROM scores ORDER BY score DESC, created_at ASC LIMIT 500)`,
+      `DELETE FROM ${table} WHERE id NOT IN (SELECT id FROM ${table} ORDER BY score DESC, created_at ASC LIMIT 500)`,
     ).run();
     const best = await env.DB.prepare(
-      `SELECT MAX(score) AS score FROM scores`,
+      `SELECT MAX(score) AS score FROM ${table}`,
     ).first();
     return json(
       {
@@ -248,3 +280,4 @@ export async function onRequestPost({ request, env }) {
     );
   }
 }
+

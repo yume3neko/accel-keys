@@ -337,9 +337,13 @@
         </section>
         <div class="tools">
           <h1>登録履歴</h1>
+          <select id="modeFilter" aria-label="ランキングのモード">
+            <option value="time">通常モード</option>
+            <option value="cosmos">加速する大宇宙</option>
+          </select>
           <div>
             <button class="refresh" id="refresh">更新</button
-            ><button class="danger" id="clear">ランキングを全削除</button>
+            ><button class="danger" id="clear">選択モードを全削除</button>
           </div>
         </div>
         <p class="status" id="status"></p>
@@ -424,9 +428,10 @@
     <script>
       (() => {
         const q = (s) => document.querySelector(s),
-          api = "/api/admin/scores";
+          api = () => "/api/admin/scores?mode=" + q("#modeFilter").value;
         let token = sessionStorage.getItem("accel-admin-token") || "",
-          currentScores = [];
+          currentScores = [],
+          loadRequest = 0;
         const headers = () => ({
             authorization: "Bearer " + token,
             "content-type": "application/json",
@@ -437,10 +442,12 @@
             return d.innerHTML;
           };
         async function load() {
+          const requestId = ++loadRequest;
           q("#status").textContent = "読み込み中…";
           try {
-            const r = await fetch(api, { headers: headers() }),
+            const r = await fetch(api(), { headers: headers() }),
               d = await r.json();
+            if (requestId !== loadRequest) return;
             if (r.status === 401) throw Error("管理者キーが正しくありません。");
             if (!r.ok) throw Error(d.error);
             q("#login").style.display = "none";
@@ -473,6 +480,7 @@
                     remove(Number(b.dataset.id), b.dataset.name)),
               );
           } catch (e) {
+            if (requestId !== loadRequest) return;
             q("#status").textContent = "";
             q("#loginError").textContent = e.message;
             q("#login").style.display = "block";
@@ -505,7 +513,7 @@
           const saveButton = q("#editSave");
           saveButton.disabled = true;
           q("#editMessage").textContent = "保存中…";
-          const r = await fetch(api, {
+          const r = await fetch(api(), {
               method: "PATCH",
               headers: headers(),
               body: JSON.stringify({
@@ -530,7 +538,7 @@
         q("#editCancel").onclick = closeEditor;
         async function remove(id, name) {
           if (!confirm(`${name} の記録を削除しますか？`)) return;
-          const r = await fetch(api, {
+          const r = await fetch(api(), {
               method: "DELETE",
               headers: headers(),
               body: JSON.stringify({ id }),
@@ -547,13 +555,14 @@
           load();
         };
         q("#refresh").onclick = load;
+        q("#modeFilter").onchange = load;
         q("#clear").onclick = async () => {
           if (
-            !confirm("ランキングを全件削除します。この操作は取り消せません。")
+            !confirm("選択中のモードのランキングを全件削除します。この操作は取り消せません。")
           )
             return;
           if (!confirm("本当にすべて削除しますか？")) return;
-          const r = await fetch(api, {
+          const r = await fetch(api(), {
               method: "DELETE",
               headers: headers(),
               body: JSON.stringify({ all: true }),
@@ -572,3 +581,4 @@
     </script>
   </body>
 </html>
+

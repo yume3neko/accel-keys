@@ -659,6 +659,14 @@
               ><span id="lineText"></span><small>右ほど上へ移動</small
             ></output>
           </section>
+          <section class="hsbox">
+            <label for="gameMode">モード</label>
+            <select id="gameMode" style="min-width:0;background:#0b1114;color:#f4f7f5;padding:10px;border:1px solid #2a353a;border-radius:6px">
+              <option value="time">通常モード</option>
+              <option value="cosmos">加速する大宇宙</option>
+            </select>
+          </section>
+          <p class="message" id="modeDescription"></p>
           <section class="controls" id="controls">
             <label class="demo-toggle">
               <input id="demoMode" type="checkbox" />
@@ -677,7 +685,7 @@
           </form>
           <p class="message" id="message"></p>
           <section class="ranking">
-            <h3>GLOBAL TOP 10</h3>
+            <h3 id="rankingTitle">GLOBAL TOP 10</h3>
             <ol id="ranking">
               <li><span>—</span><span>読み込み中…</span></li>
             </ol>
@@ -712,7 +720,10 @@
           overlay = q("#overlay"),
           keys = q("#keys"),
           BASE = 0.145;
-        let phase = "idle",
+        let gameMode = localStorage.getItem("accel-keys-mode") === "cosmos" ? "cosmos" : "time",
+          patternIndex = 0,
+          cosmosProgress = 0,
+          phase = "idle",
           notes = [],
           score = 0,
           combo = 0,
@@ -758,7 +769,8 @@
             highSpeed < 1
               ? 0.6 + (highSpeed - 0.5) * 0.25
               : 1 + (highSpeed - 1) * 0.08,
-          myBest = Number(localStorage.getItem("accel-keys-best") || 0);
+          bestKey = () => gameMode === "cosmos" ? "accel-keys-best-cosmos" : "accel-keys-best",
+          myBest = Number(localStorage.getItem(bestKey()) || 0);
         q("#myBest").textContent = myBest.toLocaleString();
         q("#hs").value = String(highSpeed);
         function updateHs() {
@@ -816,7 +828,7 @@
         new ResizeObserver(resize).observe(canvas);
         function dims() {
           const h = canvas.clientHeight,
-            lineBottom = phase === "playing" ? 25 : 45;
+            lineBottom = 45;
           return {
             w: canvas.clientWidth,
             h,
@@ -885,17 +897,22 @@
             x.classList.toggle("active", i === activeLane),
           );
         }
-        function spawn() {
-          let lane = Math.floor(Math.random() * 4);
-          if (lane === lastLane)
-            lane = (lane + 1 + Math.floor(Math.random() * 3)) % 4;
+        function spawn(at = performance.now(), initialY = -28) {
+          let lane;
+          if (gameMode === "cosmos") {
+            lane = [3, 1, 2, 0][patternIndex++ % 4];
+          } else {
+            lane = Math.floor(Math.random() * 4);
+            if (lane === lastLane)
+              lane = (lane + 1 + Math.floor(Math.random() * 3)) % 4;
+          }
           lastLane = lane;
           const id = phase === "playing" ? nextNoteId++ : 0;
-          notes.push({ id, lane, y: -28 });
+          notes.push({ id, lane, y: initialY });
           if (phase === "playing" && replayEvents.length < 12000)
             replayEvents.push([
               0,
-              Math.max(0, Math.round(performance.now() - startAt)),
+              Math.max(0, Math.round(at - startAt)),
               id,
               lane,
             ]);
@@ -904,7 +921,7 @@
           if (phase !== "idle") return;
           const dt = Math.min(34, now - lastAt || 16);
           lastAt = now;
-          if (now - previewAt > 820) {
+          if (now - previewAt > (gameMode === "cosmos" ? 1000 / 1.5 : 820)) {
             spawn();
             previewAt = now;
           }
@@ -1005,6 +1022,9 @@
             }, delay);
           });
         }
+        function cosmosDensity(elapsed) {
+          return 1.5 + Math.floor(Math.max(0, elapsed) / 4000) * 0.1;
+        }
         function getDensityInterval() {
           const densityIntervals = [1050, 900, 760, 640, 530, 440, 360];
           if (speed <= 4) {
@@ -1020,6 +1040,7 @@
           return lateIntervals[Math.max(0, lateLevel)];
         }
         function getScrollSpeed() {
+          if (gameMode === "cosmos") return 1;
           if (speed <= 4) return 1;
           return 1 + (speed - 4);
         }
@@ -1032,7 +1053,24 @@
           maxSpeed = Math.max(maxSpeed, speed);
           if (!demoEnding) {
             const interval = getDensityInterval();
-            if (now - lastSpawn >= interval) {
+            if (gameMode === "cosmos") {
+              // Carry fractional note progress across each four-second density step.
+              while (lastSpawn < now) {
+                const elapsed = lastSpawn - startAt;
+                const boundary = startAt + (Math.floor(Math.max(0, elapsed) / 4000) + 1) * 4000;
+                const rate = cosmosDensity(elapsed) / 1000;
+                const end = Math.min(now, boundary);
+                const needed = (1 - cosmosProgress) / rate;
+                if (lastSpawn + needed <= end + 0.000001) {
+                  lastSpawn += needed;
+                  cosmosProgress = 0;
+                  spawn(lastSpawn, -28 + BASE * highSpeed * (now - lastSpawn - dt));
+                } else {
+                  cosmosProgress += (end - lastSpawn) * rate;
+                  lastSpawn = end;
+                }
+              }
+            } else if (now - lastSpawn >= interval) {
               spawn();
               lastSpawn = now;
             }
@@ -1069,6 +1107,11 @@
         function start() {
           cancelAnimationFrame(raf);
           phase = "count";
+          patternIndex = 0;
+          cosmosProgress = 0;
+          lastLane = -1;
+          clearTimeout(judgeTimer);
+          q("#gameMode").disabled = true;
           document.body.classList.add("playing");
           notes = [];
           score = combo = bestCombo = miss = 0;
@@ -1092,7 +1135,7 @@
               phase = "playing";
               overlay.innerHTML = "";
               startAt = lastAt = performance.now();
-              lastSpawn = startAt - 600;
+              lastSpawn = gameMode === "cosmos" ? startAt : startAt - 600;
               raf = requestAnimationFrame(loop);
             } else overlay.innerHTML = '<div class="count">' + n + "</div>";
           }, 700);
@@ -1103,10 +1146,10 @@
           cancelAnimationFrame(raf);
           notes = [];
           activeLane = -1;
-          const old = Number(localStorage.getItem("accel-keys-best") || 0);
+          const old = Number(localStorage.getItem(bestKey()) || 0);
           if (!demoMode) {
             const best = Math.max(old, score);
-            localStorage.setItem("accel-keys-best", best);
+            localStorage.setItem(bestKey(), best);
             q("#myBest").textContent = best.toLocaleString();
           }
           overlay.innerHTML =
@@ -1306,7 +1349,7 @@
           setReplayCanvasSize();
           replayCtx.clearRect(0, 0, replayCanvas.clientWidth, replayCanvas.clientHeight);
           try {
-            const response = await fetch("/api/scores?id=" + id),
+            const response = await fetch("/api/scores?mode=" + gameMode + "&id=" + id),
               data = await response.json();
             if (!response.ok) throw Error(data.error);
             const record = data.record,
@@ -1338,10 +1381,13 @@
               error.message || "記録を読み込めませんでした。";
           }
         }
+        let rankingRequest = 0;
         async function rankings() {
+          const requestId = ++rankingRequest;
           try {
-            const r = await fetch("/api/scores"),
+            const r = await fetch("/api/scores?mode=" + gameMode),
               d = await r.json();
+            if (requestId !== rankingRequest) return;
             if (!r.ok) throw Error();
             q("#worldBest").textContent = Number(
               d.worldBest || 0,
@@ -1376,6 +1422,7 @@
                 };
               });
           } catch {
+            if (requestId !== rankingRequest) return;
             q("#ranking").innerHTML =
               "<li><span>!</span><span>ランキングに接続できません</span></li>";
             q("#worldBest").textContent = "OFFLINE";
@@ -1415,6 +1462,7 @@
                 },
                 body: JSON.stringify({
                   name: enteredName,
+                  mode: gameMode,
                   score,
                   maxSpeed,
                   bestCombo,
@@ -1445,7 +1493,25 @@
             b.disabled = false;
           }
         };
-        rankings();
+        function updateMode() {
+          gameMode = q("#gameMode").value;
+          localStorage.setItem("accel-keys-mode", gameMode);
+          notes = [];
+          patternIndex = 0;
+          lastLane = -1;
+          previewAt = performance.now();
+          q("#myBest").textContent = Number(localStorage.getItem(bestKey()) || 0).toLocaleString();
+          q("#worldBest").textContent = "---";
+          q("#ranking").innerHTML = "<li><span>—</span><span>読み込み中…</span></li>";
+          q("#rankingTitle").textContent = (gameMode === "cosmos" ? "加速する大宇宙" : "通常モード") + " / GLOBAL TOP 10";
+          q("#modeDescription").textContent = gameMode === "cosmos"
+            ? "K → F → J → D の繰り返し。1.5ノーツ/秒から、4秒ごとに+0.1ノーツ/秒。"
+            : "同じレーンが連続しないランダム配置。段階的に加速します。";
+          rankings();
+        }
+        q("#gameMode").value = gameMode;
+        q("#gameMode").onchange = updateMode;
+        updateMode();
         paint();
         resize();
         lastAt = performance.now();
@@ -1454,3 +1520,4 @@
     </script>
   </body>
 </html>
+

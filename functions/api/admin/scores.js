@@ -1,3 +1,5 @@
+import { scoreTable } from "../scores.js";
+
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -17,16 +19,20 @@ export async function onRequestGet({ request, env }) {
   if (!authorized(request, env))
     return json({ error: "認証に失敗しました。" }, 401);
   try {
+    const mode = new URL(request.url).searchParams.get("mode") ?? "time";
+    if (!["time", "cosmos"].includes(mode))
+      return json({ error: "モードが正しくありません。" }, 400);
+    const table = await scoreTable(env, mode);
     const { results } = await env.DB.prepare(
       `SELECT id, player_name AS name, score, max_speed AS maxSpeed,
               best_combo AS bestCombo, created_at AS createdAt
-       FROM scores ORDER BY created_at DESC, id DESC LIMIT 500`,
+       FROM ${table} ORDER BY created_at DESC, id DESC LIMIT 500`,
     ).all();
     const summary = await env.DB.prepare(
       `SELECT COUNT(*) AS total, COALESCE(MAX(score), 0) AS worldBest,
               COUNT(DISTINCT player_id) +
               COALESCE(SUM(CASE WHEN player_id IS NULL THEN 1 ELSE 0 END), 0)
-              AS players FROM scores`,
+              AS players FROM ${table}`,
     ).first();
     return json({ scores: results ?? [], summary });
   } catch {
@@ -38,6 +44,10 @@ export async function onRequestPatch({ request, env }) {
   if (!authorized(request, env))
     return json({ error: "認証に失敗しました。" }, 401);
   try {
+    const mode = new URL(request.url).searchParams.get("mode") ?? "time";
+    if (!["time", "cosmos"].includes(mode))
+      return json({ error: "モードが正しくありません。" }, 400);
+    const table = await scoreTable(env, mode);
     const body = await request.json();
     const id = Number(body.id);
     const rawName = String(body.name ?? "")
@@ -68,7 +78,7 @@ export async function onRequestPatch({ request, env }) {
       return json({ error: "編集内容が正しくありません。" }, 400);
     }
     const result = await env.DB.prepare(
-      `UPDATE scores SET player_name = ?, score = ?, max_speed = ?, best_combo = ? WHERE id = ?`,
+      `UPDATE ${table} SET player_name = ?, score = ?, max_speed = ?, best_combo = ? WHERE id = ?`,
     )
       .bind(name, score, maxSpeed, bestCombo, id)
       .run();
@@ -84,15 +94,19 @@ export async function onRequestDelete({ request, env }) {
   if (!authorized(request, env))
     return json({ error: "認証に失敗しました。" }, 401);
   try {
+    const mode = new URL(request.url).searchParams.get("mode") ?? "time";
+    if (!["time", "cosmos"].includes(mode))
+      return json({ error: "モードが正しくありません。" }, 400);
+    const table = await scoreTable(env, mode);
     const body = await request.json();
     if (body.all === true) {
-      const result = await env.DB.prepare("DELETE FROM scores").run();
+      const result = await env.DB.prepare(`DELETE FROM ${table}`).run();
       return json({ ok: true, deleted: result.meta?.changes ?? 0 });
     }
     const id = Number(body.id);
     if (!Number.isInteger(id) || id < 1)
       return json({ error: "IDが正しくありません。" }, 400);
-    const result = await env.DB.prepare("DELETE FROM scores WHERE id = ?")
+    const result = await env.DB.prepare(`DELETE FROM ${table} WHERE id = ?`)
       .bind(id)
       .run();
     if (!result.meta?.changes)
@@ -102,3 +116,4 @@ export async function onRequestDelete({ request, env }) {
     return json({ error: "削除処理に失敗しました。" }, 500);
   }
 }
+

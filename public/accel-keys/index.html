@@ -1025,17 +1025,24 @@
         function cosmosDensity(elapsed) {
           return 1.5 + Math.floor(Math.max(0, elapsed) / 4000) * 0.1;
         }
-        function getDensityInterval() {
+        function getDensityInterval(densitySpeed = speed) {
           const densityIntervals = [1050, 900, 760, 640, 530, 440, 360];
-          if (speed <= 4) {
-            const level = Math.min(6, Math.floor((speed - 1) / 0.5));
+          if (densitySpeed <= 4) {
+            const level = Math.min(6, Math.floor((densitySpeed - 1) / 0.5));
             return densityIntervals[level];
           }
-          if (speed <= 6) return densityIntervals[6];
+          if (densitySpeed <= 6) return densityIntervals[6];
+          // Continue adding 0.5 notes/second every 15 seconds after ×8.0.
+          // Use density rather than subtracting milliseconds so the interval
+          // stays positive without an upper density limit.
+          if (densitySpeed >= 8.1) {
+            const extraSteps = 1 + Math.floor((densitySpeed - 8.1) / 0.5 + 0.000001);
+            return 1000 / (1000 / 140 + extraSteps * 0.5);
+          }
           const lateIntervals = [290, 230, 180, 140];
           const lateLevel = Math.min(
             lateIntervals.length - 1,
-            Math.floor((speed - 6.1) / 0.5),
+            Math.floor((densitySpeed - 6.1) / 0.5),
           );
           return lateIntervals[Math.max(0, lateLevel)];
         }
@@ -1048,11 +1055,12 @@
           if (phase !== "playing") return;
           const dt = Math.min(34, now - lastAt);
           lastAt = now;
-          const rawSpeed = Math.min(8, 1 + (now - startAt) / 30000);
-          speed = Math.floor(rawSpeed * 10 + 0.000001) / 10;
+          const rawSpeed = 1 + (now - startAt) / 30000;
+          const densitySpeed = Math.floor(rawSpeed * 10 + 0.000001) / 10;
+          speed = Math.min(8, densitySpeed);
           maxSpeed = Math.max(maxSpeed, speed);
           if (!demoEnding) {
-            const interval = getDensityInterval();
+            const interval = getDensityInterval(densitySpeed);
             if (gameMode === "cosmos") {
               // Carry fractional note progress across each four-second density step.
               while (lastSpawn < now) {
@@ -1070,9 +1078,12 @@
                   lastSpawn = end;
                 }
               }
-            } else if (now - lastSpawn >= interval) {
-              spawn();
-              lastSpawn = now;
+            } else {
+              // Keep the schedule even when multiple notes fall within one frame.
+              while (now - lastSpawn >= interval) {
+                lastSpawn += interval;
+                spawn(lastSpawn, -28 + BASE * getScrollSpeed() * highSpeed * (now - lastSpawn - dt));
+              }
             }
             const { line } = dims();
             notes.forEach((n) => {
@@ -1506,7 +1517,7 @@
           q("#rankingTitle").textContent = (gameMode === "cosmos" ? "加速する大宇宙" : "通常モード") + " / GLOBAL TOP 10";
           q("#modeDescription").textContent = gameMode === "cosmos"
             ? "K → F → J → D の繰り返し。1.5ノーツ/秒から、4秒ごとに+0.1ノーツ/秒。"
-            : "同じレーンが連続しないランダム配置。段階的に加速します。";
+            : "同じレーンが連続しないランダム配置。速度は×8.0まで、密度は上限なく上昇します。";
           rankings();
         }
         q("#gameMode").value = gameMode;

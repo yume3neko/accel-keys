@@ -194,7 +194,7 @@ export async function onRequestPost({ request, env }) {
       score > 100000000 ||
       !Number.isFinite(maxSpeed) ||
       maxSpeed < 1 ||
-      maxSpeed > 8.1 ||
+      (mode !== "cosmos" && maxSpeed > 8.1) ||
       !Number.isInteger(bestCombo) ||
       bestCombo < 0 ||
       bestCombo > 1000000 ||

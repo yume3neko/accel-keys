@@ -495,6 +495,9 @@
           q("#editName").value = record.name;
           q("#editScore").value = record.score;
           q("#editMaxSpeed").value = record.maxSpeed;
+          if (q("#modeFilter").value === "cosmos")
+            q("#editMaxSpeed").removeAttribute("max");
+          else q("#editMaxSpeed").max = "8.1";
           q("#editBestCombo").value = record.bestCombo;
           q("#editMeta").textContent =
             `記録ID: ${record.id} ／ 登録日時: ${record.createdAt}`;

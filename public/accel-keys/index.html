@@ -1057,7 +1057,7 @@
           lastAt = now;
           const rawSpeed = 1 + (now - startAt) / 30000;
           const densitySpeed = Math.floor(rawSpeed * 10 + 0.000001) / 10;
-          speed = Math.min(8, densitySpeed);
+          speed = gameMode === "cosmos" ? densitySpeed : Math.min(8, densitySpeed);
           maxSpeed = Math.max(maxSpeed, speed);
           if (!demoEnding) {
             const interval = getDensityInterval(densitySpeed);

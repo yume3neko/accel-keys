@@ -16,7 +16,23 @@ function settings(){hs=Number($('hs').value);line=Number($('line').value);$('hsT
 $('hs').oninput=settings;$('line').oninput=settings;settings();
 $('kind').onchange=()=>{$('rule').textContent=rules($('kind').value);};$('kind').onchange();
 const invited=new URL(location.href).searchParams.get('room');if(invited)$('codeInput').value=invited.toUpperCase();
-function name(){const n=$('name').value.trim();if(!n)throw Error('プレイヤー名を入力してください。');localStorage.setItem('accel-multi-name',n);return n;}
+let debugInput=false;
+function updateDebugInput(){
+  const debug=$('codeInput').value.trim()==='000000';
+  if(debug!==debugInput){
+    if(!debug)$('name').value=localStorage.getItem('accel-multi-name')||'';
+    else if($('name').value===(localStorage.getItem('accel-multi-name')||''))$('name').value='';
+    debugInput=debug;
+  }
+  $('name').type=debug?'password':'text';
+  $('name').maxLength=debug?4096:12;
+  $('name').autocomplete=debug?'off':'nickname';
+  $('name').placeholder=debug?'管理者パスワード':'12文字まで';
+  $('nameLabel').textContent=debug?'管理者パスワード（デバッグルーム）':'プレイヤー名';
+  $('create').disabled=debug;
+}
+$('codeInput').oninput=updateDebugInput;updateDebugInput();
+function name(){if($('codeInput').value.trim()==='000000')throw Error('デバッグルームは「参加する」から入室してください。');const n=$('name').value.trim();if(!n)throw Error('プレイヤー名を入力してください。');localStorage.setItem('accel-multi-name',n);return n;}
 function roomCode(){const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return [...crypto.getRandomValues(new Uint8Array(6))].map(v=>alphabet[v%alphabet.length]).join('');}
 function send(action,extra={}){
   const operation=chain.catch(()=>{}).then(async()=>{
@@ -39,7 +55,13 @@ function send(action,extra={}){
 }
 async function action(button,fn){button.disabled=true;$('message').textContent='';try{await fn();}catch(e){$('message').textContent=e.name==='AbortError'?'通信がタイムアウトしました。もう一度お試しください。':e.message;}finally{button.disabled=false;if(room)renderRoom();}}
 $('create').onclick=()=>action($('create'),async()=>{await send('create',{name:name(),mode:$('mode').value,kind:$('kind').value,code:roomCode()});schedule();});
-$('joinForm').onsubmit=e=>{e.preventDefault();action($('join'),async()=>{await send('join',{name:name(),code:$('codeInput').value.trim().toUpperCase()});schedule();});};
+$('joinForm').onsubmit=e=>{e.preventDefault();return action($('join'),async()=>{
+  const code=$('codeInput').value.trim().toUpperCase(),debug=code==='000000';
+  const enteredName=debug?$('name').value:name();
+  if(debug)$('name').value='';
+  await send('join',{name:enteredName,code,mode:$('mode').value,kind:$('kind').value});schedule();
+});};
+$('addCPU').onclick=()=>action($('addCPU'),()=>send('addCPU'));
 $('ready').onclick=()=>action($('ready'),()=>send('ready',{ready:!room.players.find(p=>p.id===room.you)?.ready}));
 $('start').onclick=()=>action($('start'),()=>send('start'));
 $('copy').onclick=()=>action($('copy'),async()=>{const url=new URL(location.href);url.searchParams.set('room',room.code);try{await navigator.clipboard.writeText(url.href);$('message').textContent='招待リンクをコピーしました。';}catch{$('message').textContent='ルーム番号 '+room.code+' を友だちに伝えてください。';}});
@@ -77,13 +99,21 @@ function member(parent,p,result=false){
   const row=document.createElement('div');row.className='member'+(p.left?' out':'');
   const who=document.createElement('span');who.textContent=p.name+(p.id===room.you?'（あなた）':'')+(p.id===room.host?' / ホスト':'');
   const detail=document.createElement('small');detail.textContent=result?`${p.stats.score.toLocaleString()}点 / 最大${p.stats.bestCombo}コンボ / ${p.stats.miss}ミス${p.left?' / 退出':''}`:(p.ready?'準備完了':'準備中');
-  row.append(who,detail);parent.append(row);
+  row.append(who,detail);
+  if(!result&&p.cpu&&room.debug&&room.host===room.you){
+    const remove=document.createElement('button');remove.className='secondary';remove.textContent='削除';
+    remove.onclick=()=>action(remove,()=>send('removeCPU',{id:p.id}));row.append(remove);
+  }
+  parent.append(row);
 }
 function renderRoom(){
   $('roomTitle').textContent=modeName(room.mode)+' / '+kindName(room.kind);$('roomCode').textContent=room.code;$('roomRule').textContent=rules(room.kind);
   $('members').replaceChildren();room.players.forEach(p=>member($('members'),p));
   const me=room.players.find(p=>p.id===room.you);$('ready').textContent=me?.ready?'準備を取り消す':'準備完了';
   $('start').hidden=room.host!==room.you;$('start').disabled=room.phase!=='lobby'||room.players.length<2||room.players.some(p=>!p.ready);
+  $('addCPU').hidden=!room.debug||room.host!==room.you||room.phase!=='lobby';
+  $('addCPU').disabled=room.players.length>=4;
+  if(room.debug)$('roomRule').textContent+=' CPU：平均精度約74%、ミス率5〜10%（短いプレイではばらつきます）。';
   $('rivals').replaceChildren();
   for(const p of room.players){
     const row=document.createElement('div');row.className='rival'+(p.left||(room.kind==='battle'&&p.stats.miss>=4)?' out':'');
@@ -140,3 +170,4 @@ function frame(now){
   raf=requestAnimationFrame(frame);
 }
 addEventListener('pagehide',()=>{if(room&&room.phase!=='finished')fetch('/api/multiplayer',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({action:'leave',code:room.code}),keepalive:true}).catch(()=>{});});
+

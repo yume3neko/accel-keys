@@ -5,13 +5,14 @@
 </style></head><body><main>
 <header><b>ACCEL KEYS / MULTI</b><a href="/accel-keys/">ソロへ</a></header>
 <section id="setup"><h1>みんなで加速する。</h1><p>2〜4人で同じ譜面に挑戦。ルームを作るか、友だちのルーム番号を入力してください。</p>
-<label>プレイヤー名<input id="name" maxlength="12" autocomplete="nickname" placeholder="12文字まで"></label>
+<label><span id="nameLabel">プレイヤー名</span><input id="name" maxlength="12" autocomplete="nickname" placeholder="12文字まで"></label>
 <div class="card"><div class="grid"><label>譜面<select id="mode"><option value="time">通常モード</option><option value="cosmos">加速する大宇宙</option></select></label><label>遊び方<select id="kind"><option value="battle">サバイバルバトル</option><option value="coop">協力モード</option></select></label></div><p id="rule" class="small"></p><button id="create">ルームを作る</button></div>
 <form id="joinForm" class="card"><label>ルーム番号<input id="codeInput" maxlength="6" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="例：ABCD23"></label><div class="actions"><button id="join">参加する</button></div></form></section>
-<section id="lobby" hidden><h1 id="roomTitle">待機ルーム</h1><div class="card"><div class="small">ルーム番号</div><div id="roomCode" class="code"></div><div class="actions"><button id="copy" class="secondary">招待リンクをコピー</button><button id="leave" class="danger">退出</button></div><p id="roomRule" class="small"></p><div id="members" class="members"></div><div class="actions"><button id="ready">準備完了</button><button id="start">全員でスタート</button></div></div>
+<section id="lobby" hidden><h1 id="roomTitle">待機ルーム</h1><div class="card"><div class="small">ルーム番号</div><div id="roomCode" class="code"></div><div class="actions"><button id="copy" class="secondary">招待リンクをコピー</button><button id="leave" class="danger">退出</button></div><p id="roomRule" class="small"></p><div id="members" class="members"></div><div class="actions"><button id="addCPU" class="secondary" hidden>CPUを追加</button><button id="ready">準備完了</button><button id="start">全員でスタート</button></div></div>
 <div class="card"><div class="grid"><label>HIGH SPEED <span id="hsText"></span><input id="hs" type="range" min="0.5" max="2" step="0.1"></label><label>判定ライン <span id="lineText"></span><input id="line" type="range" min="-15" max="160" step="5"></label></div><p class="small">HSは見た目のみ。全員同じ判定幅・得点条件です。PERFECT ±60ms / GREAT ±110ms / GOOD ±170ms。開始後の設定変更はできません。</p></div></section>
 <section id="results" hidden><h1 id="resultTitle"></h1><p id="resultReason"></p><div id="resultRows"></div><p class="small">マルチプレイの結果はソロランキングには送信されません。</p><button id="again">新しいルームで遊ぶ</button></section>
 <p id="connection" role="status"></p><p id="message" class="message" role="alert"></p>
 </main>
 <section id="play" hidden><div class="hud"><span>SCORE <b id="score">0</b></span><span>COMBO <b id="combo">0</b></span><span>倍率 <b id="speed">×1.00</b></span><button id="quit" class="danger">退出</button></div><div class="hud"><span id="life"></span><span id="density"></span></div><div id="rivals" class="rivals"></div><div id="netStatus"></div><div class="board"><canvas id="canvas" aria-label="D F J K の4レーン"></canvas><div id="overlay"></div><div id="judge"></div></div><div class="keys"><button data-lane="0">D</button><button data-lane="1">F</button><button data-lane="2">J</button><button data-lane="3">K</button></div></section>
 <script type="module" src="./multiplayer.js"></script></body></html>
+

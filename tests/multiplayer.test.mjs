@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
-import {onRequestPost,apply,maintain} from '../functions/api/multiplayer.js';
+import {onRequestPost,apply,maintain,cpuJudgement} from '../functions/api/multiplayer.js';
 import {makeChart,density,multiplier} from '../public/accel-keys/multiplayer-engine.js';
 function fixture(){
  const db=new DatabaseSync(':memory:');
- const env={DB:{prepare(sql){let args=[];return {bind(...a){args=a;return this;},async run(){return {meta:{changes:db.prepare(sql).run(...args).changes}};},async first(){return db.prepare(sql).get(...args);}};}}};
+ const env={ADMIN_TOKEN:'debug-test-password-more-than-12',DB:{prepare(sql){let args=[];return {bind(...a){args=a;return this;},async run(){return {meta:{changes:db.prepare(sql).run(...args).changes}};},async first(){return db.prepare(sql).get(...args);}};}}};
  const tokens=Array.from({length:5},()=>crypto.randomUUID());
  async function request(i,body){const response=await onRequestPost({env,request:new Request('https://example.test/api/multiplayer',{method:'POST',headers:{authorization:'Bearer '+tokens[i],origin:'https://example.test','content-type':'application/json'},body:JSON.stringify({code:'ABCD23',...body})})});return {status:response.status,...await response.json()};}
  function time(value){const row=db.prepare('SELECT state FROM multiplayer_rooms WHERE code=?').get('ABCD23');const r=JSON.parse(row.state);r.startAt=value;for(const p of r.players)p.seen=Date.now();db.prepare('UPDATE multiplayer_rooms SET state=? WHERE code=?').run(JSON.stringify(r),'ABCD23');return r;}
@@ -64,4 +64,46 @@ test('disconnect ends coop, last two simultaneous eliminations draw, readiness e
  const coop={phase:'playing',kind:'coop',startAt:1,life:8,players:[player(1),player(2)]};coop.players[0].seen=now-16000;maintain(coop,now);assert.equal(coop.reason,'disconnect');
  const battle={phase:'playing',kind:'battle',startAt:1,players:[player(1),player(2)]};battle.players.forEach(p=>p.stats.miss=4);maintain(battle,now);maintain(battle,now+2600);assert.equal(battle.reason,'draw');assert.equal(battle.winner,null);
  const lobby={phase:'lobby',host:'1',players:[player(1),player(2)]};lobby.players[0].seen=now-16000;maintain(lobby,now);assert.equal(lobby.host,'2');assert.equal(lobby.players.length,1);
+});
+
+
+test('reserved room authenticates before creation and never stores or returns password',async()=>{
+ const f=fixture();try{
+ assert.equal((await f.request(0,{action:'create',code:'000000',name:'x',mode:'time',kind:'battle'})).status,403);
+ assert.equal((await f.request(0,{action:'join',code:'000000',name:'wrong'})).status,401);
+ const joined=await f.request(0,{action:'join',code:'000000',name:'debug-test-password-more-than-12',mode:'cosmos',kind:'coop'});
+ assert.equal(joined.status,200);assert.equal(joined.debug,true);assert.equal(joined.players[0].name,'管理者');assert.equal(joined.mode,'cosmos');
+ assert.equal(JSON.stringify(joined).includes('debug-test-password'),false);
+ assert.equal(f.db.prepare('SELECT state FROM multiplayer_rooms WHERE code=?').get('000000').state.includes('debug-test-password'),false);
+ assert.equal((await f.request(1,{action:'sync',code:'000000'})).status,403);
+ assert.equal((await f.request(1,{action:'join',code:'000000',name:'wrong'})).status,401);
+ for(let i=0;i<3;i++)assert.equal((await f.request(0,{action:'addCPU',code:'000000'})).status,200);
+ assert.equal((await f.request(0,{action:'addCPU',code:'000000'})).status,409);
+ const r=await f.request(0,{action:'sync',code:'000000'});assert.equal(r.players.filter(p=>p.cpu).length,3);
+ await f.request(0,{action:'removeCPU',code:'000000',id:r.players.find(p=>p.cpu).id});
+ assert.equal((await f.request(0,{action:'sync',code:'000000'})).players.length,3);
+ await f.request(0,{action:'create',name:'normal',mode:'time',kind:'battle'});
+ assert.equal((await f.request(0,{action:'addCPU'})).status,403);
+ }finally{f.db.close();}
+});
+for(const mode of ['time','cosmos'])for(const kind of ['battle','coop'])test(`debug CPU progresses and finishes ${mode}/${kind}`,async()=>{
+ const f=fixture();try{
+ const auth={code:'000000'};
+ await f.request(0,{...auth,action:'join',name:'debug-test-password-more-than-12',mode,kind});await f.request(0,{...auth,action:'addCPU'});await f.request(0,{...auth,action:'ready',ready:true});const started=await f.request(0,{...auth,action:'start'});assert.equal(started.phase,'playing');
+ assert.equal((await f.request(0,{...auth,action:'addCPU'})).status,409);
+ let state=JSON.parse(f.db.prepare('SELECT state FROM multiplayer_rooms WHERE code=?').get('000000').state);
+ const start=Date.now();state.startAt=start;const bot=state.players.find(p=>p.cpu);bot.rng=42;bot.missRate=.075;
+ for(let elapsed=1000;elapsed<=300000&&state.phase!=='finished';elapsed+=1000){state.players.find(p=>!p.cpu).seen=start+elapsed;maintain(state,start+elapsed);}
+ assert.equal(state.phase,'finished');assert.equal(bot.left,false);assert.ok(bot.stats.hits>0);assert.ok(bot.stats.score>0);
+ if(kind==='battle'){assert.equal(bot.stats.miss,4);assert.equal(state.winner,started.you);}else assert.equal(bot.stats.miss,8);
+ // Re-entry after a completed test makes the reserved room reusable.
+ f.db.prepare('UPDATE multiplayer_rooms SET state=? WHERE code=?').run(JSON.stringify(state),'000000');
+ const fresh=await f.request(0,{...auth,action:'join',name:'debug-test-password-more-than-12',mode,kind});assert.equal(fresh.phase,'lobby');assert.equal(fresh.players.length,1);
+ }finally{f.db.close();}
+});
+test('CPU weighted accuracy and miss rates match requested long-run ranges',()=>{
+ for(const missRate of [.05,.075,.10]){const cpu={rng:12345,missRate};let total=0,misses=0;for(let i=0;i<100000;i++){const value=cpuJudgement(cpu);total+=value;if(!value)misses++;}assert.ok(total/100000>=70&&total/100000<=80);assert.ok(Math.abs(misses/100000-missRate)<.005);}
+});
+test('serialized chart resumes without changing CPU note schedule',()=>{
+ for(const mode of ['time','cosmos']){const a=makeChart(mode,123);for(let i=0;i<23;i++)a.next();const b=makeChart(mode,0,JSON.parse(JSON.stringify(a.save())));for(let i=0;i<100;i++)assert.deepEqual(a.next(),b.next());}
 });

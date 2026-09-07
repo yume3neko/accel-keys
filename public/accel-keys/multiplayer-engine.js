@@ -11,10 +11,12 @@ export function multiplier(mode, elapsed) {
   const value = Math.floor((1+Math.max(0,elapsed)/30000)*10+1e-6)/10;
   return mode === 'cosmos' ? value : Math.min(8,value);
 }
-export function makeChart(mode, seed) {
+export function makeChart(mode, seed, saved = null) {
   let state=seed>>>0, index=0, previous=-1, time=0, progress=0;
+  if(saved)({state,index,previous,time,progress}=saved);
   function random(){state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;}
   return {
+    save(){return {state,index,previous,time,progress};},
     next(){
       // Integrate across density boundaries, preserving fractional notes.
       const step=mode==='cosmos'?4000:3000;
@@ -33,3 +35,4 @@ export function makeChart(mode, seed) {
     }
   };
 }
+

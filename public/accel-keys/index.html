@@ -679,7 +679,8 @@
           <form class="submit" id="submit">
             <input
               id="player"
-              maxlength="12"
+              maxlength="4096"
+              autocomplete="off"
               placeholder="プレイヤー名（12文字まで）"
               required
             /><button>スコア送信</button>
@@ -1444,23 +1445,8 @@
         q("#submit").onsubmit = async (e) => {
           e.preventDefault();
           const b = e.currentTarget.querySelector("button");
-          const enteredName = q("#player").value.trim();
-          const normalizedName = enteredName
-            .normalize("NFKC")
-            .replace(/[\s\p{Cf}<>\x00-\x1f]/gu, "");
-          const creatorName =
-            normalizedName.includes("ゆめみねこ");
-          let adminToken = "";
-          if (creatorName) {
-            const enteredToken = prompt(
-              "製作者名で登録するには、管理者メニューパスワードを入力してください。",
-            );
-            if (enteredToken === null) {
-              q("#message").textContent = "登録をキャンセルしました。";
-              return;
-            }
-            adminToken = enteredToken;
-          }
+          const enteredName = q("#player").value;
+          q("#player").value = "";
           b.disabled = true;
           q("#message").textContent = "送信中…";
           try {
@@ -1468,9 +1454,6 @@
                 method: "POST",
                 headers: {
                   "content-type": "application/json",
-                  ...(adminToken
-                    ? { authorization: "Bearer " + adminToken }
-                    : {}),
                 },
                 body: JSON.stringify({
                   name: enteredName,
@@ -1532,6 +1515,7 @@
     </script>
   </body>
 </html>
+
 
 
 

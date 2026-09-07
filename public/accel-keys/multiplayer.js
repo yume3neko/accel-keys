@@ -54,21 +54,13 @@ function send(action,extra={}){
   });chain=operation;return operation;
 }
 async function action(button,fn){button.disabled=true;$('message').textContent='';try{await fn();}catch(e){$('message').textContent=e.name==='AbortError'?'通信がタイムアウトしました。もう一度お試しください。':e.message;}finally{button.disabled=false;if(room)renderRoom();}}
-async function sendIdentity(action,extra){
-  try{return await send(action,extra);}catch(e){
-    if(e.code!=='CREATOR_AUTH_REQUIRED')throw e;
-    const password=prompt('「ゆめみねこ」を含む名前には管理者パスワードが必要です。');
-    if(password===null)throw Error('参加をキャンセルしました。');
-    return send(action,{...extra,adminPassword:password});
-  }
-}
 function badge(element,player){if(player?.creator){const b=document.createElement('span');b.className='creator-badge';b.textContent='製作者';element.append(b);}}
-$('create').onclick=()=>action($('create'),async()=>{await sendIdentity('create',{name:name(),mode:$('mode').value,kind:$('kind').value,code:roomCode()});schedule();});
+$('create').onclick=()=>action($('create'),async()=>{await send('create',{name:name(),mode:$('mode').value,kind:$('kind').value,code:roomCode()});schedule();});
 $('joinForm').onsubmit=e=>{e.preventDefault();return action($('join'),async()=>{
   const code=$('codeInput').value.trim().toUpperCase(),debug=code==='000000';
   const enteredName=debug?$('name').value:name();
   if(debug)$('name').value='';
-  await sendIdentity('join',{name:enteredName,code,mode:$('mode').value,kind:$('kind').value});schedule();
+  await send('join',{name:enteredName,code,mode:$('mode').value,kind:$('kind').value});schedule();
 });};
 $('addCPU').onclick=()=>action($('addCPU'),()=>send('addCPU'));
 $('ready').onclick=()=>action($('ready'),()=>send('ready',{ready:!room.players.find(p=>p.id===room.you)?.ready}));
@@ -182,5 +174,6 @@ function frame(now){
   raf=requestAnimationFrame(frame);
 }
 addEventListener('pagehide',()=>{if(room&&room.phase!=='finished')fetch('/api/multiplayer',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({action:'leave',code:room.code}),keepalive:true}).catch(()=>{});});
+
 
 

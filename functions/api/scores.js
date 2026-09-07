@@ -1,3 +1,4 @@
+import {identifyName,displayRecord,CREATOR_RECORD} from '../../lib/creator-identity.js';
 const json = (data, status = 200, headers = {}) =>
   new Response(JSON.stringify(data), {
     status,
@@ -133,7 +134,7 @@ export async function onRequestGet({ request, env }) {
       try {
         replay = record.replay ? JSON.parse(record.replay) : null;
       } catch {}
-      return json({ record: { ...record, replay } }, 200, player.headers);
+      return json({ record: { ...displayRecord(record), replay } }, 200, player.headers);
     }
     const { results } = await env.DB.prepare(
       `SELECT id, player_name AS name, score, max_speed AS maxSpeed,
@@ -141,7 +142,7 @@ export async function onRequestGet({ request, env }) {
        FROM ${table} ORDER BY score DESC, created_at ASC LIMIT 10`,
     ).all();
     return json(
-      { scores: results ?? [], worldBest: results?.[0]?.score ?? 0 },
+      { scores: (results ?? []).map(displayRecord), worldBest: results?.[0]?.score ?? 0 },
       200,
       player.headers,
     );
@@ -161,23 +162,10 @@ export async function onRequestPost({ request, env }) {
     const mode = body.mode ?? "time";
     if (!["time", "cosmos"].includes(mode))
       return json({ error: "モードが正しくありません。" }, 400, player.headers);
-    const rawName = String(body.name ?? "")
-      .trim()
-      .replace(/[<>]/g, "");
-    const normalizedName = rawName.normalize("NFKC").replace(/\s/g, "");
-    const creatorName =
-      normalizedName === "ゆめみねこ" ||
-      normalizedName === "ゆめみねこ(製作者)";
-    const token =
-      request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-    if (creatorName && (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN)) {
-      return json(
-        { error: "製作者名での登録には管理者パスワードが必要です。" },
-        401,
-        player.headers,
-      );
-    }
-    const name = creatorName ? "ゆめみねこ（製作者）" : rawName.slice(0, 12);
+    const token=request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")??"";
+    let identity;
+    try{identity=identifyName(body.name,token,env);}catch(e){return json({error:e.message,code:e.code},e.status,player.headers);}
+    const name=identity.creator?CREATOR_RECORD:identity.name;
     const score = Number(body.score),
       maxSpeed = Number(body.maxSpeed),
       bestCombo = Number(body.bestCombo),
@@ -280,4 +268,5 @@ export async function onRequestPost({ request, env }) {
     );
   }
 }
+
 

@@ -1,10 +1,11 @@
+import {identifyName} from '../../lib/creator-identity.js';
 import {makeChart,multiplier} from '../../public/accel-keys/multiplayer-engine.js';
 const TTL=2*60*60*1000, DISCONNECT=15000;
 const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store'}});
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const blank=()=>({seq:0,score:0,combo:0,bestCombo:0,miss:0,hits:0,elapsed:0});
 const cleanName=value=>String(value??'').trim().replace(/[<>\x00-\x1f]/g,'').slice(0,12);
-function person(token,name,now){return {id:crypto.randomUUID(),token,name,ready:false,seen:now,left:false,stats:blank()};}
+function person(token,name,now,creator=false){return {id:crypto.randomUUID(),token,name,creator,ready:false,seen:now,left:false,stats:blank()};}
 function debugRoom(body,now){
   return {code:'000000',debug:true,mode:body.mode==='cosmos'?'cosmos':'time',kind:body.kind==='coop'?'coop':'battle',phase:'lobby',host:null,players:[],createdAt:now,startAt:0};
 }
@@ -62,10 +63,11 @@ export function apply(room,token,body,now){
       if(room.phase!=='lobby')fail('このルームはすでに開始しています。',409);
       if(room.players.length>=4)fail('ルームは満員です。',409);
       const name=cleanName(body.name);if(!name)fail('名前を入力してください。');
-      player=person(token,name,now);room.players.push(player);
+      player=person(token,name,now,body.creator);room.players.push(player);
       if(!room.host)room.host=player.id;
     }
   }
+  if(body.action==='join'&&player){player.name=cleanName(body.name);player.creator=body.creator===true;}
   // Finished participants may still fetch the result after timing out.
   if(!player&&room.phase==='finished')player=room.players.find(p=>p.token===token);
   if(!player)fail('ルームへの接続が終了しました。入り直してください。',403);
@@ -125,7 +127,12 @@ export async function onRequestPost({request,env}){
     if(debugJoin){
       if(!env.ADMIN_TOKEN||typeof body.name!=='string'||body.name!==env.ADMIN_TOKEN)fail('管理者パスワードが正しくありません。',401);
       // Never persist or reflect the password as a player name.
-      body={...body,name:'管理者'};
+      body={...body,name:'ゆめみねこ',creator:true};
+    }
+    if(!debugJoin&&['create','join'].includes(body.action)){
+      const identity=identifyName(body.name,body.adminPassword,env);
+      body={...body,...identity};
+      delete body.adminPassword;
     }
     const db=env.DB.withSession?env.DB.withSession('first-primary'):env.DB;
     await db.prepare(`CREATE TABLE IF NOT EXISTS multiplayer_rooms(code TEXT PRIMARY KEY,state TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 0,expires INTEGER NOT NULL)`).run();
@@ -136,7 +143,7 @@ export async function onRequestPost({request,env}){
       // Creation is idempotent per proposed room code and participant token.
       if(!/^[A-HJ-NP-Z2-9]{6}$/.test(body.code??''))fail('ルーム番号が正しくありません。');
       await db.prepare('DELETE FROM multiplayer_rooms WHERE expires < ?').bind(now).run();
-      const p=person(token,name,now);
+      const p=person(token,name,now,body.creator);
       const room={code:body.code,mode:body.mode,kind:body.kind,phase:'lobby',host:p.id,players:[p],createdAt:now,startAt:0};
       const result=await db.prepare('INSERT OR IGNORE INTO multiplayer_rooms(code,state,expires) VALUES(?,?,?)').bind(body.code,JSON.stringify(room),now+TTL).run();
       if(!result.meta?.changes){
@@ -159,6 +166,7 @@ export async function onRequestPost({request,env}){
       if(result.meta?.changes)return reply(snapshot(room,you,now));
     }
     return reply({error:'通信が混み合っています。再試行します。'},503);
-  }catch(error){return reply({error:error.status?error.message:'ルームに接続できませんでした。少し待って再試行してください。'},error.status??500);}
+  }catch(error){return reply({error:error.status?error.message:'ルームに接続できませんでした。少し待って再試行してください。',code:error.code},error.status??500);}
 }
+
 

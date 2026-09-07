@@ -72,7 +72,7 @@ test('reserved room authenticates before creation and never stores or returns pa
  assert.equal((await f.request(0,{action:'create',code:'000000',name:'x',mode:'time',kind:'battle'})).status,403);
  assert.equal((await f.request(0,{action:'join',code:'000000',name:'wrong'})).status,401);
  const joined=await f.request(0,{action:'join',code:'000000',name:'debug-test-password-more-than-12',mode:'cosmos',kind:'coop'});
- assert.equal(joined.status,200);assert.equal(joined.debug,true);assert.equal(joined.players[0].name,'管理者');assert.equal(joined.mode,'cosmos');
+ assert.equal(joined.status,200);assert.equal(joined.debug,true);assert.equal(joined.players[0].name,'ゆめみねこ');assert.equal(joined.mode,'cosmos');
  assert.equal(JSON.stringify(joined).includes('debug-test-password'),false);
  assert.equal(f.db.prepare('SELECT state FROM multiplayer_rooms WHERE code=?').get('000000').state.includes('debug-test-password'),false);
  assert.equal((await f.request(1,{action:'sync',code:'000000'})).status,403);

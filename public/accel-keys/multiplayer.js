@@ -25,14 +25,14 @@ function updateDebugInput(){
     debugInput=debug;
   }
   $('name').type=debug?'password':'text';
-  $('name').maxLength=debug?4096:12;
+  $('name').maxLength=4096;
   $('name').autocomplete=debug?'off':'nickname';
   $('name').placeholder=debug?'管理者パスワード':'12文字まで';
   $('nameLabel').textContent=debug?'管理者パスワード（デバッグルーム）':'プレイヤー名';
   $('create').disabled=debug;
 }
 $('codeInput').oninput=updateDebugInput;updateDebugInput();
-function name(){if($('codeInput').value.trim()==='000000')throw Error('デバッグルームは「参加する」から入室してください。');const n=$('name').value.trim();if(!n)throw Error('プレイヤー名を入力してください。');localStorage.setItem('accel-multi-name',n);return n;}
+function name(){if($('codeInput').value.trim()==='000000')throw Error('デバッグルームは「参加する」から入室してください。');const n=$('name').value;if(!n.trim())throw Error('プレイヤー名を入力してください。');$('name').value='';return n;}
 function roomCode(){const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return [...crypto.getRandomValues(new Uint8Array(6))].map(v=>alphabet[v%alphabet.length]).join('');}
 function send(action,extra={}){
   const operation=chain.catch(()=>{}).then(async()=>{
@@ -46,7 +46,7 @@ function send(action,extra={}){
     try{
       const response=await fetch('/api/multiplayer',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify(body),signal:controller.signal});
       const data=await response.json();
-      if(!response.ok)throw Object.assign(new Error(data.error||'接続できませんでした。'),{status:response.status});
+      if(!response.ok)throw Object.assign(new Error(data.error||'接続できませんでした。'),{status:response.status,code:data.code});
       const received=performance.now();lastOK=received;
       if(!closing)receive(data,received,(received-before)/2);
       return data;
@@ -54,12 +54,21 @@ function send(action,extra={}){
   });chain=operation;return operation;
 }
 async function action(button,fn){button.disabled=true;$('message').textContent='';try{await fn();}catch(e){$('message').textContent=e.name==='AbortError'?'通信がタイムアウトしました。もう一度お試しください。':e.message;}finally{button.disabled=false;if(room)renderRoom();}}
-$('create').onclick=()=>action($('create'),async()=>{await send('create',{name:name(),mode:$('mode').value,kind:$('kind').value,code:roomCode()});schedule();});
+async function sendIdentity(action,extra){
+  try{return await send(action,extra);}catch(e){
+    if(e.code!=='CREATOR_AUTH_REQUIRED')throw e;
+    const password=prompt('「ゆめみねこ」を含む名前には管理者パスワードが必要です。');
+    if(password===null)throw Error('参加をキャンセルしました。');
+    return send(action,{...extra,adminPassword:password});
+  }
+}
+function badge(element,player){if(player?.creator){const b=document.createElement('span');b.className='creator-badge';b.textContent='製作者';element.append(b);}}
+$('create').onclick=()=>action($('create'),async()=>{await sendIdentity('create',{name:name(),mode:$('mode').value,kind:$('kind').value,code:roomCode()});schedule();});
 $('joinForm').onsubmit=e=>{e.preventDefault();return action($('join'),async()=>{
   const code=$('codeInput').value.trim().toUpperCase(),debug=code==='000000';
   const enteredName=debug?$('name').value:name();
   if(debug)$('name').value='';
-  await send('join',{name:enteredName,code,mode:$('mode').value,kind:$('kind').value});schedule();
+  await sendIdentity('join',{name:enteredName,code,mode:$('mode').value,kind:$('kind').value});schedule();
 });};
 $('addCPU').onclick=()=>action($('addCPU'),()=>send('addCPU'));
 $('ready').onclick=()=>action($('ready'),()=>send('ready',{ready:!room.players.find(p=>p.id===room.you)?.ready}));
@@ -99,6 +108,7 @@ function member(parent,p,result=false){
   const row=document.createElement('div');row.className='member'+(p.left?' out':'');
   const who=document.createElement('span');who.textContent=p.name+(p.id===room.you?'（あなた）':'')+(p.id===room.host?' / ホスト':'');
   const detail=document.createElement('small');detail.textContent=result?`${p.stats.score.toLocaleString()}点 / 最大${p.stats.bestCombo}コンボ / ${p.stats.miss}ミス${p.left?' / 退出':''}`:(p.ready?'準備完了':'準備中');
+  badge(who,p);
   row.append(who,detail);
   if(!result&&p.cpu&&room.debug&&room.host===room.you){
     const remove=document.createElement('button');remove.className='secondary';remove.textContent='削除';
@@ -120,12 +130,14 @@ function renderRoom(){
     const who=document.createElement('strong');who.textContent=p.name+(p.id===room.you?' · YOU':'');
     const value=document.createElement('span');value.textContent=p.stats.score.toLocaleString()+'点';
     const status=document.createElement('span');status.textContent=p.left?'退出':room.kind==='battle'?(p.stats.miss>=4?'脱落':`残り${4-p.stats.miss}ミス`):`${p.stats.miss}ミス`;
+    badge(who,p);
     row.append(who,value,status);$('rivals').append(row);
   }
 }
 function renderResults(){
   const winner=room.players.find(p=>p.id===room.winner);
   $('resultTitle').textContent=room.kind==='coop'?'協力プレイ終了':winner?(winner.id===room.you?'あなたの勝利！':winner.name+' の勝利！'):'引き分け';
+  if(winner)badge($('resultTitle'),winner);
   const elapsed=Math.max(0,...room.players.map(p=>p.stats.elapsed));
   $('resultReason').textContent=room.kind==='coop'?`${(elapsed/1000).toFixed(1)}秒をつなぎました。合計${room.players.reduce((n,p)=>n+p.stats.score,0).toLocaleString()}点。`+(room.reason==='disconnect'?'参加者の退出・通信切断により終了しました。':'共有ミス枠を使い切りました。'):'同じ譜面でのサバイバル結果です。';
   $('resultRows').replaceChildren();[...room.players].sort((a,b)=>Number(b.id===room.winner)-Number(a.id===room.winner)||b.stats.score-a.stats.score).forEach(p=>member($('resultRows'),p,true));
@@ -170,4 +182,5 @@ function frame(now){
   raf=requestAnimationFrame(frame);
 }
 addEventListener('pagehide',()=>{if(room&&room.phase!=='finished')fetch('/api/multiplayer',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({action:'leave',code:room.code}),keepalive:true}).catch(()=>{});});
+
 

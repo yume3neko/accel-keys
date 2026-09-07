@@ -1,3 +1,4 @@
+import {reservedName,displayRecord,CREATOR_RECORD} from '../../../lib/creator-identity.js';
 import { scoreTable } from "../scores.js";
 
 const json = (data, status = 200) =>
@@ -34,7 +35,7 @@ export async function onRequestGet({ request, env }) {
               COALESCE(SUM(CASE WHEN player_id IS NULL THEN 1 ELSE 0 END), 0)
               AS players FROM ${table}`,
     ).first();
-    return json({ scores: results ?? [], summary });
+    return json({ scores: (results ?? []).map(displayRecord), summary });
   } catch {
     return json({ error: "管理データを取得できませんでした。" }, 500);
   }
@@ -53,11 +54,7 @@ export async function onRequestPatch({ request, env }) {
     const rawName = String(body.name ?? "")
       .trim()
       .replace(/[<>]/g, "");
-    const normalizedName = rawName.normalize("NFKC").replace(/\s/g, "");
-    const creatorName =
-      normalizedName === "ゆめみねこ" ||
-      normalizedName === "ゆめみねこ(製作者)";
-    const name = creatorName ? "ゆめみねこ（製作者）" : rawName.slice(0, 12);
+    const name = reservedName(rawName) ? CREATOR_RECORD : rawName.slice(0,12);
     const score = Number(body.score);
     const maxSpeed = Number(body.maxSpeed);
     const bestCombo = Number(body.bestCombo);
@@ -116,4 +113,5 @@ export async function onRequestDelete({ request, env }) {
     return json({ error: "削除処理に失敗しました。" }, 500);
   }
 }
+
 

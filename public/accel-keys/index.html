@@ -606,7 +606,8 @@
           font-size: 18px;
         }
       }
-    </style>
+    .creator-badge{display:inline-block;margin-left:6px;padding:2px 6px;border:1px solid #d6b75f;border-radius:4px;background:#302713;color:#ffe196;font-size:11px;font-weight:bold;line-height:1.4;vertical-align:middle;white-space:nowrap}
+</style>
   </head>
   <body>
     <div class="app">
@@ -1366,7 +1367,7 @@
             if (!response.ok) throw Error(data.error);
             const record = data.record,
               hasReplay = Boolean(record.replay);
-            q("#replayTitle").textContent = record.name;
+            q("#replayTitle").innerHTML = esc(record.name) + (record.creator ? '<span class="creator-badge">製作者</span>' : "");
             const stats = [
               ["スコア", Number(record.score).toLocaleString()],
               ["最大コンボ", record.bestCombo],
@@ -1413,7 +1414,7 @@
                       '" tabindex="0" role="button"><span>' +
                       (i + 1) +
                       "</span><span>" +
-                      esc(x.name) +
+                      esc(x.name) + (x.creator ? '<span class="creator-badge">製作者</span>' : "") +
                       "</span><b>" +
                       Number(x.score).toLocaleString() +
                       "</b><small>最高速度 ×" +
@@ -1446,10 +1447,9 @@
           const enteredName = q("#player").value.trim();
           const normalizedName = enteredName
             .normalize("NFKC")
-            .replace(/\s/g, "");
+            .replace(/[\s\p{Cf}<>\x00-\x1f]/gu, "");
           const creatorName =
-            normalizedName === "ゆめみねこ" ||
-            normalizedName === "ゆめみねこ(製作者)";
+            normalizedName.includes("ゆめみねこ");
           let adminToken = "";
           if (creatorName) {
             const enteredToken = prompt(
@@ -1532,5 +1532,6 @@
     </script>
   </body>
 </html>
+
 
 

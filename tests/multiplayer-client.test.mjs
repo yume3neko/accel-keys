@@ -49,5 +49,5 @@ test('debug password field supports long passwords without saving a player name'
  assert.equal(c.e('name').type,'password');assert.equal(c.e('name').maxLength,4096);assert.equal(c.e('create').disabled,true);
  c.e('name').value='long-test-password-never-save';await c.e('joinForm').onsubmit({preventDefault(){}});
  assert.equal(c.e('name').value,'');assert.equal([...c.storage.values()].some(v=>String(v).includes('long-test-password')),false);
- c.e('codeInput').value='ABCD23';c.e('codeInput').oninput();assert.equal(c.e('name').type,'text');assert.equal(c.e('name').maxLength,12);
+ c.e('codeInput').value='ABCD23';c.e('codeInput').oninput();assert.equal(c.e('name').type,'text');assert.equal(c.e('name').maxLength,4096);
 });

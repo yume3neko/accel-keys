@@ -304,7 +304,8 @@
           padding: 17px;
         }
       }
-    </style>
+    .creator-badge{display:inline-block;margin-left:6px;padding:2px 6px;border:1px solid #d6b75f;border-radius:4px;background:#302713;color:#ffe196;font-size:11px;font-weight:bold;line-height:1.4;vertical-align:middle;white-space:nowrap}
+</style>
   </head>
   <body>
     <div class="wrap">
@@ -463,7 +464,7 @@
             q("#rows").innerHTML = d.scores
               .map(
                 (x) =>
-                  `<tr><td>${x.id}</td><td>${esc(x.createdAt)}</td><td>${esc(x.name)}</td><td class="score">${Number(x.score).toLocaleString()}</td><td>×${Number(x.maxSpeed).toFixed(2)}</td><td>${x.bestCombo}</td><td><button class="edit" data-id="${x.id}">編集</button><button class="del" data-id="${x.id}" data-name="${esc(x.name)}">削除</button></td></tr>`,
+                  `<tr><td>${x.id}</td><td>${esc(x.createdAt)}</td><td>${esc(x.name)}${x.creator ? '<span class="creator-badge">製作者</span>' : ""}</td><td class="score">${Number(x.score).toLocaleString()}</td><td>×${Number(x.maxSpeed).toFixed(2)}</td><td>${x.bestCombo}</td><td><button class="edit" data-id="${x.id}">編集</button><button class="del" data-id="${x.id}" data-name="${esc(x.name)}">削除</button></td></tr>`,
               )
               .join("");
             q("#empty").hidden = d.scores.length > 0;
@@ -584,4 +585,5 @@
     </script>
   </body>
 </html>
+
 

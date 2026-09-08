@@ -4,17 +4,18 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {DatabaseSync} from 'node:sqlite';
 import {onRequestPost} from '../functions/api/multiplayer.js';
+import * as battleRules from '../public/accel-keys/multiplayer-rules.js';
 import {makeChart,bpm,multiplier} from '../public/accel-keys/multiplayer-engine.js';
 // Execute the actual frontend with a minimal DOM against the real API handler.
-const source=fs.readFileSync(new URL('../public/accel-keys/multiplayer.js',import.meta.url),'utf8').replace(/^import .*\n/,'');
+const source=fs.readFileSync(new URL('../public/accel-keys/multiplayer.js',import.meta.url),'utf8').replace(/^import .*\n/gm,'');
 function client(env){
  const elements=new Map(),storage=new Map();let now=1000;
  const context=new Proxy({createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]??(()=>{})});
- const el=()=>({value:'',hidden:false,textContent:'',style:{},children:[],classList:{add(){},remove(){}},append(...v){this.children.push(...v)},replaceChildren(...v){this.children=v},getContext:()=>context,getBoundingClientRect:()=>({width:390,height:500,left:0}),clientWidth:390,clientHeight:500});
+ const el=()=>({setAttribute(){},value:'',hidden:false,textContent:'',style:{},children:[],classList:{add(){},remove(){}},append(...v){this.children.push(...v)},replaceChildren(...v){this.children=v},getContext:()=>context,getBoundingClientRect:()=>({width:390,height:500,left:0}),clientWidth:390,clientHeight:500});
  const element=id=>{if(!elements.has(id))elements.set(id,el());return elements.get(id)};
  for(const [id,value]of [['mode','time'],['kind','battle']])element(id).value=value;
  const buttons=Array.from({length:4},(_,i)=>({...el(),dataset:{lane:String(i)}}));
- const sandbox={makeChart,bpm,multiplier,console,crypto,AbortController,URL,performance:{now:()=>now},devicePixelRatio:1,
+ const sandbox={...battleRules,makeChart,bpm,multiplier,console,crypto,AbortController,URL,performance:{now:()=>now},devicePixelRatio:1,
  document:{getElementById:element,createElement:el,body:el(),querySelectorAll:()=>buttons,querySelector:s=>buttons[Number(s.match(/\d/)[0])]},
  localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,String(v))},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,String(v))},
  location:{href:'https://example.test/accel-keys/multiplayer.html'},navigator:{},ResizeObserver:class{observe(){}},addEventListener(){},setTimeout(){return 1},clearTimeout(){},setInterval(){return 1},clearInterval(){},requestAnimationFrame(){return 1},cancelAnimationFrame(){},confirm:()=>true,
@@ -52,3 +53,27 @@ test('debug password field supports long passwords without saving a player name'
  c.e('codeInput').value='ABCD23';c.e('codeInput').oninput();assert.equal(c.e('name').type,'text');assert.equal(c.e('name').maxLength,4096);
 });
 
+
+
+test('four actual clients select teams, enable specials, sync hits and continue supporting at HP0',async()=>{
+ const db=new DatabaseSync(':memory:');const env={DB:{prepare(sql){let args=[];return{bind(...a){args=a;return this},async run(){return{meta:{changes:db.prepare(sql).run(...args).changes}}},async first(){return db.prepare(sql).get(...args)}}}}};
+ const players=Array.from({length:4},()=>client(env));const a=players[0];
+ try{
+ await a.api.send('create',{code:'ABCD23',mode:'cosmos',kind:'team',name:'A'});
+ for(let i=1;i<4;i++)await players[i].api.send('join',{code:'ABCD23',name:'P'+i});
+ await a.api.send('settings',{specials:true});
+ for(let i=0;i<4;i++)await players[i].api.send('team',{team:i<2?'A':'B'});
+ for(const p of players)await p.api.send('ready',{ready:true});
+ await a.api.send('start');for(const p of players.slice(1))await p.api.send('sync');
+ const at=a.api.startPerf+3166.6666667;a.tick(at);a.api.press(3);
+ const r=JSON.parse(db.prepare('SELECT state FROM multiplayer_rooms WHERE code=?').get('ABCD23').state);r.startAt=Date.now()-4000;
+ db.prepare('UPDATE multiplayer_rooms SET state=? WHERE code=?').run(JSON.stringify(r),'ABCD23');
+ await a.api.send('sync');assert.equal(a.api.room.players[0].eventSeq,1);assert.equal(a.api.stats.hits,1);
+ // A repeated synchronization cannot collect the special effect a second time.
+ const notice=JSON.stringify(a.api.room.players[0].notice);await a.api.send('sync');assert.equal(JSON.stringify(a.api.room.players[0].notice),notice);
+ const down=JSON.parse(db.prepare('SELECT state FROM multiplayer_rooms WHERE code=?').get('ABCD23').state);down.players[0].hp=0;
+ db.prepare('UPDATE multiplayer_rooms SET state=? WHERE code=?').run(JSON.stringify(down),'ABCD23');
+ await a.api.send('sync');a.tick(a.api.startPerf+3833.3333334);a.api.press(1);assert.equal(a.api.stats.hits,2);assert.match(a.e('life').textContent,/支援中/);
+ await a.api.send('sync');assert.equal(a.api.room.players[0].hp,0);assert.equal(a.api.room.players[0].eventSeq,2);
+ }finally{db.close();}
+});

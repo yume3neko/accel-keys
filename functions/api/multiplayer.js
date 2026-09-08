@@ -1,3 +1,4 @@
+import {enhanced,hp,teamHP,active,initPlayer,judgeEvent} from '../../public/accel-keys/multiplayer-rules.js';
 import {identifyName} from '../../lib/creator-identity.js';
 import {makeChart,multiplier} from '../../public/accel-keys/multiplayer-engine.js';
 const TTL=2*60*60*1000, DISCONNECT=15000;
@@ -7,7 +8,7 @@ const blank=()=>({seq:0,score:0,combo:0,bestCombo:0,miss:0,hits:0,elapsed:0});
 const cleanName=value=>String(value??'').trim().replace(/[<>\x00-\x1f]/g,'').slice(0,12);
 function person(token,name,now,creator=false){return {id:crypto.randomUUID(),token,name,creator,ready:false,seen:now,left:false,stats:blank()};}
 function debugRoom(body,now){
-  return {code:'000000',debug:true,mode:body.mode==='cosmos'?'cosmos':'time',kind:body.kind==='coop'?'coop':'battle',phase:'lobby',host:null,players:[],createdAt:now,startAt:0};
+  return {code:'000000',debug:true,mode:body.mode==='cosmos'?'cosmos':'time',kind:['coop','team'].includes(body.kind)?body.kind:'battle',specials:body.specials===true,phase:'lobby',host:null,players:[],createdAt:now,startAt:0};
 }
 function cpuRandom(cpu){cpu.rng=(Math.imul(cpu.rng,1664525)+1013904223)>>>0;return cpu.rng/4294967296;}
 export function cpuJudgement(cpu){
@@ -21,8 +22,10 @@ function advanceCPUs(room,now){
   let next=room.cpuChart?.next??chart.next();
   const elapsed=now-room.startAt;
   while(next.at+170<=elapsed){
-    for(const p of room.players.filter(p=>p.cpu&&!p.left&&(room.kind==='coop'||p.stats.miss<4))){
-      const value=cpuJudgement(p),s=p.stats;
+    for(const p of room.players.filter(p=>p.cpu&&!p.left&&(room.kind==='coop'||room.kind==='team'&&teamHP(room,p.team)>0||hp(p)>0))){
+      const baseRate=p.missRate;p.missRate=Math.min(1,baseRate*(active(p,'strict',next.at)?1.6:1)*(active(p,'boost',next.at)?.5:1));
+      let value=active(p,'auto',next.at)?100:cpuJudgement(p);p.missRate=baseRate;const s=p.stats;
+      if(enhanced(room)){judgeEvent(room,p,{seq:p.eventSeq+1,note:next.id,value},next.at,()=>cpuRandom(p));if(!value&&active(p,'shield',next.at))continue;}
       s.seq++;s.elapsed=Math.floor(next.at+170);
       if(!value){s.miss++;s.combo=0;}
       else{s.hits++;s.combo++;s.bestCombo=Math.max(s.bestCombo,s.combo);s.score+=Math.round(value*multiplier(room.mode,next.at)*(1+Math.min(s.combo,50)*.01));}
@@ -30,7 +33,7 @@ function advanceCPUs(room,now){
     }
     next=chart.next();
     if(room.kind==='coop'&&room.players.reduce((sum,p)=>sum+p.stats.miss,0)>=room.life)break;
-    if(room.kind==='battle'&&room.players.filter(p=>!p.left&&p.stats.miss<4).length<=1)break;
+    if(room.kind==='battle'&&room.players.filter(p=>!p.left&&hp(p)>0).length<=1)break;
   }
   room.cpuChart={cursor:chart.save(),next};
 }
@@ -48,9 +51,9 @@ export function maintain(room,now){
     if(room.players.some(p=>p.left)){room.phase='finished';room.reason='disconnect';}
     else if(room.players.reduce((n,p)=>n+p.stats.miss,0)>=room.life){room.phase='finished';room.reason='life';}
   }else{
-    const alive=room.players.filter(p=>!p.left&&p.stats.miss<4);
+    const alive=room.kind==='team'?['A','B'].filter(t=>teamHP(room,t)>0):room.players.filter(p=>hp(p)>0);
     if(alive.length<=1&&!room.settleAt)room.settleAt=now+2500;
-    if(room.settleAt&&now>=room.settleAt){room.phase='finished';room.winner=alive[0]?.id??null;room.reason=alive.length?'survivor':'draw';}
+    if(room.settleAt&&now>=room.settleAt){room.phase='finished';room.winner=room.kind==='team'?(alive[0]??null):(alive[0]?.id??null);room.reason=alive.length?'survivor':'draw';}
   }
   if(room.phase==='finished')room.finishedAt=now;
 }
@@ -83,6 +86,17 @@ export function apply(room,token,body,now){
       Object.assign(cpu,{cpu:true,ready:true,rng:crypto.getRandomValues(new Uint32Array(1))[0],missRate:.05+crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*.05});
       room.players.push(cpu);
     }else room.players=room.players.filter(p=>!(p.cpu&&p.id===body.id));
+  }else if(body.action==='settings'){
+    if(room.host!==player.id)fail('設定はホスト専用です。',403);
+    if(room.phase!=='lobby')fail('設定は開始前に変更してください。',409);
+    room.specials=body.specials===true;for(const p of room.players)if(!p.cpu)p.ready=false;
+  }else if(body.action==='team'){
+    if(room.phase!=='lobby'||room.kind!=='team')fail('チームは開始前に選んでください。',409);
+    const target=body.id?room.players.find(p=>p.id===body.id):player;
+    if(!target||(target.id!==player.id&&room.host!==player.id))fail('チームを変更できません。',403);
+    if(!['A','B'].includes(body.team))fail('チームを選んでください。');
+    if(room.players.filter(p=>p.id!==target.id&&p.team===body.team).length>=2)fail('各チーム2人までです。');
+    target.team=body.team;for(const p of room.players)if(!p.cpu)p.ready=false;
   }else if(body.action==='ready'){
     if(room.phase!=='lobby')fail('対戦は開始済みです。',409);
     player.ready=Boolean(body.ready);
@@ -90,18 +104,38 @@ export function apply(room,token,body,now){
     if(room.host!==player.id)fail('開始できるのはルームを作った人です。',403);
     if(room.phase==='lobby'){
       if(room.players.length<2||room.players.some(p=>!p.ready))fail('2人以上で、全員が準備完了にしてください。',409);
+      if(room.kind==='team'&&(room.players.length!==4||['A','B'].some(t=>room.players.filter(p=>p.team===t).length!==2)))fail('A・Bチームを2人ずつにしてください。',409);
       room.phase='playing';room.startAt=now+5000;room.life=room.players.length*4;
       room.seed=crypto.getRandomValues(new Uint32Array(1))[0];room.match=crypto.randomUUID();
       delete room.cpuChart;
-      for(const p of room.players)p.stats=blank();
+      for(const p of room.players){p.stats=blank();if(enhanced(room))initPlayer(p);}
     }
   }else if(body.action==='sync'&&room.phase==='playing'&&body.stats&&now>=room.startAt){
     if(body.match!==room.match)fail('対戦情報が更新されました。',409);
     const s=body.stats,old=player.stats;
+    if(enhanced(room)){
+      if(!Array.isArray(body.events)||body.events.length>80)fail('判定データが正しくありません。');
+      for(const event of body.events){
+        if(event.seq<=player.eventSeq)continue;
+        if(!Number.isFinite(event.at)||event.at<0||event.at>now-room.startAt+250||event.at<(player.eventAt??0))fail('判定時刻が正しくありません。');
+        if(event.seq<=player.eventSeq)continue;
+        if(room.kind==='battle'&&hp(player)===0)break;
+        const chart=makeChart(room.mode,room.seed,player.verifyChart?.cursor);
+        const cache=player.verifyChart?.notes??[];
+        let last=cache.at(-1)?.id??0;
+        if(event.note>last+512)fail('ノーツ番号が範囲外です。');
+        while(last<event.note){const n=chart.next();cache.push(n);last=n.id;}
+        const note=cache.find(n=>n.id===event.note);
+        if(!note||event.at<note.at-(event.value?255:-110)||event.value&&event.at>note.at+255&&!active(player,'auto',event.at))fail('ノーツの判定時刻が正しくありません。');
+        player.verifyChart={cursor:chart.save(),notes:cache.slice(-256)};
+        try{judgeEvent(room,player,event,event.at);}catch(e){fail(e.message);}
+        player.eventAt=event.at;
+      }
+    }
     const values=['seq','score','combo','bestCombo','miss','hits','elapsed'];
     if(values.some(k=>!Number.isSafeInteger(s[k])||s[k]<0))fail('プレイ情報が正しくありません。');
     if(s.elapsed>now-room.startAt+2000||s.score>1e12||s.hits>1e6||s.miss>1e6||s.combo>s.hits||s.bestCombo>s.hits)fail('プレイ情報が範囲外です。');
-    if(s.seq>old.seq&&!player.left&&(room.kind==='coop'||old.miss<4)){
+    if(s.seq>old.seq&&!player.left&&(enhanced(room)||room.kind==='coop'||old.miss<4)){
       if(s.score<old.score||s.hits<old.hits||s.miss<old.miss||s.bestCombo<old.bestCombo||s.elapsed<old.elapsed)fail('プレイ情報が逆行しています。');
       player.stats=Object.fromEntries(values.map(k=>[k,s[k]]));
     }
@@ -111,7 +145,7 @@ export function apply(room,token,body,now){
   maintain(room,now);
   return player.id;
 }
-function snapshot(room,you,now){const {cpuChart,...visible}=room;return {...visible,you,serverNow:now,players:room.players.map(({token,rng,missRate,...p})=>p)};}
+function snapshot(room,you,now){const {cpuChart,...visible}=room;return {...visible,you,serverNow:now,players:room.players.map(({token,rng,missRate,usedNotes,verifyChart,...p})=>p)};}
 export async function onRequestPost({request,env}){
   try{
     const origin=request.headers.get('origin');
@@ -121,7 +155,7 @@ export async function onRequestPost({request,env}){
     let body;try{body=JSON.parse(raw);}catch{return reply({error:'送信形式が正しくありません。'},400);}
     const token=request.headers.get('authorization')?.replace(/^Bearer /,'');
     if(!/^[0-9a-f-]{36}$/.test(token??''))return reply({error:'参加情報を取得できません。再読み込みしてください。'},401);
-    if(!body||!['create','join','ready','start','sync','leave','addCPU','removeCPU'].includes(body.action))return reply({error:'操作が正しくありません。'},400);
+    if(!body||!['create','join','ready','start','sync','leave','addCPU','removeCPU','settings','team'].includes(body.action))return reply({error:'操作が正しくありません。'},400);
     const debugJoin=body.action==='join'&&String(body.code??'').trim()==='000000';
     if(body.action==='create'&&body.code==='000000')fail('000000は予約済みです。「参加する」から認証してください。',403);
     if(debugJoin){
@@ -139,12 +173,12 @@ export async function onRequestPost({request,env}){
     const now=Date.now();
     if(body.action==='create'){
       const name=cleanName(body.name);
-      if(!name||!['time','cosmos'].includes(body.mode)||!['battle','coop'].includes(body.kind))fail('名前・モードを確認してください。');
+      if(!name||!['time','cosmos'].includes(body.mode)||!['battle','coop','team'].includes(body.kind))fail('名前・モードを確認してください。');
       // Creation is idempotent per proposed room code and participant token.
       if(!/^[A-HJ-NP-Z2-9]{6}$/.test(body.code??''))fail('ルーム番号が正しくありません。');
       await db.prepare('DELETE FROM multiplayer_rooms WHERE expires < ?').bind(now).run();
       const p=person(token,name,now,body.creator);
-      const room={code:body.code,mode:body.mode,kind:body.kind,phase:'lobby',host:p.id,players:[p],createdAt:now,startAt:0};
+      const room={code:body.code,mode:body.mode,kind:body.kind,specials:body.specials===true,phase:'lobby',host:p.id,players:[p],createdAt:now,startAt:0};
       const result=await db.prepare('INSERT OR IGNORE INTO multiplayer_rooms(code,state,expires) VALUES(?,?,?)').bind(body.code,JSON.stringify(room),now+TTL).run();
       if(!result.meta?.changes){
         const row=await db.prepare('SELECT state FROM multiplayer_rooms WHERE code=?').bind(body.code).first();
@@ -168,5 +202,6 @@ export async function onRequestPost({request,env}){
     return reply({error:'通信が混み合っています。再試行します。'},503);
   }catch(error){return reply({error:error.status?error.message:'ルームに接続できませんでした。少し待って再試行してください。',code:error.code},error.status??500);}
 }
+
 
 

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {onRequestPost,apply,maintain,cpuJudgement} from '../functions/api/multiplayer.js';
-import {makeChart,density,multiplier} from '../public/accel-keys/multiplayer-engine.js';
+import {makeChart,bpm,multiplier} from '../public/accel-keys/multiplayer-engine.js';
 function fixture(){
  const db=new DatabaseSync(':memory:');
  const env={ADMIN_TOKEN:'debug-test-password-more-than-12',DB:{prepare(sql){let args=[];return {bind(...a){args=a;return this;},async run(){return {meta:{changes:db.prepare(sql).run(...args).changes}};},async first(){return db.prepare(sql).get(...args);}};}}};
@@ -18,7 +18,7 @@ test('same seeds produce identical charts; normal never repeats and cosmos order
  for(let i=0;i<5000;i++){const n=a.next();assert.deepEqual(n,b.next());assert.ok(n.at>last);last=n.at;if(mode==='cosmos')assert.equal(n.lane,[3,1,2,0][i%4]);else assert.notEqual(n.lane,prev);prev=n.lane;}
  }
  assert.equal(multiplier('time',600000),8);assert.equal(multiplier('cosmos',600000),21);
- assert.ok(density('time',600000)>density('time',300000));assert.ok(density('cosmos',600000)>density('cosmos',300000));
+ assert.ok(bpm('time',600000)>bpm('time',300000));assert.ok(bpm('cosmos',600000)>bpm('cosmos',300000));
 });
 for(const mode of ['time','cosmos'])for(const kind of ['battle','coop'])test(`${mode}/${kind}: two players can join, start, report and finish`,async()=>{
  const f=fixture();try{
@@ -106,4 +106,12 @@ test('CPU weighted accuracy and miss rates match requested long-run ranges',()=>
 });
 test('serialized chart resumes without changing CPU note schedule',()=>{
  for(const mode of ['time','cosmos']){const a=makeChart(mode,123);for(let i=0;i<23;i++)a.next();const b=makeChart(mode,0,JSON.parse(JSON.stringify(a.save())));for(let i=0;i<100;i++)assert.deepEqual(a.next(),b.next());}
+});
+
+
+test('BPM is the scheduling unit: cosmos starts at 90 and adds 6 every 4 seconds',()=>{
+ assert.equal(bpm('cosmos',0),90);assert.equal(bpm('cosmos',3999),90);assert.equal(bpm('cosmos',4000),96);assert.equal(bpm('cosmos',8000),102);assert.equal(bpm('cosmos',4000000),6090);
+ const chart=makeChart('cosmos',42);assert.ok(Math.abs(chart.next().at-2500-60000/90)<1e-6);
+ assert.ok(Math.abs(bpm('time',0)-60000/1050)<1e-6);
+ assert.ok(Math.abs(bpm('time',228000)-bpm('time',213000)-30)<1e-6);
 });

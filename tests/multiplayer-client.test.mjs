@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {DatabaseSync} from 'node:sqlite';
 import {onRequestPost} from '../functions/api/multiplayer.js';
-import {makeChart,density,multiplier} from '../public/accel-keys/multiplayer-engine.js';
+import {makeChart,bpm,multiplier} from '../public/accel-keys/multiplayer-engine.js';
 // Execute the actual frontend with a minimal DOM against the real API handler.
 const source=fs.readFileSync(new URL('../public/accel-keys/multiplayer.js',import.meta.url),'utf8').replace(/^import .*\n/,'');
 function client(env){
@@ -14,7 +14,7 @@ function client(env){
  const element=id=>{if(!elements.has(id))elements.set(id,el());return elements.get(id)};
  for(const [id,value]of [['mode','time'],['kind','battle']])element(id).value=value;
  const buttons=Array.from({length:4},(_,i)=>({...el(),dataset:{lane:String(i)}}));
- const sandbox={makeChart,density,multiplier,console,crypto,AbortController,URL,performance:{now:()=>now},devicePixelRatio:1,
+ const sandbox={makeChart,bpm,multiplier,console,crypto,AbortController,URL,performance:{now:()=>now},devicePixelRatio:1,
  document:{getElementById:element,createElement:el,body:el(),querySelectorAll:()=>buttons,querySelector:s=>buttons[Number(s.match(/\d/)[0])]},
  localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,String(v))},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,String(v))},
  location:{href:'https://example.test/accel-keys/multiplayer.html'},navigator:{},ResizeObserver:class{observe(){}},addEventListener(){},setTimeout(){return 1},clearTimeout(){},requestAnimationFrame(){return 1},cancelAnimationFrame(){},confirm:()=>true,
@@ -51,3 +51,4 @@ test('debug password field supports long passwords without saving a player name'
  assert.equal(c.e('name').value,'');assert.equal([...c.storage.values()].some(v=>String(v).includes('long-test-password')),false);
  c.e('codeInput').value='ABCD23';c.e('codeInput').oninput();assert.equal(c.e('name').type,'text');assert.equal(c.e('name').maxLength,4096);
 });
+

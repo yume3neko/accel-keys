@@ -1,4 +1,4 @@
-import {makeChart,density,multiplier} from './multiplayer-engine.js';
+import {makeChart,bpm,multiplier} from './multiplayer-engine.js';
 const $=id=>document.getElementById(id), K=['D','F','J','K'];
 const token=sessionStorage.getItem('accel-multi-token')||crypto.randomUUID();
 sessionStorage.setItem('accel-multi-token',token);
@@ -168,12 +168,13 @@ function frame(now){
   const lost=room.kind==='battle'?stats.miss:Math.floor(sharedMiss()/room.life*4);
   for(let i=0;i<4;i++){ctx.strokeStyle=i>=4-Math.min(4,lost)?'#ff4964':'#adff2f';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(i*lane,lineY);ctx.lineTo((i+1)*lane,lineY);ctx.stroke();}
   if(!stopped())for(const n of notes){const y=lineY+(elapsed-n.at)*pixelsPerMs;if(y< -22||y>h+22)continue;ctx.fillStyle='#baff85';ctx.fillRect(n.lane*lane+6,y-11,lane-12,22);ctx.fillStyle='#071006';ctx.font='bold 13px Arial';ctx.textAlign='center';ctx.fillText(K[n.lane],(n.lane+.5)*lane,y+5);}
-  $('score').textContent=stats.score.toLocaleString();$('combo').textContent=stats.combo;$('speed').textContent='×'+speed.toFixed(2);$('density').textContent=density(room.mode,elapsed).toFixed(1)+'ノーツ/秒';
+  $('score').textContent=stats.score.toLocaleString();$('combo').textContent=stats.combo;$('speed').textContent='×'+speed.toFixed(2);$('density').textContent='BPM '+bpm(room.mode,elapsed).toFixed(1);
   $('life').textContent=room.kind==='coop'?`共有：あと${Math.max(0,room.life-sharedMiss())}ミス / ${room.life}`:`あと${Math.max(0,4-stats.miss)}ミス`;
   $('overlay').textContent=elapsed<0?String(Math.ceil(-elapsed/1000)):performance.now()-lastOK>15000?'再接続を待っています…':stopped()?(room.kind==='battle'?'脱落しました。結果を待っています…':'協力プレイ終了。結果を確認しています…'):room.settleAt?'勝敗を確認しています…':'';
   raf=requestAnimationFrame(frame);
 }
 addEventListener('pagehide',()=>{if(room&&room.phase!=='finished')fetch('/api/multiplayer',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({action:'leave',code:room.code}),keepalive:true}).catch(()=>{});});
+
 
 
 

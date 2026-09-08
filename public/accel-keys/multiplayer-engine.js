@@ -1,11 +1,11 @@
 // Shared deterministic chart: hit times do not depend on screen size or frame rate.
-export function density(mode, elapsed) {
-  if (mode === 'cosmos') return 1.5 + Math.floor(Math.max(0, elapsed) / 4000) * .1;
+export function bpm(mode, elapsed) {
+  if (mode === 'cosmos') return 90 + Math.floor(Math.max(0, elapsed) / 4000) * 6;
   const speed = Math.floor((1 + Math.max(0, elapsed) / 30000) * 10 + 1e-6) / 10;
-  if (speed <= 4) return 1000 / [1050,900,760,640,530,440,360][Math.min(6, Math.floor((speed-1)/.5))];
-  if (speed <= 6) return 1000/360;
-  if (speed >= 8.1) return 1000/140 + (1+Math.floor((speed-8.1)/.5+1e-6))*.5;
-  return 1000/[290,230,180,140][Math.max(0,Math.min(3,Math.floor((speed-6.1)/.5)))];
+  if (speed <= 4) return 60000 / [1050,900,760,640,530,440,360][Math.min(6, Math.floor((speed-1)/.5))];
+  if (speed <= 6) return 60000/360;
+  if (speed >= 8.1) return 60000/140 + (1+Math.floor((speed-8.1)/.5+1e-6))*30;
+  return 60000/[290,230,180,140][Math.max(0,Math.min(3,Math.floor((speed-6.1)/.5)))];
 }
 export function multiplier(mode, elapsed) {
   const value = Math.floor((1+Math.max(0,elapsed)/30000)*10+1e-6)/10;
@@ -22,7 +22,7 @@ export function makeChart(mode, seed, saved = null) {
       const step=mode==='cosmos'?4000:3000;
       for(;;){
         const boundary=(Math.floor(time/step)+1)*step;
-        const rate=density(mode,time)/1000;
+        const rate=bpm(mode,time)/60000;
         const needed=(1-progress)/rate;
         if(time+needed<=boundary+1e-7){time=Math.min(time+needed,boundary);progress=0;break;}
         progress+=(boundary-time)*rate;time=boundary;
@@ -35,4 +35,5 @@ export function makeChart(mode, seed, saved = null) {
     }
   };
 }
+
 

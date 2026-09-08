@@ -623,7 +623,7 @@
           <div class="stat"><span>SCORE</span><b id="score">0</b></div>
           <div class="stat"><span>COMBO</span><b id="combo">0</b></div>
           <div class="stat">
-            <span>SPEED</span><b class="lime" id="speed">×1.00</b>
+            <span>SPEED<br /><span id="bpm">BPM 57.1</span></span><b class="lime" id="speed">×1.00</b>
           </div>
         </section>
         <div class="speedbar"><i id="speedFill"></i></div>
@@ -892,6 +892,9 @@
           });
         }
         function paint() {
+          const elapsed = phase === "playing" ? Math.max(0, performance.now() - startAt) : phase === "over" ? runDuration : 0;
+          const bpm = gameMode === "cosmos" ? cosmosBpm(elapsed) : normalBpm(Math.floor((1 + elapsed / 30000) * 10 + 0.000001) / 10);
+          q("#bpm").textContent = "BPM " + bpm.toFixed(1);
           q("#score").textContent = score.toLocaleString();
           q("#combo").textContent = combo;
           q("#speed").textContent = "×" + speed.toFixed(2);
@@ -924,7 +927,7 @@
           if (phase !== "idle") return;
           const dt = Math.min(34, now - lastAt || 16);
           lastAt = now;
-          if (now - previewAt > (gameMode === "cosmos" ? 1000 / 1.5 : 820)) {
+          if (now - previewAt > (gameMode === "cosmos" ? 60000 / 90 : 820)) {
             spawn();
             previewAt = now;
           }
@@ -1025,29 +1028,21 @@
             }, delay);
           });
         }
-        function cosmosDensity(elapsed) {
-          return 1.5 + Math.floor(Math.max(0, elapsed) / 4000) * 0.1;
+        function cosmosBpm(elapsed) {
+          return 90 + Math.floor(Math.max(0, elapsed) / 4000) * 6;
         }
-        function getDensityInterval(densitySpeed = speed) {
-          const densityIntervals = [1050, 900, 760, 640, 530, 440, 360];
-          if (densitySpeed <= 4) {
-            const level = Math.min(6, Math.floor((densitySpeed - 1) / 0.5));
-            return densityIntervals[level];
+        function normalBpm(level) {
+          const earlyBpms = [60000/1050, 60000/900, 60000/760, 60000/640, 60000/530, 60000/440, 60000/360];
+          if (level <= 4) return earlyBpms[Math.min(6, Math.floor((level - 1) / 0.5))];
+          if (level <= 6) return earlyBpms[6];
+          // Beyond ×8.0, add 30 BPM every 15 seconds, without a cap.
+          if (level >= 8.1) {
+            const extraSteps = 1 + Math.floor((level - 8.1) / 0.5 + 0.000001);
+            return 60000 / 140 + extraSteps * 30;
           }
-          if (densitySpeed <= 6) return densityIntervals[6];
-          // Continue adding 0.5 notes/second every 15 seconds after ×8.0.
-          // Use density rather than subtracting milliseconds so the interval
-          // stays positive without an upper density limit.
-          if (densitySpeed >= 8.1) {
-            const extraSteps = 1 + Math.floor((densitySpeed - 8.1) / 0.5 + 0.000001);
-            return 1000 / (1000 / 140 + extraSteps * 0.5);
-          }
-          const lateIntervals = [290, 230, 180, 140];
-          const lateLevel = Math.min(
-            lateIntervals.length - 1,
-            Math.floor((densitySpeed - 6.1) / 0.5),
-          );
-          return lateIntervals[Math.max(0, lateLevel)];
+          const lateBpms = [60000/290, 60000/230, 60000/180, 60000/140];
+          const lateLevel = Math.min(3, Math.floor((level - 6.1) / 0.5));
+          return lateBpms[Math.max(0, lateLevel)];
         }
         function getScrollSpeed() {
           if (gameMode === "cosmos") return 1;
@@ -1063,13 +1058,13 @@
           speed = gameMode === "cosmos" ? densitySpeed : Math.min(8, densitySpeed);
           maxSpeed = Math.max(maxSpeed, speed);
           if (!demoEnding) {
-            const interval = getDensityInterval(densitySpeed);
+            const interval = 60000 / normalBpm(densitySpeed);
             if (gameMode === "cosmos") {
               // Carry fractional note progress across each four-second density step.
               while (lastSpawn < now) {
                 const elapsed = lastSpawn - startAt;
                 const boundary = startAt + (Math.floor(Math.max(0, elapsed) / 4000) + 1) * 4000;
-                const rate = cosmosDensity(elapsed) / 1000;
+                const rate = cosmosBpm(elapsed) / 60000;
                 const end = Math.min(now, boundary);
                 const needed = (1 - cosmosProgress) / rate;
                 if (lastSpawn + needed <= end + 0.000001) {
@@ -1500,8 +1495,9 @@
           q("#ranking").innerHTML = "<li><span>—</span><span>読み込み中…</span></li>";
           q("#rankingTitle").textContent = (gameMode === "cosmos" ? "加速する大宇宙" : "通常モード") + " / GLOBAL TOP 10";
           q("#modeDescription").textContent = gameMode === "cosmos"
-            ? "K → F → J → D の繰り返し。1.5ノーツ/秒から、4秒ごとに+0.1ノーツ/秒。"
-            : "同じレーンが連続しないランダム配置。速度は×8.0まで、密度は上限なく上昇します。";
+            ? "K → F → J → D の繰り返し。BPM90から、4秒ごとにBPM+6（1拍1ノーツ）。"
+            : "同じレーンが連続しないランダム配置。速度は×8.0まで、BPMは上限なく上昇します（1拍1ノーツ）。";
+          paint();
           rankings();
         }
         q("#gameMode").value = gameMode;
@@ -1515,6 +1511,7 @@
     </script>
   </body>
 </html>
+
 
 
 

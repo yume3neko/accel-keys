@@ -75,12 +75,13 @@ async function leave(){
   if(room.phase==='playing'&&!confirm(room.kind==='coop'?'退出すると全員の協力プレイが終了します。退出しますか？':'退出すると脱落します。退出しますか？'))return;
   guide.stop();closing=true;clearTimeout(pollTimer);
   try{await send('leave');}catch{}
+  $('chatPanel').hidden=true;$('chatToggle').hidden=true;$('modePanel').hidden=true;
   room=null;activeMatch=null;gameActive=false;closing=false;cancelAnimationFrame(raf);notes=[];
   $('play').hidden=true;$('lobby').hidden=true;$('results').hidden=true;$('setup').hidden=false;
   $('connection').textContent='';$('message').textContent='';document.body.style.overflow='';
 }
 $('leave').onclick=leave;$('quit').onclick=leave;$('again').onclick=leave;
-function schedule(){clearTimeout(pollTimer);if(room&&!closing&&room.phase!=='finished')pollTimer=setTimeout(poll,900);}
+function schedule(){clearTimeout(pollTimer);if(room&&!closing)pollTimer=setTimeout(poll,900);}
 async function poll(){
   try{await send('sync');$('connection').textContent='接続中';$('netStatus').textContent='';}
   catch(e){
@@ -99,11 +100,13 @@ function receive(data,received,halfRTT){
     $('play').hidden=false;document.body.style.overflow='hidden';resize();cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
   }
   if(room.phase==='finished'){gameActive=false;guide.stop();cancelAnimationFrame(raf);$('play').hidden=true;document.body.style.overflow='';renderResults();clearTimeout(pollTimer);}
-  renderRoom();
+  renderRoom();renderChat();
+  if(data.openMode){$('editMode').value=room.mode;$('editKind').value=room.kind;$('editSpecials').value=room.specials?'on':'off';$('modeError').textContent='';$('modePanel').hidden=false;}
+  if(room.phase!=='lobby')$('modePanel').hidden=true;
 }
 function member(parent,p,result=false){
   const row=document.createElement('div');row.className='member'+(p.left?' out':'');
-  const who=document.createElement('span');who.textContent=p.name+(p.id===room.you?'（あなた）':'')+(p.id===room.host?' / ホスト':'');
+  const who=document.createElement('span');who.textContent=p.name+(p.cpu?' [Lv.'+(p.level??3)+']':'')+(p.id===room.you?'（あなた）':'')+(p.id===room.host?' / ホスト':'');
   const detail=document.createElement('small');detail.textContent=result?`${p.stats.score.toLocaleString()}点 / 最大${p.stats.bestCombo}コンボ / ${p.stats.miss}ミス${p.left?' / 退出':''}`:(p.ready?'準備完了':'準備中');
   badge(who,p);
   row.append(who,detail);
@@ -162,14 +165,14 @@ function press(lane,automatic=null){
   const elapsed=performance.now()-startPerf;
   const bounds=windows(me(),elapsed);
   const note=automatic||notes.find(n=>!n.done&&n.lane===lane&&Math.abs(n.at-elapsed)<=bounds[2]);if(!note)return;
-  note.done=true;const diff=Math.abs(note.at-elapsed),value=automatic?100:diff<=bounds[0]?100:diff<=bounds[1]?80:50;record(note,value);
+  note.done=true;const diff=Math.abs(note.at-elapsed),value=(automatic||me().commandAuto)?100:diff<=bounds[0]?100:diff<=bounds[1]?80:50;record(note,value);
   stats.hits++;stats.combo++;stats.bestCombo=Math.max(stats.bestCombo,stats.combo);stats.elapsed=Math.max(stats.elapsed,Math.floor(elapsed));
   stats.score+=Math.round(value*multiplier(room.mode,elapsed)*(1+Math.min(stats.combo,50)*.01));showJudge(value===100?'PERFECT':value===80?'GREAT':'GOOD',value===100?'#adff2f':value===80?'#54e8ff':'#ffe66a');
   const button=document.querySelector(`[data-lane="${lane}"]`);button.classList.add('active');setTimeout(()=>button.classList.remove('active'),80);
 }
 for(const button of document.querySelectorAll('[data-lane]'))button.onpointerdown=e=>{e.preventDefault();press(Number(button.dataset.lane));};
 canvas.onpointerdown=e=>{e.preventDefault();const r=canvas.getBoundingClientRect();press(Math.min(3,Math.max(0,Math.floor((e.clientX-r.left)/(r.width/4)))));};
-addEventListener('keydown',e=>{if($('play').hidden)return;const lane=K.indexOf(e.key.toUpperCase());if(lane>=0&&!e.repeat){e.preventDefault();press(lane);}});
+addEventListener('keydown',e=>{if($('play').hidden||!$('chatPanel').hidden||!$('modePanel').hidden)return;const lane=K.indexOf(e.key.toUpperCase());if(lane>=0&&!e.repeat){e.preventDefault();press(lane);}});
 function frame(now){
   if(!gameActive)return;
   const elapsed=now-startPerf,w=canvas.clientWidth,h=canvas.clientHeight,lane=w/4,lineY=Math.min(h-8,Math.max(30,h-45-line));
@@ -201,10 +204,43 @@ addEventListener('pagehide',()=>{if(room&&room.phase!=='finished')fetch('/api/mu
 
 function drawEffects(t,w,h,lineY){
   const p=me(),labels={bottom:'下部妨害',top:'上部妨害',strict:'判定妨害',noise:'ノイズ',shield:'シールド',boost:'判定強化',auto:'オートプレイ'};
-  const text=Object.entries(labels).filter(([k])=>active(p,k,t)).map(([k,label])=>label+' '+Math.ceil((p.effects[k]-t)/1000)+'秒');
+  const text=Object.entries(labels).filter(([k])=>active(p,k,t)).map(([k,label])=>label+(k==='auto'&&p.commandAuto?' ON':' '+Math.ceil((p.effects[k]-t)/1000)+'秒'));
   if(p.challenge)text.push('チャレンジ '+p.challenge.count+' / 100');
   if(p.notice&&t-p.notice.at<2500)text.push('発動：'+({attack:'おじゃま',heal:'味方HP+1',challenge:'100コンボチャレンジ',...labels}[p.notice.effect]||p.notice.effect)+(p.notice.target?' → '+p.notice.target:''));
   $('effects').textContent=text.join(' / ');
   ctx.fillStyle='#030508';if(active(p,'bottom',t))ctx.fillRect(0,lineY-h*.05,w,h*.05);if(active(p,'top',t))ctx.fillRect(0,0,w,h*.1);
   if(active(p,'noise',t)){ctx.fillStyle='rgba(170,190,190,.24)';for(let i=0;i<18;i++){const y=(i*71+Math.floor(t/100)*37)%h;ctx.fillRect((i*83)%w,y,w*.45,2+i%3);}}
 }
+
+let chatSignature='';
+function renderChat(){
+  $('chatToggle').hidden=!room;
+  const messages=room?.chat||[],signature=messages.map(m=>m.id).join(',');
+  if(signature===chatSignature)return;chatSignature=signature;
+  const log=$('chatLog'),nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<50;
+  log.replaceChildren();for(const message of messages){const row=document.createElement('p'),who=document.createElement('strong');who.textContent=message.name+'：';badge(who,message);const text=document.createElement('span');text.textContent=message.text;row.append(who,text);log.append(row);}
+  if(nearBottom)log.scrollTop=log.scrollHeight;
+}
+$('chatToggle').onclick=()=>{$('chatPanel').hidden=!$('chatPanel').hidden;if(!$('chatPanel').hidden){$('chatLog').scrollTop=$('chatLog').scrollHeight;$('chatInput').focus?.();}};
+$('chatClose').onclick=()=>{$('chatPanel').hidden=true;};
+let pendingChat=null;
+$('chatForm').onsubmit=async e=>{
+  e.preventDefault();if($('chatSend').disabled)return;
+  const text=$('chatInput').value;if(!text.trim())return;
+  if(!pendingChat||pendingChat.text!==text)pendingChat={text,requestId:crypto.randomUUID()};
+  $('chatSend').disabled=true;$('chatError').textContent='';
+  try{await send('chat',pendingChat);$('chatInput').value='';pendingChat=null;$('chatError').textContent='送信しました。';}
+  catch(error){$('chatError').textContent=error.message;}
+  finally{$('chatSend').disabled=false;schedule();}
+};
+$('modeClose').onclick=()=>{$('modePanel').hidden=true;};
+let pendingMode=null;
+$('modeForm').onsubmit=async e=>{
+  e.preventDefault();if($('modeSave').disabled)return;
+  const options={mode:$('editMode').value,kind:$('editKind').value,specials:$('editSpecials').value==='on'},signature=JSON.stringify(options);
+  if(pendingMode?.signature!==signature)pendingMode={signature,body:{...options,requestId:crypto.randomUUID()}};
+  $('modeSave').disabled=true;$('modeError').textContent='';
+  try{await send('changeMode',pendingMode.body);pendingMode=null;$('modePanel').hidden=true;}
+  catch(error){$('modeError').textContent=error.message;}
+  finally{$('modeSave').disabled=false;schedule();}
+};

@@ -1,3 +1,4 @@
+import {chatAction,makeCPU} from '../../lib/multiplayer-chat.js';
 import {enhanced,hp,teamHP,active,initPlayer,judgeEvent} from '../../public/accel-keys/multiplayer-rules.js';
 import {identifyName} from '../../lib/creator-identity.js';
 import {makeChart,multiplier} from '../../public/accel-keys/multiplayer-engine.js';
@@ -12,9 +13,11 @@ function debugRoom(body,now){
 }
 function cpuRandom(cpu){cpu.rng=(Math.imul(cpu.rng,1664525)+1013904223)>>>0;return cpu.rng/4294967296;}
 export function cpuJudgement(cpu){
+  if(cpu.commandAuto||cpu.level===5)return 100;
   if(cpuRandom(cpu)<cpu.missRate)return 0;
   const value=cpuRandom(cpu);
-  return value<.3?100:value<.8?80:50;
+  const [perfect,great]={1:[.05,.3],2:[.15,.6],3:[.3,.8],4:[.8,.97],5:[1,1]}[cpu.level??3];
+  return value<perfect?100:value<great?80:50;
 }
 function advanceCPUs(room,now){
   if(!room.players.some(p=>p.cpu)||now<room.startAt)return;
@@ -73,17 +76,17 @@ export function apply(room,token,body,now){
   if(body.action==='join'&&player){player.name=cleanName(body.name);player.creator=body.creator===true;}
   // Finished participants may still fetch the result after timing out.
   if(!player&&room.phase==='finished')player=room.players.find(p=>p.token===token);
+  if(player?.kicked)fail('ルームから退出させられました。',403);
   if(!player)fail('ルームへの接続が終了しました。入り直してください。',403);
   player.seen=now;
-  if(body.action==='addCPU'||body.action==='removeCPU'){
+  if(body.action==='chat'||body.action==='changeMode'){
+    chatAction(room,player,body,now);
+  }else if(body.action==='addCPU'||body.action==='removeCPU'){
     if(room.code!=='000000'||!room.debug||room.host!==player.id)fail('CPU操作はデバッグルームのホスト専用です。',403);
     if(room.phase!=='lobby')fail('CPU操作は開始前に行ってください。',409);
     if(body.action==='addCPU'){
       if(room.players.length>=4)fail('CPUを含めて4人までです。',409);
-      const numbers=new Set(room.players.filter(p=>p.cpu).map(p=>p.name));
-      let i=1;while(numbers.has('CPU '+i))i++;
-      const cpu=person(null,'CPU '+i,now);
-      Object.assign(cpu,{cpu:true,ready:true,rng:crypto.getRandomValues(new Uint32Array(1))[0],missRate:.05+crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*.05});
+      const cpu=makeCPU(room,3,now);
       room.players.push(cpu);
     }else room.players=room.players.filter(p=>!(p.cpu&&p.id===body.id));
   }else if(body.action==='settings'){
@@ -145,7 +148,7 @@ export function apply(room,token,body,now){
   maintain(room,now);
   return player.id;
 }
-function snapshot(room,you,now){const {cpuChart,...visible}=room;return {...visible,you,serverNow:now,players:room.players.map(({token,rng,missRate,usedNotes,verifyChart,...p})=>p)};}
+function snapshot(room,you,now){const {cpuChart,...visible}=room;return {...visible,you,serverNow:now,players:room.players.map(({token,rng,missRate,usedNotes,verifyChart,chatRequests,lastChat,...p})=>p)};}
 export async function onRequestPost({request,env}){
   try{
     const origin=request.headers.get('origin');
@@ -155,7 +158,7 @@ export async function onRequestPost({request,env}){
     let body;try{body=JSON.parse(raw);}catch{return reply({error:'送信形式が正しくありません。'},400);}
     const token=request.headers.get('authorization')?.replace(/^Bearer /,'');
     if(!/^[0-9a-f-]{36}$/.test(token??''))return reply({error:'参加情報を取得できません。再読み込みしてください。'},401);
-    if(!body||!['create','join','ready','start','sync','leave','addCPU','removeCPU','settings','team'].includes(body.action))return reply({error:'操作が正しくありません。'},400);
+    if(!body||!['create','join','ready','start','sync','leave','addCPU','removeCPU','settings','team','chat','changeMode'].includes(body.action))return reply({error:'操作が正しくありません。'},400);
     const debugJoin=body.action==='join'&&String(body.code??'').trim()==='000000';
     if(body.action==='create'&&body.code==='000000')fail('000000は予約済みです。「参加する」から認証してください。',403);
     if(debugJoin){
@@ -197,7 +200,7 @@ export async function onRequestPost({request,env}){
       if(debugJoin&&(row.expires<now||room.phase==='finished'||!room.players.some(p=>!p.cpu&&!p.left&&now-p.seen<=DISCONNECT)))room=debugRoom(body,now);
       const you=apply(room,token,body,now);
       const result=await db.prepare('UPDATE multiplayer_rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=?').bind(JSON.stringify(room),now+TTL,code,row.version).run();
-      if(result.meta?.changes)return reply(snapshot(room,you,now));
+      if(result.meta?.changes)return reply({...snapshot(room,you,now),openMode:body.action==='chat'&&/^\/mode$/i.test(body.text?.trim()??'')});
     }
     return reply({error:'通信が混み合っています。再試行します。'},503);
   }catch(error){return reply({error:error.status?error.message:'ルームに接続できませんでした。少し待って再試行してください。',code:error.code},error.status??500);}

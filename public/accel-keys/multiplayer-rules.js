@@ -3,7 +3,7 @@ export const enhanced=r=>r.kind==='team'||r.specials===true;
 export const hp=p=>p.left?0:Math.max(0,p.hp??(4-p.stats.miss));
 export const teamHP=(r,t)=>r.players.filter(p=>p.team===t).reduce((n,p)=>n+hp(p),0);
 export function special(id,seed){let x=Math.imul(id^(seed>>>0),0x45d9f3b);x=Math.imul(x^(x>>>16),0x45d9f3b);return ((x^(x>>>16))>>>0)%10===0;}
-export const active=(p,key,t)=>t>=0&&(p.effects?.[key]??0)>t;
+export const active=(p,key,t)=>t>=0&&(key==='auto'&&p.commandAuto===true||(p.effects?.[key]??0)>t);
 export function windows(p,t){const scale=(active(p,'strict',t)?.65:1)*(active(p,'boost',t)?1.5:1);return [60,110,170].map(v=>v*scale);}
 export function initPlayer(p){p.hp=4;p.eventSeq=0;p.effects={};p.challenge=null;p.usedNotes=[];}
 export function reward(room,p,t,random=Math.random){

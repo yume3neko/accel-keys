@@ -75,13 +75,13 @@ async function leave(){
   if(room.phase==='playing'&&!confirm(room.kind==='coop'?'退出すると全員の協力プレイが終了します。退出しますか？':'退出すると脱落します。退出しますか？'))return;
   guide.stop();closing=true;clearTimeout(pollTimer);
   try{await send('leave');}catch{}
-  $('chatPanel').hidden=true;$('chatToggle').hidden=true;$('modePanel').hidden=true;
+  $('chatPanel').hidden=true;$('chatToggle').hidden=true;$('modePanel').hidden=true;$('chatToast').hidden=true;clearTimeout(chatToastTimer);chatRoom=null;
   room=null;activeMatch=null;gameActive=false;closing=false;cancelAnimationFrame(raf);notes=[];
   $('play').hidden=true;$('lobby').hidden=true;$('results').hidden=true;$('setup').hidden=false;
   $('connection').textContent='';$('message').textContent='';document.body.style.overflow='';
 }
 $('leave').onclick=leave;$('quit').onclick=leave;$('again').onclick=leave;
-function schedule(){clearTimeout(pollTimer);if(room&&!closing)pollTimer=setTimeout(poll,900);}
+function schedule(){clearTimeout(pollTimer);if(room&&!closing&&room.phase!=='finished')pollTimer=setTimeout(poll,900);}
 async function poll(){
   try{await send('sync');$('connection').textContent='接続中';$('netStatus').textContent='';}
   catch(e){
@@ -187,7 +187,7 @@ function frame(now){
   for(let i=0;i<4;i++){ctx.fillStyle=i%2?'#101a1e':'#081013';ctx.fillRect(i*lane,0,lane,h);ctx.strokeStyle='#2a353a';ctx.beginPath();ctx.moveTo(i*lane,0);ctx.lineTo(i*lane,h);ctx.stroke();}
   const lost=room.kind==='team'?4-currentHP():room.kind==='battle'?(enhanced(room)?4-currentHP():stats.miss):Math.floor(sharedMiss()/room.life*4);
   for(let i=0;i<4;i++){ctx.strokeStyle=i>=4-Math.min(4,lost)?'#ff4964':'#adff2f';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(i*lane,lineY);ctx.lineTo((i+1)*lane,lineY);ctx.stroke();}
-  if(!stopped())for(const n of notes){const y=lineY+(elapsed-n.at)*pixelsPerMs;if(y< -22||y>h+22)continue;const gold=room.specials&&special(n.id,room.seed);ctx.fillStyle=gold?'#ffe16a':'#baff85';ctx.fillRect(n.lane*lane+6,y-11,lane-12,22);ctx.fillStyle='#071006';ctx.font='bold 13px Arial';ctx.textAlign='center';ctx.fillText((gold?'★ ':'')+K[n.lane],(n.lane+.5)*lane,y+5);}
+  if(!stopped())for(const n of notes){const y=lineY+(elapsed-n.at)*pixelsPerMs;if(y< -22||y>h+22)continue;const gold=room.specials&&!me().challenge&&special(n.id,room.seed);ctx.fillStyle=gold?'#ffe16a':'#baff85';ctx.fillRect(n.lane*lane+6,y-11,lane-12,22);ctx.fillStyle='#071006';ctx.font='bold 13px Arial';ctx.textAlign='center';ctx.fillText((gold?'★ ':'')+K[n.lane],(n.lane+.5)*lane,y+5);}
   drawEffects(elapsed,w,h,lineY);
   $('score').textContent=stats.score.toLocaleString();$('combo').textContent=stats.combo;$('speed').textContent='×'+speed.toFixed(2);$('density').textContent='BPM '+bpm(room.mode,elapsed).toFixed(1);
   $('life').textContent=room.kind==='team'?`チーム${me().team} HP ${teamHP(room,me().team)} / 8・自分 ${currentHP()}${currentHP()===0?'（支援中・回復不可）':''}`:room.kind==='coop'?`共有：あと${Math.max(0,room.life-sharedMiss())}ミス / ${room.life}`:`あと${(enhanced(room)?currentHP():Math.max(0,4-stats.miss))}ミス`;
@@ -203,29 +203,31 @@ addEventListener('pagehide',()=>{if(room&&room.phase!=='finished')fetch('/api/mu
 
 
 function drawEffects(t,w,h,lineY){
-  const p=me(),labels={bottom:'下部妨害',top:'上部妨害',strict:'判定妨害',noise:'ノイズ',shield:'シールド',boost:'判定強化',auto:'オートプレイ'};
+  const p=me(),labels={bottom:'下部妨害',top:'上部妨害',strict:'判定妨害',shield:'シールド',boost:'判定強化',auto:'オートプレイ'};
   const text=Object.entries(labels).filter(([k])=>active(p,k,t)).map(([k,label])=>label+(k==='auto'&&p.commandAuto?' ON':' '+Math.ceil((p.effects[k]-t)/1000)+'秒'));
   if(p.challenge)text.push('チャレンジ '+p.challenge.count+' / 100');
   if(p.notice&&t-p.notice.at<2500)text.push('発動：'+({attack:'おじゃま',heal:'味方HP+1',challenge:'100コンボチャレンジ',...labels}[p.notice.effect]||p.notice.effect)+(p.notice.target?' → '+p.notice.target:''));
   $('effects').textContent=text.join(' / ');
-  ctx.fillStyle='#030508';if(active(p,'bottom',t))ctx.fillRect(0,lineY-h*.05,w,h*.05);if(active(p,'top',t))ctx.fillRect(0,0,w,h*.1);
-  if(active(p,'noise',t)){ctx.fillStyle='rgba(170,190,190,.24)';for(let i=0;i<18;i++){const y=(i*71+Math.floor(t/100)*37)%h;ctx.fillRect((i*83)%w,y,w*.45,2+i%3);}}
+  ctx.fillStyle='#030508';if(active(p,'bottom',t))ctx.fillRect(0,Math.max(0,lineY-h*.5),w,Math.min(lineY,h*.5));if(active(p,'top',t))ctx.fillRect(0,0,w,h*.4);
 }
 
-let chatSignature='';
+let chatSignature='',chatRoom=null,chatToastTimer=0;
 function renderChat(){
-  $('chatToggle').hidden=!room;
+  const available=room?.phase==='lobby';$('chatToggle').hidden=!available;
+  if(!available){$('chatPanel').hidden=true;$('chatToast').hidden=true;clearTimeout(chatToastTimer);}
+  if(chatRoom!==room?.code){chatRoom=room?.code;chatSignature=(room?.chat||[]).map(m=>m.id).join(',');$('chatToast').hidden=true;}
   const messages=room?.chat||[],signature=messages.map(m=>m.id).join(',');
-  if(signature===chatSignature)return;chatSignature=signature;
+  if(signature!==chatSignature&&available&&messages.length){const latest=messages.at(-1);$('chatToast').textContent=latest.name+'：'+latest.text;$('chatToast').hidden=false;clearTimeout(chatToastTimer);chatToastTimer=setTimeout(()=>{$('chatToast').hidden=true;},4000);}
+  chatSignature=signature;
   const log=$('chatLog'),nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<50;
   log.replaceChildren();for(const message of messages){const row=document.createElement('p'),who=document.createElement('strong');who.textContent=message.name+'：';badge(who,message);const text=document.createElement('span');text.textContent=message.text;row.append(who,text);log.append(row);}
   if(nearBottom)log.scrollTop=log.scrollHeight;
 }
-$('chatToggle').onclick=()=>{$('chatPanel').hidden=!$('chatPanel').hidden;if(!$('chatPanel').hidden){$('chatLog').scrollTop=$('chatLog').scrollHeight;$('chatInput').focus?.();}};
+$('chatToggle').onclick=()=>{if(room?.phase!=='lobby')return;$('chatPanel').hidden=!$('chatPanel').hidden;if(!$('chatPanel').hidden){$('chatLog').scrollTop=$('chatLog').scrollHeight;$('chatInput').focus?.();}};
 $('chatClose').onclick=()=>{$('chatPanel').hidden=true;};
 let pendingChat=null;
 $('chatForm').onsubmit=async e=>{
-  e.preventDefault();if($('chatSend').disabled)return;
+  e.preventDefault();if(room?.phase!=='lobby'||$('chatSend').disabled)return;
   const text=$('chatInput').value;if(!text.trim())return;
   if(!pendingChat||pendingChat.text!==text)pendingChat={text,requestId:crypto.randomUUID()};
   $('chatSend').disabled=true;$('chatError').textContent='';

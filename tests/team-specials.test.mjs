@@ -34,7 +34,7 @@ test('shield expiry, stricter/boosted windows and 100 subsequent hits trigger 15
  assert.equal(active({},'shield',-1000),false);
 });
 test('attack selects only an opponent and has a 5–10 second expiry',()=>{
- const r=room(),p=r.players[0];const draws=[.8,0,.6,.5];reward(r,p,1000,()=>draws.shift());
+ const r=room(),p=r.players[0];const draws=[.8,0,.99,.5];reward(r,p,1000,()=>draws.shift());
  assert.equal(r.players[2].effects.strict,8500);assert.deepEqual(r.players[1].effects,{});
 });
 
@@ -47,4 +47,18 @@ test('debug team CPUs advance with effects and a down CPU keeps supporting its t
  assert.ok(r.players.every(p=>p.eventSeq>0));
  for(let now=11000;now<180000&&r.phase==='playing';now+=1000)maintain(r,now);
  assert.equal(r.phase,'finished');assert.ok(['A','B',null].includes(r.winner));
+});
+
+
+test('active upper/lower mask excludes both masks and noise from attack draws',()=>{
+ for(const mask of ['top','bottom'])for(const roll of [0,.4,.99]){
+ const r=room(),p=r.players[0],q=r.players[2];q.effects[mask]=9000;
+ const draws=[.8,0,roll,.5];reward(r,p,1000,()=>draws.shift());
+ assert.equal(q.effects[mask],9000);assert.equal(q.effects[mask==='top'?'bottom':'top'],undefined);assert.equal(q.effects.noise,undefined);assert.equal(q.effects.strict,8500);
+ }
+});
+test('challenge suppresses special rewards including the 100th hit',()=>{
+ const r=room(),p=r.players[0];r.specials=true;let note=1;while(!special(note,r.seed))note++;
+ p.challenge={count:98};judgeEvent(r,p,{seq:1,note,value:100},1000,()=>0);assert.equal(p.effects.shield,undefined);assert.equal(p.challenge.count,99);
+ do{note++;}while(!special(note,r.seed));judgeEvent(r,p,{seq:2,note,value:100},2000,()=>0);assert.equal(p.effects.shield,undefined);assert.equal(p.effects.auto,17000);assert.equal(p.challenge,null);
 });

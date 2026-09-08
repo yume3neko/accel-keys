@@ -85,11 +85,12 @@ test('chat frontend opens mode modal and command auto plays perfect without manu
  const command=text=>({text,requestId:crypto.randomUUID()});
  try{
  await a.api.send('create',{code:'ABCD23',name:'Host',mode:'cosmos',kind:'battle'});await b.api.send('join',{code:'ABCD23',name:'Guest'});
- await a.api.send('chat',command('/mode'));assert.equal(a.e('modePanel').hidden,false);assert.equal(a.e('editMode').value,'cosmos');
+ await a.api.send('chat',command('/mode'));assert.equal(a.e('modePanel').hidden,false);assert.equal(a.e('chatToast').hidden,false);assert.match(a.e('chatToast').textContent,/モード設定/);assert.equal(a.e('editMode').value,'cosmos');
  clearRate();a.e('editKind').value='coop';a.e('editSpecials').value='off';await a.e('modeForm').onsubmit({preventDefault(){}});assert.equal(a.e('modePanel').hidden,true);assert.equal(a.api.room.kind,'coop');
  clearRate();await a.api.send('chat',command('/auto Guest True'));await b.api.send('sync');assert.equal(b.api.room.players.find(p=>p.name==='Guest').commandAuto,true);assert.ok(b.api.room.chat.every(m=>!m.text.includes('/auto')));
  await a.api.send('ready',{ready:true});await b.api.send('ready',{ready:true});await a.api.send('start');await b.api.send('sync');
  b.tick(b.api.startPerf+3167);assert.equal(b.api.stats.hits,1);assert.equal(b.api.stats.miss,0);assert.equal(b.e('judge').textContent,'PERFECT');assert.match(b.e('effects').textContent,/オートプレイ ON/);
- clearRate();await a.api.send('chat',command('/auto Guest False'));await b.api.send('sync');b.tick(b.api.startPerf+4100);assert.equal(b.api.stats.hits,1);assert.equal(b.api.stats.miss,1);
+ assert.equal(b.e('chatToggle').hidden,true);assert.equal(b.e('chatPanel').hidden,true);assert.equal(b.e('chatToast').hidden,true);
+ await assert.rejects(()=>a.api.send('chat',command('/auto Guest False')),/待機画面/);
  }finally{db.close();}
 });

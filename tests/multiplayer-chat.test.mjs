@@ -16,8 +16,8 @@ test('BOT command validates count, levels, room capacity and phase; retry cannot
  const r=fixture();r.players.pop();const command=chat('/bot 2 3 5');apply(r,'h',command,1000);assert.equal(r.players.length,4);assert.deepEqual(r.players.slice(2).map(p=>p.level),[3,5]);
  apply(r,'h',command,2000);assert.equal(r.players.length,4);assert.equal(r.chat.length,1);
  assert.throws(()=>apply(r,'h',chat('/bot 1 1'),3000),/4人/);
- const other=fixture();assert.throws(()=>apply(other,'h',chat('/bot 2 3'),1000),/人数分/);assert.throws(()=>apply(other,'h',chat('/bot 1 6'),1000),/使い方/);
- other.phase='playing';other.startAt=100000;assert.throws(()=>apply(other,'h',chat('/bot 1 1'),1000),/開始前/);
+ const other=fixture();assert.throws(()=>apply(other,'h',chat('/bot 2 3'),1000),/人数分/);assert.throws(()=>apply(other,'h',chat('/bot 1 6'),1000),/正しくありません/);
+ other.phase='playing';other.startAt=100000;assert.throws(()=>apply(other,'h',chat('/bot 1 1'),1000),/待機画面/);
 });
 test('BOT level accuracy increases monotonically, level 3 is baseline and level 5 always perfect',()=>{
  const rates=[];for(let level=1;level<=5;level++){const p=makeCPU({players:[]},level,1000);p.rng=123;let score=0;for(let i=0;i<50000;i++)score+=cpuJudgement(p);rates.push(score/50000);}
@@ -33,12 +33,12 @@ test('mode is manager-only, resets readiness and teams, and cannot change an act
  const r=fixture();apply(r,'a',chat('/mode'),1000);assert.match(r.chat[0].text,/設定を開き/);
  const change={action:'changeMode',mode:'cosmos',kind:'team',specials:true,requestId:crypto.randomUUID()};
  assert.throws(()=>apply(r,'g',change,2000),/ホスト／管理者/);apply(r,'a',change,2000);assert.equal(r.mode,'cosmos');assert.equal(r.kind,'team');assert.ok(r.players.every(p=>!p.ready));
- r.phase='playing';r.startAt=100000;assert.throws(()=>apply(r,'a',{...change,requestId:crypto.randomUUID()},3000),/開始前/);
+ r.phase='playing';r.startAt=100000;assert.throws(()=>apply(r,'a',{...change,requestId:crypto.randomUUID()},3000),/待機画面/);
 });
-test('chat is bounded and rate-limited; normal participants can chat after results',()=>{
+test('chat is bounded and rate-limited; results reject chat',()=>{
  const r=fixture();for(let i=0;i<65;i++){r.players.forEach(p=>p.seen=1000+i*600);apply(r,'g',chat('message '+i),1000+i*600);}
  assert.equal(r.chat.length,60);assert.throws(()=>apply(r,'g',chat('fast'),1000+64*600),/間をあけ/);
- r.phase='finished';apply(r,'g',chat('お疲れさま'),50000);assert.equal(r.chat.at(-1).text,'お疲れさま');
+ r.phase='finished';assert.throws(()=>apply(r,'g',chat('お疲れさま'),50000),/待機画面/);
 });
 test('API snapshots carry chat and private mode response; auto text is never persisted',async()=>{
  const db=new DatabaseSync(':memory:'),token=crypto.randomUUID();const env={DB:{prepare(sql){let args=[];return{bind(...a){args=a;return this},async run(){return{meta:{changes:db.prepare(sql).run(...args).changes}}},async first(){return db.prepare(sql).get(...args)}}}}};

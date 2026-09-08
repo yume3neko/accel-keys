@@ -13,7 +13,7 @@ export function reward(room,p,t,random=Math.random){
   const effect=pool[Math.floor(random()*pool.length)];
   p.notice={effect,at:t};
   if(effect==='heal'){const q=friends[Math.floor(random()*friends.length)];q.hp++;p.notice.target=q.name;}
-  else if(effect==='attack'){const q=enemies[Math.floor(random()*enemies.length)],key=['bottom','top','strict','noise'][Math.floor(random()*4)];q.effects??={};q.effects[key]=t+5000+Math.floor(random()*5001);p.notice.target=q.name;}
+  else if(effect==='attack'){const q=enemies[Math.floor(random()*enemies.length)],choices=active(q,'bottom',t)||active(q,'top',t)?['strict']:['bottom','top','strict'],key=choices[Math.floor(random()*choices.length)];q.effects??={};q.effects[key]=t+5000+Math.floor(random()*5001);p.notice.target=q.name;}
   else if(effect==='challenge')p.challenge={count:0};
   else p.effects[effect]=t+(effect==='shield'?5000:10000);
   return effect;
@@ -25,8 +25,9 @@ export function judgeEvent(room,p,event,t,random=Math.random){
   p.usedNotes??=[];
   if(p.usedNotes.includes(event.note)||event.note<(p.maxNote??0)-256)throw Error('同じノーツを再判定できません。');
   p.usedNotes.push(event.note);p.maxNote=Math.max(p.maxNote??0,event.note);p.usedNotes=p.usedNotes.filter(n=>n>=p.maxNote-256);p.eventSeq=event.seq;
+  const wasChallenge=Boolean(p.challenge);
   if(!event.value){if(!active(p,'shield',t)){p.hp=Math.max(0,p.hp-1);p.challenge=null;}}
   else if(p.challenge){if(++p.challenge.count>=100){p.effects.auto=t+15000;p.challenge=null;p.notice={effect:'auto',at:t};}}
-  if(room.specials&&event.value&&special(event.note,room.seed))reward(room,p,t,random);
+  if(room.specials&&!wasChallenge&&event.value&&special(event.note,room.seed))reward(room,p,t,random);
   return true;
 }

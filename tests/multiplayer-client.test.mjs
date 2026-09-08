@@ -17,9 +17,9 @@ function client(env){
  const sandbox={makeChart,bpm,multiplier,console,crypto,AbortController,URL,performance:{now:()=>now},devicePixelRatio:1,
  document:{getElementById:element,createElement:el,body:el(),querySelectorAll:()=>buttons,querySelector:s=>buttons[Number(s.match(/\d/)[0])]},
  localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,String(v))},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,String(v))},
- location:{href:'https://example.test/accel-keys/multiplayer.html'},navigator:{},ResizeObserver:class{observe(){}},addEventListener(){},setTimeout(){return 1},clearTimeout(){},requestAnimationFrame(){return 1},cancelAnimationFrame(){},confirm:()=>true,
+ location:{href:'https://example.test/accel-keys/multiplayer.html'},navigator:{},ResizeObserver:class{observe(){}},addEventListener(){},setTimeout(){return 1},clearTimeout(){},setInterval(){return 1},clearInterval(){},requestAnimationFrame(){return 1},cancelAnimationFrame(){},confirm:()=>true,
  fetch:async(url,options)=>onRequestPost({env,request:new Request(new URL(url,'https://example.test'),options)})};
- vm.createContext(sandbox);vm.runInContext(source+'\nglobalThis.test={send,frame,press,leave,get room(){return room},get stats(){return stats},get notes(){return notes},get startPerf(){return startPerf}}',sandbox);
+ vm.createContext(sandbox);vm.runInContext(fs.readFileSync(new URL('../public/accel-keys/metronome.js',import.meta.url),'utf8'),sandbox);vm.runInContext(source+'\nglobalThis.test={send,frame,press,leave,get room(){return room},get stats(){return stats},get notes(){return notes},get startPerf(){return startPerf}}',sandbox);
  return {api:sandbox.test,e:element,storage,tick(t){now=t;sandbox.test.frame(t)}};
 }
 test('actual clients: same chart, countdown, hits, shared game and results',async()=>{

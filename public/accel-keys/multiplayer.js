@@ -1,5 +1,6 @@
 import {makeChart,bpm,multiplier} from './multiplayer-engine.js';
 const $=id=>document.getElementById(id), K=['D','F','J','K'];
+const guide=new AccelMetronome();guide.mount();
 const token=sessionStorage.getItem('accel-multi-token')||crypto.randomUUID();
 sessionStorage.setItem('accel-multi-token',token);
 let room=null,activeMatch=null,startPerf=0,chart=null,next=null,notes=[],pollTimer=0,raf=0,lastOK=performance.now();
@@ -69,7 +70,7 @@ $('copy').onclick=()=>action($('copy'),async()=>{const url=new URL(location.href
 async function leave(){
   if(!room)return;
   if(room.phase==='playing'&&!confirm(room.kind==='coop'?'退出すると全員の協力プレイが終了します。退出しますか？':'退出すると脱落します。退出しますか？'))return;
-  closing=true;clearTimeout(pollTimer);
+  guide.stop();closing=true;clearTimeout(pollTimer);
   try{await send('leave');}catch{}
   room=null;activeMatch=null;gameActive=false;closing=false;cancelAnimationFrame(raf);notes=[];
   $('play').hidden=true;$('lobby').hidden=true;$('results').hidden=true;$('setup').hidden=false;
@@ -81,7 +82,7 @@ async function poll(){
   try{await send('sync');$('connection').textContent='接続中';$('netStatus').textContent='';}
   catch(e){
     $('connection').textContent='再接続中…';$('netStatus').textContent='再接続中…15秒以上切れると退出扱いになります。';
-    if([403,404].includes(e.status)){$('message').textContent=e.message;clearTimeout(pollTimer);gameActive=false;$('overlay').textContent=e.message;return;}
+    if([403,404].includes(e.status)){$('message').textContent=e.message;clearTimeout(pollTimer);gameActive=false;guide.stop();$('overlay').textContent=e.message;return;}
   }finally{if(gameActive&&performance.now()-lastOK>15000)$('netStatus').textContent='通信が切れています。再接続を待っています…';}
   schedule();
 }
@@ -91,9 +92,10 @@ function receive(data,received,halfRTT){
   if(room.phase==='playing'&&activeMatch!==room.match){
     activeMatch=room.match;startPerf=received+(room.startAt-room.serverNow)-halfRTT;
     chart=makeChart(room.mode,room.seed);next=chart.next();notes=[];stats=empty();gameActive=true;
+    guide.start(startPerf+2500,t=>bpm(room.mode,t),room.mode==='cosmos'?4000:3000,()=>gameActive&&(performance.now()<startPerf||!stopped()));
     $('play').hidden=false;document.body.style.overflow='hidden';resize();cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
   }
-  if(room.phase==='finished'){gameActive=false;cancelAnimationFrame(raf);$('play').hidden=true;document.body.style.overflow='';renderResults();clearTimeout(pollTimer);}
+  if(room.phase==='finished'){gameActive=false;guide.stop();cancelAnimationFrame(raf);$('play').hidden=true;document.body.style.overflow='';renderResults();clearTimeout(pollTimer);}
   renderRoom();
 }
 function member(parent,p,result=false){
@@ -174,6 +176,7 @@ function frame(now){
   raf=requestAnimationFrame(frame);
 }
 addEventListener('pagehide',()=>{if(room&&room.phase!=='finished')fetch('/api/multiplayer',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({action:'leave',code:room.code}),keepalive:true}).catch(()=>{});});
+
 
 
 

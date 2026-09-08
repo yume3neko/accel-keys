@@ -668,6 +668,7 @@
             </select>
           </section>
           <p class="message" id="modeDescription"></p>
+          <section class="hsbox"><label style="display:flex;align-items:center;gap:8px"><input id="guideEnabled" type="checkbox" style="width:18px">ガイド音</label><input id="guideVolume" aria-label="ガイド音の音量" type="range" min="0" max="100" step="5"><span style="font-size:12px">音量</span></section>
           <section class="controls" id="controls">
             <label class="demo-toggle">
               <input id="demoMode" type="checkbox" />
@@ -714,6 +715,7 @@
         </div>
       </section>
     </div>
+    <script src="./metronome.js"></script>
     <script>
       (() => {
         const K = ["D", "F", "J", "K"],
@@ -723,6 +725,8 @@
           overlay = q("#overlay"),
           keys = q("#keys"),
           BASE = 0.145;
+        const guide = new AccelMetronome();
+        guide.mount();
         let gameMode = localStorage.getItem("accel-keys-mode") === "cosmos" ? "cosmos" : "time",
           patternIndex = 0,
           cosmosProgress = 0,
@@ -1018,6 +1022,7 @@
           if (demoMode && score >= 1000000 && !demoEnding) finishDemo();
         }
         function finishDemo() {
+          guide.stop();
           demoEnding = true;
           notes = [];
           activeLane = -1;
@@ -1114,6 +1119,7 @@
           raf = requestAnimationFrame(loop);
         }
         function start() {
+          guide.unlock();
           cancelAnimationFrame(raf);
           phase = "count";
           patternIndex = 0;
@@ -1144,12 +1150,14 @@
               phase = "playing";
               overlay.innerHTML = "";
               startAt = lastAt = performance.now();
+              guide.start(startAt, elapsed => gameMode === "cosmos" ? cosmosBpm(elapsed) : normalBpm(Math.floor((1+elapsed/30000)*10+0.000001)/10), gameMode === "cosmos" ? 4000 : 3000, () => phase === "playing" && !demoEnding);
               lastSpawn = gameMode === "cosmos" ? startAt : startAt - 600;
               raf = requestAnimationFrame(loop);
             } else overlay.innerHTML = '<div class="count">' + n + "</div>";
           }, 700);
         }
         function end() {
+          guide.stop();
           runDuration = Math.max(0, Math.round(performance.now() - startAt));
           phase = "over";
           cancelAnimationFrame(raf);
@@ -1511,6 +1519,7 @@
     </script>
   </body>
 </html>
+
 
 
 

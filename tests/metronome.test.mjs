@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source=fs.readFileSync(new URL('../public/accel-keys/metronome.js',import.meta.url),'utf8');
+function setup(){let now=0;const items=new Map();const s={localStorage:{getItem:()=>null,setItem(){}},addEventListener(){},document:{hidden:false,getElementById:id=>{if(!items.has(id))items.set(id,{});return items.get(id)}},performance:{now:()=>now},setInterval:()=>1,clearInterval(){}};vm.createContext(s);vm.runInContext(source,s);const guide=new s.AccelMetronome();return{guide,s,tick(t){now=t;guide.pump()}};}
+test('90 BPM + 6 each 4 seconds yields 34 beats in 20 seconds without drift',()=>{const f=setup(),clicks=[];f.guide.click=at=>clicks.push(at);f.guide.start(0,t=>90+Math.floor(t/4000)*6,4000);for(let t=0;t<=19900;t+=25)f.tick(t);assert.equal(clicks.length,34);assert.ok(Math.abs(clicks[0]-60000/90)<1e-6);assert.equal(clicks.filter(t=>t<=4000+1e-6).length,6);assert.equal(new Set(clicks).size,34);});
+test('multiplayer start offset delays clicks until the first chart beat',()=>{const f=setup(),clicks=[];f.guide.click=at=>clicks.push(at);f.guide.start(7500,()=>90,4000);f.tick(7500);assert.equal(clicks.length,0);f.tick(8100);assert.ok(Math.abs(clicks[0]-8166.6666667)<1e-6);});
+test('delayed callbacks skip old clicks and ending cancels queued audio',()=>{const f=setup(),clicks=[];let active=true,stopped=0;f.guide.click=at=>clicks.push(at);f.guide.start(0,()=>90,4000,()=>active);f.tick(10000);assert.ok(clicks.every(t=>t>=10000));f.guide.voices.add({stop(){stopped++}});active=false;f.tick(10100);assert.equal(f.guide.timer,null);assert.equal(stopped,1);});
+test('unsupported audio is nonfatal and mute cancels pending clicks',()=>{const f=setup();f.guide.mount();assert.doesNotThrow(()=>f.guide.unlock());assert.doesNotThrow(()=>f.guide.click(0));let stopped=0;f.guide.voices.add({stop(){stopped++}});const toggle=f.s.document.getElementById('guideEnabled');toggle.checked=false;toggle.onchange();assert.equal(stopped,1);assert.equal(f.guide.enabled,false);});

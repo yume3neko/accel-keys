@@ -170,3 +170,7 @@ function updateAutoPads(){const now=audioContext?.currentTime||0;document.queryS
 function setPauseIcon(paused){const b=$('pause');b.textContent=paused?'▶':'Ⅱ';b.setAttribute('aria-label',paused?'再開':'一時停止');b.title=paused?'再開':'一時停止';}
 async function enterPlayFullscreen(){try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();if(screen.orientation?.lock)await screen.orientation.lock('landscape')}catch{}}
 function leavePlayFullscreen(){try{screen.orientation?.unlock?.()}catch{}if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}
+
+async function requestLandscape(){try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();if(screen.orientation?.lock)await screen.orientation.lock('landscape');else throw Error('unsupported');}catch{$('status').textContent='横向き固定に対応していない場合は、端末の自動回転を有効にして横にしてください。';}}
+$('landscapeOpen').onclick=requestLandscape;
+$('landscapePlay').onclick=requestLandscape;

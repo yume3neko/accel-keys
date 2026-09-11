@@ -1,0 +1,15 @@
+TITLE:創作段位 初段
+SONG1:1曲目のタイトル,3
+SONG2:2曲目のタイトル,3
+SONG3:3曲目のタイトル,3
+
+EXAM1:80,100
+EXAM2:1,good,l,100,50
+EXAM3:2,miss
+EXAM3-1:l,10,5
+EXAM3-2:l,10,5
+EXAM3-3:l,10,5
+EXAM4:2,combo
+EXAM4-1:m,100,150
+EXAM4-2:m,100,150
+EXAM4-3:m,100,150

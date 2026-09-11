@@ -19,7 +19,7 @@ async function start(options={}){
  practiceTarget=Number.isFinite(options.target)?options.target:null;judgeFrom=practiceTarget??-Infinity;
  notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
  const plan=practiceTarget===null?null:practicePlan(chart,practiceTarget,auto);
- pausedTime=plan?plan.lead:options.seamless?Math.min(0,notes[0]?.time||0):Math.min(-2,(notes[0]?.time||0)-2);
+ pausedTime=plan?plan.lead:Math.min(0,(notes[0]?.time||0)-4);
  // Manual pre-roll is visible but excluded from every judgment and score path.
  if(plan){for(const n of notes){if(n.time>=plan.target)continue;if(auto){if(n.type<=4)judge(n,0);else{addRollHits(n,autoRollHits(n,plan.target-1e-9));if(n.end<plan.target)n.done=true}}else{n.ghost=true;if((n.end??n.time)<plan.lead)n.done=true}}}
  feedback='';feedbackAt=-10;beatIndex=chart.beats.findIndex(b=>b.time>=pausedTime);if(beatIndex<0)beatIndex=chart.beats.length;

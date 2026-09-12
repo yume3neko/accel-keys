@@ -9,10 +9,21 @@ function danPreviewTitle(c){if(!c)return '？？？';const title=(c.meta.TITLE||
 function danPendingTitle(song,index){let entry;try{entry=resolveDanConfig(true,index).songs[0]}catch{}return entry?danPreviewTitle(entry.chart):pendingDan.config.hide?.includes(index+1)?'？？？':song.chart}
 function refreshDanSongs(){
  const box=$('danSummary');box.replaceChildren();if(!pendingDan){box.append(danNode('p','段位設定ファイルを読み込んでください。'));return}
- const c=pendingDan.config;box.append(danNode('h3',c.name));c.songs.forEach((song,i)=>box.append(danNode('p',(i+1)+'曲目：'+danPendingTitle(song,i)+(song.course!==undefined?' / '+['かんたん','ふつう','むずかしい','おに','裏おに'][song.course]:''))));
- box.append(danNode('p','魂：合格 '+c.gauge+'% / 金 '+c.goldGauge+'%以上'));
- for(const r of c.conditions)box.append(danNode('p',danMetrics[r.type].label+'（'+(r.scope==='total'?'全体':'曲ごと')+'）：'+r.red.join(' / ')+(' '+r.red.map((_,i)=>danLabel(r,i)).join(' / '))+'、金 '+r.gold.join(' / ')));
+ const c=pendingDan.config;box.append(danNode('h3',c.name));
+ const overall=danNode('div',undefined,'dan-preview-overall');overall.append(danNode('p','魂：赤 '+c.gauge+'%以上 / 金 '+c.goldGauge+'%以上'));
+ const condition=(r,i)=>danMetrics[r.type].label+'：赤 '+r.red[i]+danLabel(r,i)+' / 金 '+r.gold[i]+danLabel(r,i);
+ for(const r of c.conditions.filter(r=>r.scope==='total'))overall.append(danNode('p',condition(r,0)));
+ box.append(overall);
+ const list=danNode('div',undefined,'result-song-list dan-preview-list');
+ c.songs.forEach((song,i)=>{let entry;try{entry=resolveDanConfig(true,i).songs[0]}catch{}
+ const card=danNode('section',undefined,'result-song');card.append(danNode('h3',(i+1)+'. '+danPendingTitle(song,i)));
+ const difficulty=song.course!==undefined?['かんたん','ふつう','むずかしい','おに','裏おに'][song.course]:entry?.chart.meta.LEVEL&&entry.chart.meta.LEVEL!=='?'?'★ '+entry.chart.meta.LEVEL:'';
+ if(difficulty)card.append(danNode('p',difficulty));
+ card.append(danNode('p',entry?entry.chart.audioFile?'準備完了':'音源未読込':'譜面未読込','dan-preview-status'));
+ for(const r of c.conditions.filter(r=>r.scope==='song'))card.append(danNode('p',condition(r,i),'dan-preview-condition'));
+ list.append(card)});box.append(list);
 }
+
 function openDan(){if(loading||importing||danRun||state==='playing'||state==='paused')return;rememberDanCharts();refreshDanSongs();$('danDialog').showModal()}
 function parseDanConfig(text){
  const fields=new Map(),fail=m=>{throw Error('段位設定：'+m)};

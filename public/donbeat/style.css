@@ -92,3 +92,11 @@
 .course-result .result-summary .result-stats>div:first-child small{font-size:14px;letter-spacing:0;margin:0;flex-shrink:0}
 .course-result .result-summary .result-stats strong{min-width:0;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 .course-result .result-summary .result-stats>div:first-child strong{font-size:clamp(18px,7cqi,30px);letter-spacing:0}
+
+#danSummary .dan-preview-list{margin:14px 0}
+#danSummary .result-song h3{font-size:18px;overflow-wrap:anywhere}
+#danSummary .result-song p{font-size:14px;margin:6px 0;line-height:1.5}
+.dan-preview-overall{padding:10px 14px;background:#302a20;border:1px solid #685b3d;border-radius:8px}
+.dan-preview-overall p{margin:5px 0}
+#danSummary .dan-preview-status{color:#b7bdc6}
+#danSummary .dan-preview-condition{border-top:1px solid #ffffff18;padding-top:6px}

@@ -185,7 +185,7 @@ function branchDetails(e){
  if(e.kind==='p'){const done=judged.filter(n=>n.done);value=done.length?done.reduce((sum,n)=>sum+(n.branchQuality||0),0)/done.length*100:0;}
  else if(e.kind==='r')value=branchRollLog.filter(x=>x.time>=from&&x.time<e.time).reduce((s,x)=>s+x.hits,0);
  else value=branchScoreLog.filter(x=>x.time>=from&&x.time<e.time).reduce((s,x)=>s+x.score,0);
- let route=value<e.low?'N':value<e.high?'E':'M';
+ let route=value>=e.high?'M':value>=e.low?'E':'N';
  const locked=(chart.holds||[]).some(t=>t>=from&&t<=e.time);
  if(locked)route=branchChoices[branchChoices.length-1]||'N';
  return {value,route,locked};

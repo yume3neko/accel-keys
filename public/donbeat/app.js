@@ -14,7 +14,7 @@ function scheduleAudio(t){stopAudio();if(!audioBuffer)return;source=audio().crea
 function reset(){balloonRolls=balloonPops=0;if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);$('status').textContent=demoMode||audioBuffer?'準備完了':'音源の追加が必要です';if(!demoMode&&!audioBuffer){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true;seek.disabled=true}draw()}
 async function start(options={}){
  if(loading||importing||state==='playing'||(danRun&&!options.dan)||(!demoMode&&!audioBuffer))return;loading=true;enterPlayFullscreen();
- try{if(!options.seamless||audio().state==='suspended')await audio().resume()}catch(e){loading=false;$('status').textContent='音声を開始できません。もう一度お試しください。';return}loading=false;
+ try{if(!options.seamless||audio().state==='suspended')await audio().resume();if(!options.seamless)await waitForLandscape()}catch(e){loading=false;$('status').textContent='音声を開始できません。もう一度お試しください。';return}loading=false;
  cancelAnimationFrame(raf);stopAudio();auto=danRun?danRun.config.auto:Boolean(options.auto);
  practiceTarget=Number.isFinite(options.target)?options.target:null;judgeFrom=practiceTarget??-Infinity;
  if(chart._tja){chart=rebuildTjaBranches(chart,[])}branchChoices=[];branchScoreLog=[];branchRollLog=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
@@ -220,4 +220,17 @@ function drawBranchDetails(t,opacity){
  const max=e.kind==='p'?100:Infinity,routeAt=v=>v>=e.high?'M':v>=e.low?'E':'N',forced=routeAt(0)===routeAt(max);
  const text=forced?'強制分岐 → '+names[routeAt(0)]: (e.kind==='p'?'精度':e.kind==='r'?'連打':'スコア')+' '+d.value.toFixed(e.kind==='p'?1:0)+unit+' / '+(e.low>=e.high?'達人 '+e.high+unit+'以上':'玄人 '+e.low+'・達人 '+e.high)+' → '+names[d.route]+(d.locked?'（固定）':'');
  ctx.fillText(text,width-12,height-6);ctx.restore();
+}
+
+async function waitForLandscape(){
+ if(window.innerWidth>=window.innerHeight)return;
+ const dialog=document.createElement('dialog'),title=document.createElement('h2'),message=document.createElement('p');
+ title.textContent='端末を横向きにしてください';dialog.append(title,message);document.body.append(dialog);dialog.showModal();
+ await new Promise(resolve=>{
+ const deadline=Date.now()+10000;
+ const finish=()=>{clearInterval(timer);window.removeEventListener('resize',check);dialog.close();dialog.remove();resolve()};
+ const check=()=>{if(window.innerWidth>=window.innerHeight||Date.now()>=deadline){finish();return}message.textContent='横向きになると開始します。あと '+Math.ceil((deadline-Date.now())/1000)+' 秒で、そのまま開始します。'};
+ dialog.addEventListener('cancel',e=>e.preventDefault());
+ const timer=setInterval(check,100);window.addEventListener('resize',check);check();
+ });
 }

@@ -203,8 +203,18 @@ function updateBranchRoute(){
  }
 }
 function drawBranchDetails(t,opacity){
- if(danRun||!chart.branchEvents?.length)return;
- const e=chart.branchEvents[Math.min(branchChoices.length,chart.branchEvents.length-1)],d=branchDetails(e);
+ const bar=$('branchProgress'),active=state==='playing'||state==='paused';
+ const e=!danRun&&active?chart.branchEvents?.[branchChoices.length]:null;
+ bar.hidden=!e;if(!e)return;
+ const now=t-Number($('offset').value||0)/1000;
+ const previous=branchChoices.length?chart.branchEvents[branchChoices.length-1].time:Math.min(0,(chart.notes[0]?.time||0)-4);
+ const start=Math.max(previous,...(chart.sections||[]).filter(x=>x<e.time));
+ const progress=Math.max(0,Math.min(1,(now-start)/Math.max(.001,e.time-start)));
+ $('branchProgressFill').style.width=(progress*100)+'%';bar.style.opacity=opacity;
+ bar.setAttribute('aria-valuenow',String(Math.round(progress*100)));
+ bar.setAttribute('aria-valuetext','次の分岐まで '+Math.max(0,e.time-now).toFixed(1)+'秒');
+ bar.title='次の分岐まで '+Math.max(0,e.time-now).toFixed(1)+'秒';
+ const d=branchDetails(e);
  const names={N:'普通',E:'玄人',M:'達人'},unit=e.kind==='p'?'%':e.kind==='r'?'打':'点';
  ctx.save();ctx.globalAlpha=opacity;ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillStyle='#fff';ctx.font='700 12px sans-serif';
  ctx.fillText((e.kind==='p'?'精度':e.kind==='r'?'連打':'スコア')+' '+d.value.toFixed(e.kind==='p'?1:0)+unit+' / 玄人 '+e.low+'・達人 '+e.high+' → '+names[d.route]+(d.locked?'（固定）':''),width-12,height-6);ctx.restore();

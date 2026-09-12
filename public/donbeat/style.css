@@ -100,3 +100,5 @@
 .dan-preview-overall p{margin:5px 0}
 #danSummary .dan-preview-status{color:#b7bdc6}
 #danSummary .dan-preview-condition{border-top:1px solid #ffffff18;padding-top:6px}
+
+.branch-progress{height:6px;flex:0 0 6px;background:#343b43;overflow:hidden}.branch-progress[hidden]{display:none}.branch-progress>i{display:block;height:100%;width:0;background:#f8c259}

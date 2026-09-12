@@ -11,6 +11,14 @@ function danPendingTitle(song,index){if(pendingDan.config.hide?.includes(index+1
 function refreshDanSongs(){
  const box=$('danSummary');box.replaceChildren();if(!pendingDan){box.append(danNode('p','段位設定ファイルを読み込んでください。'));return}
  const c=pendingDan.config;box.append(danNode('h3',c.name));
+ let totalCharts;try{totalCharts=resolveDanConfig(true).songs.map(e=>e.chart)}catch{}
+ if(totalCharts){
+ const count=totalCharts.reduce((sum,c)=>sum+c.notes.filter(n=>n.type<=4).length,0);
+ const seconds=Math.ceil(totalCharts.reduce((sum,c)=>{const first=c.notes[0]?.time||0,lead=Math.min(0,first-4);let end=Math.max(0,c.duration||0);for(const n of c.notes)end=Math.max(end,(n.end??n.time)+.126);return sum+Math.max(end,c.preloadedAudio?.duration||0)-lead},0)+Math.max(0,totalCharts.length-1)*3);
+ const duration=(seconds>=3600?Math.floor(seconds/3600)+'時間':'')+Math.floor(seconds%3600/60)+'分'+String(seconds%60).padStart(2,'0')+'秒';
+ box.append(danNode('p','合計演奏時間（目安）：'+duration+'　／　合計ノーツ数：'+count.toLocaleString(),'dan-preview-totals'));
+ box.append(danNode('p','時間は譜面を基準に開始前の余白・曲間を含めて算出。ノーツ数は連打・ふうせんを除きます。','dan-preview-status'));
+ }else box.append(danNode('p','合計演奏時間・合計ノーツ数：譜面が揃うと集計します。','dan-preview-totals'));
  const overall=danNode('div',undefined,'dan-preview-overall');overall.append(danNode('p','魂：赤 '+c.gauge+'%以上 / 金 '+c.goldGauge+'%以上'));
  const condition=(r,i)=>danMetrics[r.type].label+'：赤 '+r.red[i]+danLabel(r,i)+' / 金 '+r.gold[i]+danLabel(r,i);
  for(const r of c.conditions.filter(r=>r.scope==='total'))overall.append(danNode('p',condition(r,0)));

@@ -6,7 +6,8 @@ function rememberDanCharts(){for(const c of charts){const old=danPool.findIndex(
 function danSongLabel(entry){const c=entry.chart;return (c.meta.TITLE||'無題')+' / '+(names[c.meta.COURSE]||c.meta.COURSE||'おに')+(entry.demo?'（練習曲）':c.audioFile?'':'（音源未選択）')}
 let pendingDan=null;
 function danPreviewTitle(c){if(!c)return '？？？';const title=(c.meta.TITLE||'').normalize('NFC').trim(),file=(c.importName||c.sourcePath||'').split('/').pop().replace(/\.[^.]+$/,'').normalize('NFC').trim();return title&&title===file?title:'？？？'}
-function danPendingTitle(song,index){let entry;try{entry=resolveDanConfig(true,index).songs[0]}catch{}return entry?danPreviewTitle(entry.chart):pendingDan.config.hide?.includes(index+1)?'？？？':song.chart}
+function danPendingTitle(song,index){if(pendingDan.config.hide?.includes(index+1))return '？？？';let entry;try{entry=resolveDanConfig(true,index).songs[0]}catch{}return entry?.chart.meta.TITLE||song.chart}
+
 function refreshDanSongs(){
  const box=$('danSummary');box.replaceChildren();if(!pendingDan){box.append(danNode('p','段位設定ファイルを読み込んでください。'));return}
  const c=pendingDan.config;box.append(danNode('h3',c.name));

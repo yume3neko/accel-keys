@@ -54,8 +54,11 @@ function songDuration(){return Math.max(.001,chart.duration+(danRun?0:1),danRun?
 function updateProgress(t=time()){
   const songFraction=state==='result'?1:state==='ready'?0:Math.max(0,Math.min(1,t/songDuration()));
   const percent=danRun?Math.min(100,(danRun.index+((state==='dan-break'||danRun.results.length>danRun.index)?1:songFraction))/Math.max(1,danRun.config.songs.length)*100):songFraction*100;
-  $('songProgressFill').style.transform=`scaleX(${percent/100})`;
-  $('songProgress').setAttribute('aria-valuenow',String(Math.floor(percent)));
+  $('songProgressFill').style.transform=`scaleX(${songFraction})`;
+  $('courseProgress').hidden=!danRun;
+  $('courseProgressFill').style.transform=`scaleX(${percent/100})`;
+  $('courseProgress').setAttribute('aria-valuenow',String(Math.floor(percent)));
+  $('songProgress').setAttribute('aria-valuenow',String(Math.floor(songFraction*100)));
 }
 function finish(){if(danRun){finishDanSong();return}pausedTime=time();state='result';updateProgress();stopAudio();document.body.classList.remove('playing');unlock();$('pause').disabled=true;showSingleResult();}
 

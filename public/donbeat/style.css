@@ -102,3 +102,5 @@
 #danSummary .dan-preview-condition{border-top:1px solid #ffffff18;padding-top:6px}
 
 .branch-progress{height:6px;flex:0 0 6px;background:#343b43;overflow:hidden}.branch-progress[hidden]{display:none}.branch-progress>i{display:block;height:100%;width:0;background:#f8c259}
+
+.course-progress[hidden]{display:none}.course-progress{border-bottom:2px solid #171b20}.course-progress>i{background:#f8c259;transform-origin:left;transform:scaleX(0)}

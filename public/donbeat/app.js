@@ -52,7 +52,8 @@ function addRollHitsCore(r,count=1){
 function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const t=time()-Number($('offset').value||0)/1000;if(t<judgeFrom)return;const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows().miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&n.type>=5&&t>=n.time&&t<=n.end);if(r&&(r.type!==7||type===1))addRollHits(r)}
 function songDuration(){return Math.max(.001,chart.duration+(danRun?0:1),danRun?Math.max(0,...chart.notes.map(n=>(n.end??n.time)+judgmentWindows().miss+.001)):0,audioBuffer?.duration||0)}
 function updateProgress(t=time()){
-  const percent=state==='result'?100:state==='ready'?0:Math.max(0,Math.min(100,t/songDuration()*100));
+  const songFraction=state==='result'?1:state==='ready'?0:Math.max(0,Math.min(1,t/songDuration()));
+  const percent=danRun?Math.min(100,(danRun.index+((state==='dan-break'||danRun.results.length>danRun.index)?1:songFraction))/Math.max(1,danRun.config.songs.length)*100):songFraction*100;
   $('songProgressFill').style.transform=`scaleX(${percent/100})`;
   $('songProgress').setAttribute('aria-valuenow',String(Math.floor(percent)));
 }

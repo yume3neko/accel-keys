@@ -173,7 +173,7 @@ function leavePlayFullscreen(){try{screen.orientation?.unlock?.()}catch{}if(docu
 
 async function requestLandscape(){try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();if(screen.orientation?.lock)await screen.orientation.lock('landscape');else throw Error('unsupported');}catch{$('status').textContent='横向き固定に対応していない場合は、端末の自動回転を有効にして横にしてください。';}}
 $('landscapeOpen').onclick=requestLandscape;
-$('landscapePlay').onclick=requestLandscape;
+
 
 var branchChoices=[],branchScoreLog=[],branchRollLog=[];
 function judge(n,error){n.branchQuality=error<=judgmentWindows().good?1:error<=judgmentWindows().ok?.5:0;const before=score;judgeCore(n,error);branchScoreLog.push({time:n.time,score:score-before});}

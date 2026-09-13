@@ -17,7 +17,7 @@ function parseMalody(text){
  const stateAt=b=>{let s={scroll:1,gogo:false,showbar:true,hs:1};for(const e of states){if(e.beat>b)break;s=e}return s};
  const fades=effects.filter(e=>e.fade!==undefined).map(e=>{const mode=String(e.mode||'').toLowerCase(),end=beat(e.endbeat);if(![0,1].includes(e.fade)||end<e.position||!['all','info','lane','note','button'].includes(mode))throw Error('fadeの指定が不正です。');return {time:seconds(e.position)-offset,end:seconds(end)-offset,direction:e.fade,mode}});
  const map=[1,3,2,4,5,6,7],notes=[];let lastBeat=0;
- for(const n of d.note){if(n.sound&&n.type)continue;const type=map[n.style??0];if(type===undefined){warnings.add('音符style:'+n.style+'は未対応');continue}const b=beat(n.beat),s=stateAt(b),note={type,time:seconds(b)-offset,bpm:at(b).bpm,scroll:s.hs,gogo:s.gogo};lastBeat=Math.max(lastBeat,b);
+ for(const n of d.note){if(n.sound&&n.type)continue;const style=Number(n.style??0),dummy=style>=10&&style<=16,type=map[dummy?style-10:style];if(type===undefined){warnings.add('音符style:'+n.style+'は未対応');continue}const b=beat(n.beat),s=stateAt(b),note={type,dummy,time:seconds(b)-offset,bpm:at(b).bpm,scroll:s.hs,gogo:s.gogo};lastBeat=Math.max(lastBeat,b);
  if(type>=5){if(!n.endbeat)throw Error('連打・風船の終点がありません。');const end=beat(n.endbeat);if(end<b)throw Error('連打の終点が始点より前です。');note.end=seconds(end)-offset;note.hits=0;lastBeat=Math.max(lastBeat,end);if(type===7){note.required=Number(n.hits);if(!Number.isInteger(note.required)||note.required<1)throw Error('風船の必要打数が不正です。')}}notes.push(note)}
  if(!notes.length)throw Error('演奏できる太鼓の音符がありません。');notes.sort((a,b)=>a.time-b.time);
  // sign is the number of quarter-note beats per bar; it never retimes notes.
@@ -38,7 +38,7 @@ function parseMalody(text){
  const visual=[];
  for(const e of events){distance+=(e.time-previous)*visualBpm/120*visualScroll;previous=e.time;if(e.bpm!==undefined)visualBpm=e.bpm;if(e.scroll!==undefined)visualScroll=e.scroll;if(e.hs!==undefined)visualHs=e.hs;jumpDistance+=(e.jump||0)/1000*visualBpm/120*visualScroll*visualHs;visual.push({time:e.time,distance,jumpDistance,rate:visualBpm/120*visualScroll,bpm:visualBpm,scroll:visualScroll,hs:visualHs})}
  const song=d.meta.song||{},version=d.meta.version||'Malody',level=version.match(/[☆★]\s*(\d+)/)?.[1]||'?';
- return {charts:[{meta:{TITLE:song.titleorg||song.title||'無題',SUBTITLE:[song.artistorg||song.artist,d.meta.creator].filter(Boolean).join(' / '),COURSE:version,LEVEL:level,VIDEO:d.meta.video||'',WAVE:sound?.sound||''},notes,bars,measures,visual,fades,beats:[],bpm:timing[0].bpm,duration:seconds(lastBeat)-offset,warnings:[...warnings]}],warnings:[...warnings]};
+ return {charts:[{meta:{TITLE:song.titleorg||song.title||'無題',SUBTITLE:[song.artistorg||song.artist,d.meta.creator].filter(Boolean).join(' / '),COURSE:version,LEVEL:level,VIDEO:d.meta.video||'',WAVE:sound?.sound||''},notes:notes.filter(n=>!n.dummy),dummyNotes:notes.filter(n=>n.dummy),bars,measures,visual,fades,beats:[],bpm:timing[0].bpm,duration:seconds(lastBeat)-offset,warnings:[...warnings]}],warnings:[...warnings]};
 }
 async function readChartArchive(file){
  if(file.size>256*1024*1024)throw Error('MCZ / ZIPは256MB以下にしてください。');const bytes=new Uint8Array(await file.arrayBuffer()),v=new DataView(bytes.buffer);let end=-1;

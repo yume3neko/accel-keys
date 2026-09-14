@@ -38,7 +38,7 @@ function parseMalody(text){
  const visual=[];
  for(const e of events){distance+=(e.time-previous)*visualBpm/120*visualScroll;previous=e.time;if(e.bpm!==undefined)visualBpm=e.bpm;if(e.scroll!==undefined)visualScroll=e.scroll;if(e.hs!==undefined)visualHs=e.hs;jumpDistance+=(e.jump||0)/1000*visualBpm/120*visualScroll*visualHs;visual.push({time:e.time,distance,jumpDistance,rate:visualBpm/120*visualScroll,bpm:visualBpm,scroll:visualScroll,hs:visualHs})}
  const song=d.meta.song||{},version=d.meta.version||'Malody',level=version.match(/[☆★]\s*(\d+)/)?.[1]||'?';
- return {charts:[{meta:{TITLE:song.titleorg||song.title||'無題',SUBTITLE:[song.artistorg||song.artist,d.meta.creator].filter(Boolean).join(' / '),COURSE:version,LEVEL:level,VIDEO:d.meta.video||'',WAVE:sound?.sound||''},notes:notes.filter(n=>!n.dummy),dummyNotes:notes.filter(n=>n.dummy),bars,measures,visual,fades,beats:[],bpm:timing[0].bpm,duration:seconds(lastBeat)-offset,warnings:[...warnings]}],warnings:[...warnings]};
+ return {charts:[{meta:{TITLE:song.titleorg||song.title||'無題',SUBTITLE:[song.artistorg||song.artist,d.meta.creator].filter(Boolean).join(' / '),COURSE:version,LEVEL:level,VIDEO:d.meta.video||'',WAVE:sound?.sound||''},notes:notes.filter(n=>!n.dummy),dummyNotes:notes.filter(n=>n.dummy),bars,measures,visual,fades,gogoEvents:effects.filter(e=>e.ggt!==undefined).map(e=>({time:seconds(e.position)-offset,active:!!e.ggt})),beats:[],bpm:timing[0].bpm,duration:seconds(lastBeat)-offset,warnings:[...warnings]}],warnings:[...warnings]};
 }
 async function readChartArchive(file){
  if(file.size>256*1024*1024)throw Error('MCZ / ZIPは256MB以下にしてください。');const bytes=new Uint8Array(await file.arrayBuffer()),v=new DataView(bytes.buffer);let end=-1;

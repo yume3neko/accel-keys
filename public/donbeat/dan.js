@@ -79,7 +79,7 @@ function danPossibleStats(songOnly){
  const t=time()-Number($('offset').value||0)/1000;
  const groups=[{chart,notes,current:true}];if(!songOnly)for(let i=danRun.index+1;i<danRun.config.songs.length;i++)groups.push({chart:danRun.config.songs[i].chart,notes:danRun.config.songs[i].chart.notes,current:false});
  for(const group of groups){const normalCount=group.chart.notes.filter(n=>n.type<=4).length,noteScore=Math.floor(1000000/Math.max(1,normalCount)/10)*10;
-  for(const n of group.notes){if(group.current&&n.done)continue;if(n.type<=4){remaining++;possible.good++;possible.ok++;possible.miss++;possible.allcombo++;possible.score+=noteScore;continue}
+  for(const n of group.notes){if(group.current&&n.done)continue;if(n.type===9){if(!danRun.config.auto)possible.miss++;continue;}if(n.type<=4){remaining++;possible.good++;possible.ok++;possible.miss++;possible.allcombo++;possible.score+=noteScore;continue}
    if(group.current&&n.end<t)continue;const hits=group.current?n.hits||0:0;let extra;
    if(danRun.config.auto)extra=Math.max(0,autoRollHits(n,n.end)-hits);
    else extra=n.type===7?Math.max(0,n.required-hits):Infinity;
@@ -89,7 +89,7 @@ function danPossibleStats(songOnly){
  }
  possible.maxCombo=Math.max(possible.maxCombo,(songOnly?danRun.songCombo:combo)+remaining);return possible;
 }
-function danUnplayedMaximum(c){const normal=c.notes.filter(n=>n.type<=4).length,result={good:normal,ok:0,miss:0,maxCombo:normal,rolls:0,score:normal*Math.floor(1000000/Math.max(1,normal)/10)*10};for(const n of c.notes){if(n.type<5)continue;const hits=danRun.config.auto?autoRollHits(n,n.end):n.type===7?n.required:Infinity;result.rolls+=hits;result.score+=hits*100;if(n.type===7&&hits>=n.required)result.score+=5000}result.ok=normal;result.miss=normal;result.allcombo=normal+result.rolls;return result}
+function danUnplayedMaximum(c){const normal=c.notes.filter(n=>n.type<=4).length,result={good:normal,ok:0,miss:0,maxCombo:normal,rolls:0,score:normal*Math.floor(1000000/Math.max(1,normal)/10)*10};for(const n of c.notes){if(n.type<5||n.type>7)continue;const hits=danRun.config.auto?autoRollHits(n,n.end):n.type===7?n.required:Infinity;result.rolls+=hits;result.score+=hits*100;if(n.type===7&&hits>=n.required)result.score+=5000}result.ok=normal;result.miss=normal+(danRun.config.auto?0:c.notes.filter(n=>n.type===9).length);result.allcombo=normal+result.rolls;return result}
 function danCurrentFailed(){
  if(!danRun)return false;if(danRun.failed||danExceededMaximum())return true;
  const whole=danPossibleStats(false),current=danPossibleStats(true);

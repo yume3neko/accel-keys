@@ -4,6 +4,21 @@ const idOK=id=>/^[a-f0-9-]{36}$/.test(id||'');
 const allowed=p=>/\.(mc|tja|ogg|mp3|wav|m4a|flac|mp4|webm|m4v)$/i.test(p);
 const readJSON=async(bucket,key)=>{const f=await bucket.get(key);return f?await f.json():null};
 const removePrefix=async(bucket,prefix)=>{let cursor;do{const page=await bucket.list({prefix,cursor});if(page.objects.length)await bucket.delete(page.objects.map(o=>o.key));cursor=page.truncated?page.cursor:undefined}while(cursor)};
+const normTitle=s=>String(s||'').normalize('NFC').trim();
+async function publishedSongTitles(bucket){const titles=new Set();let cursor;do{const page=await bucket.list({prefix:'catalog/',cursor});for(const o of page.objects){const data=await readJSON(bucket,o.key);for(const song of data?.songs||[])if(song?.title)titles.add(normTitle(song.title))}cursor=page.truncated?page.cursor:undefined}while(cursor);return titles}
+function danSongNames(content){
+ const found=[];
+ for(const raw of String(content).replace(/^\uFEFF/,'').split(/\r?\n/)){
+  const line=raw.trim();if(!line||line.startsWith('//'))continue;
+  const m=line.match(/^SONG(\d+)\s*:\s*(.+)$/i);if(!m)continue;
+  const index=Number(m[1]),value=m[2].trim();let name='';
+  if(value.startsWith('"')){const q=value.match(/^"((?:[^"]|"")*)"(?:\s*,\s*[0-4])?\s*$/);if(!q)throw Error('SONG'+index+' の曲名または難易度指定が不正です。');name=q[1].replace(/""/g,'"').trim()}
+  else{const d=value.match(/^(.*?)(?:\s*,\s*([0-4]))?\s*$/);name=(d?.[1]||'').trim()}
+  if(!name)throw Error('SONG'+index+' の曲名が空です。');found.push({index,name:normTitle(name)});
+ }
+ found.sort((a,b)=>a.index-b.index);if(!found.length||found.some((x,i)=>x.index!==i+1))throw Error('SONGは1から連番で指定してください。');return found.map(x=>x.name);
+}
+async function validateDanSongs(bucket,content){const available=await publishedSongTitles(bucket),missing=[...new Set(danSongNames(content).filter(name=>!available.has(name)))];if(missing.length)throw Error('未収録曲を含むため段位を登録できません：'+missing.join('、'));}
 async function listAdmin(bucket){
  const songs=[],dans=[],disabledStatic=[];let cursor;
  do{const page=await bucket.list({prefix:'catalog/',cursor});for(const o of page.objects){const data=await readJSON(bucket,o.key);if(!data)continue;const id=o.key.slice('catalog/'.length,-5);(data.songs||[]).forEach((song,index)=>songs.push({id,index,...song}))}cursor=page.truncated?page.cursor:undefined}while(cursor);
@@ -23,6 +38,7 @@ export async function onRequest({request,env}){
   }
   if(action==='dan'&&request.method==='POST'){
    if(!idOK(id))return json({error:'段位IDが不正です。'},400);const raw=await request.text();if(raw.length>120000)return json({error:'段位設定が大きすぎます。'},413);const body=JSON.parse(raw),title=String(body.title||'').trim(),content=String(body.content||'');if(!title||title.length>300||!content.trim())return json({error:'段位名または設定内容が不正です。'},400);if(!/^\s*(?:TITLE\s*:|SONG1\s*:)/mi.test(content)||!/^\s*SONG1\s*:/mi.test(content))return json({error:'段位設定ファイルとして認識できません。'},400);
+   await validateDanSongs(bucket,content);
    const file='/api/donbeat/dan/'+id;await bucket.put('dan/'+id+'.dan',content,{httpMetadata:{contentType:'text/plain; charset=utf-8'}});await bucket.put('dan-catalog/'+id+'.json',JSON.stringify({id,title,file}),{httpMetadata:{contentType:'application/json'}});await bucket.delete('dan-disabled/'+id+'.json');return json({ok:true,id,title,file});
   }
   if(action==='dan'&&request.method==='DELETE'){

@@ -1,6 +1,7 @@
 {
   "presets": [
     {
+      "id": "long-endurance",
       "title": "長尺耐久段位",
       "file": "presets/long-endurance.dan"
     }

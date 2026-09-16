@@ -2,6 +2,7 @@
 
 (function(){
   const catalogURL=new URL('dan-presets/catalog.json',location.href);
+  const serverCatalogURL='/api/donbeat/dan-catalog';
   let catalogLoaded=false,catalogLoading=null;
 
   const cleanTitle=value=>String(value||'').normalize('NFC').trim();
@@ -114,12 +115,15 @@
     catalogLoading=(async()=>{
       const status=$('danPresetStatus'),list=$('danPresetList');
       try{
-        const response=await fetch(catalogURL,{cache:'no-cache'});
-        if(!response.ok)throw Error('HTTP '+response.status);
-        const data=await response.json();
-        if(!Array.isArray(data.presets))throw Error('presets配列がありません。');
+        const [localResponse,serverResponse]=await Promise.all([fetch(catalogURL,{cache:'no-cache'}),fetch(serverCatalogURL,{cache:'no-cache'})]);
+        const localData=localResponse.ok?await localResponse.json():{presets:[]};
+        const serverData=serverResponse.ok?await serverResponse.json():{presets:[],disabledStatic:[]};
+        const disabled=new Set(Array.isArray(serverData.disabledStatic)?serverData.disabledStatic:[]);
+        const local=Array.isArray(localData.presets)?localData.presets.filter(x=>!disabled.has(String(x.id||''))):[];
+        const remote=Array.isArray(serverData.presets)?serverData.presets:[];
+        const presets=[...local,...remote];
         list.replaceChildren();
-        for(const entry of data.presets){
+        for(const entry of presets){
           if(!entry||typeof entry.title!=='string'||typeof entry.file!=='string')continue;
           const b=document.createElement('button');b.type='button';b.textContent=entry.title;b.onclick=()=>selectPreset(entry,b);list.append(b);
         }

@@ -322,9 +322,12 @@ function renderSongSelection(){
 }
 
 function chartFeatures(c){
- const result={soflan:!!c.features?.soflan,fadeout:!!c.features?.fadeout,mv:!!(c.videoFile||c.meta.VIDEO)};
+ const result={soflan:!!c.features?.soflan,fadeout:!!c.features?.fadeout,branch:!!c.features?.branch||!!c.branchEvents?.length,dummy:!!c.features?.dummy||!!c.dummyNotes?.length,damage:!!c.features?.damage||!!c.notes?.some(n=>n.type===9),mv:!!(c.features?.mv||c.videoFile||c.meta.VIDEO)};
  if(c._tja){
   for(const line of c._tja.lines){
+   if(/^#BRANCHSTART\b/i.test(line))result.branch=true;
+   if(/^#DUMMYSTART\b/i.test(line))result.dummy=true;
+   if(!line.startsWith('#')&&/9/.test(line))result.damage=true;
    const match=line.match(/^#(BPMCHANGE|ABSCROLL|SCROLL)\s+([+-]?[\d.]+)/i);
    if(match){const command=match[1].toUpperCase(),value=Number(match[2]);if(command==='BPMCHANGE'&&value!==c.bpm||command==='ABSCROLL'&&value!==1||command==='SCROLL'&&value<0)result.soflan=true}
    if(/^#FADE\s*,\s*0\s*,/i.test(line))result.fadeout=true;
@@ -335,7 +338,7 @@ function chartFeatures(c){
 function featureBadges(list){
  const box=document.createElement('span');box.className='feature-badges';
  const flags=list.map(chartFeatures);
- for(const [key,icon,label] of [['soflan','↔','ソフラン'],['fadeout','◐','フェードアウト'],['mv','▶','MV付き']]){
+ for(const [key,icon,label] of [['soflan','↔','ソフランあり'],['branch','⑂','譜面分岐あり'],['dummy','◇','ダミーノーツあり'],['damage','⚠','ダメージノーツあり'],['fadeout','◐','フェードアウトあり'],['mv','▶','MV付き']]){
   if(!flags.some(f=>f[key]))continue;
   const badge=document.createElement('span');badge.className='feature-badge '+key;badge.title=label;badge.setAttribute('aria-label',label);badge.textContent=icon+' '+label;box.append(badge);
  }
@@ -369,7 +372,7 @@ async function prepareServerChart(c){
    for(const chart of parsed){
     const wave=entry.audio||chart.meta.WAVE,video=entry.video||chart.meta.VIDEO;
     if(wave)chart.serverAudio=serverURL(wave,entry.url);
-    if(video){chart.serverVideo=serverURL(video,entry.url);chart.meta.VIDEO=video}
+    if(video){if(entry.videoParts?.length)chart.serverVideoParts=entry.videoParts.map(p=>serverURL(p,entry.url));else chart.serverVideo=serverURL(video,entry.url);chart.meta.VIDEO=video}
    }
   }
   if(!parsed.length)throw Error('対応する譜面がありません');
@@ -377,6 +380,7 @@ async function prepareServerChart(c){
   const index=charts.indexOf(c);charts.splice(index,1,...parsed);c=parsed[0];expandedSong=c.meta.TITLE;fillCourses();$('course').value=index;
  }
  if(c.serverAudio&&!c.audioFile)c.audioFile=await serverFile(c.serverAudio,c.meta.WAVE||'music');
+ if(c.serverVideoParts&&!c.videoFile){const parts=[];for(const url of c.serverVideoParts)parts.push(await serverFile(url,'part'));c.videoFile=new File(parts,c.meta.VIDEO||'video.mp4',{type:'video/mp4'})}
  if(c.serverVideo&&!c.videoFile)c.videoFile=await serverFile(c.serverVideo,c.meta.VIDEO||'video.mp4');
  return c;
 }
@@ -384,11 +388,11 @@ async function loadServerCatalog(){
  try{
   const url=new URL('songs/catalog.json',location.href),response=await fetch(url,{cache:'no-cache'});
   if(response.status===404)return;if(!response.ok)throw Error('一覧 HTTP '+response.status);
-  const data=await response.json();if(!Array.isArray(data.songs))throw Error('songs配列が必要です');
+  const data=await response.json();try{const uploaded=await fetch('/api/donbeat/catalog',{cache:'no-store'});if(uploaded.ok){const remote=await uploaded.json();if(Array.isArray(remote.songs))data.songs.push(...remote.songs)}}catch{}if(!Array.isArray(data.songs))throw Error('songs配列が必要です');
   const added=data.songs.map((e,i)=>{
    if(typeof e.file!=='string'||!e.file||typeof e.title!=='string')throw Error('曲のtitleとfileを指定してください');
    const entry={...e,url:serverURL(e.file,url)};
-   return {serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
+   return {features:e.features||{},serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
   });
   charts.push(...added);const selected=charts.indexOf(chart);fillCourses();$('course').value=Math.max(0,selected);renderSongSelection();
  }catch(e){$('fileinfo').textContent='収録曲一覧を読み込めません：'+e.message}

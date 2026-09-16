@@ -66,7 +66,7 @@ function loop(){updateBranchRoute();const t=time(),adjust=Number($('offset').val
 function resize(){const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);width=r.width;height=r.height;canvas.width=width*dpr;canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
 function isGogoTime(c,t){const events=c.gogoEvents||[];let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<=t)lo=mid+1;else hi=mid}return lo>0&&events[lo-1].active;}
 function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const t=time(),fade=applyChartFade(t),y=height*.5,target=width<600?76:125,speed=Number($('speed').value),r=Math.min(26,height*.19);ctx.globalAlpha=fade.lane;ctx.clearRect(0,0,width,height);ctx.fillStyle=chart.videoFile?'#171b2044':'#171b20';ctx.fillRect(0,y-r-20,width,2*r+40);if(isGogoTime(chart,t)){const glow=ctx.createLinearGradient(0,0,width,0);glow.addColorStop(0,'rgba(240,120,40,0.35)');glow.addColorStop(1,'rgba(240,120,40,0)');ctx.fillStyle=glow;ctx.fillRect(0,y-r-20,width,2*r+40)}if(!danRun&&chart.branchEvents?.length&&(state==='playing'||state==='paused')){const route=branchChoices[branchChoices.length-1]||'N',colors={N:'255,255,255',E:'85,187,210',M:'181,105,235'},rgb=colors[route],shade=ctx.createLinearGradient(width*.72,0,width,0);shade.addColorStop(0,'rgba('+rgb+',0)');shade.addColorStop(1,'rgba('+rgb+',0.35)');ctx.fillStyle=shade;ctx.fillRect(width*.72,y-r-20,width*.28,2*r+40);}ctx.strokeStyle='#333940';ctx.lineWidth=1;for(let i of [-1,1]){ctx.beginPath();ctx.moveTo(0,y+i*(r+20));ctx.lineTo(width,y+i*(r+20));ctx.stroke()}ctx.fillStyle='#f8c2590c';ctx.fillRect(0,0,target+40,height);const pos=n=>target+(chart.visual?malodyDistance(chart,n.time,n.scroll)-malodyDistance(chart,t,n.scroll):(n.time-t)*(n.bpm/120)*n.scroll)*speed*240;for(const b of chart.bars){const x=pos(b);if(x<0||x>width)continue;ctx.strokeStyle='#ffffff20';ctx.beginPath();ctx.moveTo(x,y-r-18);ctx.lineTo(x,y+r+18);ctx.stroke()}ctx.strokeStyle='#dbd3bd';ctx.lineWidth=3;ctx.beginPath();ctx.arc(target,y,r+8,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#d6c9a05c';ctx.lineWidth=1;ctx.beginPath();ctx.arc(target,y,r+14,0,Math.PI*2);ctx.stroke();const visibleNotes=renderNotes();for(let i=visibleNotes.length-1;i>=0;i--){const n=visibleNotes[i];if(n.done||(n.dummy&&t>(n.end??n.time)+.15))continue;let x=pos(n),nr=n.type===3||n.type===4||n.type===6?r*1.25:r;ctx.globalAlpha=(n.ghost?.25:1)*fade.note;if((n.type>=5&&n.type<=7)){let end=pos({...n,time:n.end});if(Math.max(x,end)<-50||Math.min(x,end)>width+50||t>n.end)continue;ctx.strokeStyle='#daa738';ctx.lineWidth=nr*1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(Math.max(target,x),y);ctx.lineTo(Math.max(target,end),y);ctx.stroke();x=Math.max(target,x)}else if(x< -50||x>width+50)continue;ctx.fillStyle=n.type===9?'#b569eb':(n.type>=5&&n.type<=7)?'#f5c757':n.type===1||n.type===3?'#f66b51':'#55bbd2';ctx.strokeStyle='#f4e8cc';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,nr,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#17242a';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${nr*.7}px sans-serif`;if(n.type===9){ctx.fillStyle='#fff';ctx.fillText('×',x,y)}if((n.type>=5&&n.type<=7))ctx.fillText(n.type===7?String(Math.max(0,n.required-n.hits)):(t>=n.time?String(n.hits||0):'連'),x,y)}if(danRun){ctx.globalAlpha=fade.lane;ctx.fillStyle='#fff';ctx.font='700 14px sans-serif';ctx.textAlign='left';ctx.textBaseline='bottom';const remaining=notes.filter(n=>n.type<=4&&!n.done).length+danRun.config.songs.slice(danRun.index+1).reduce((sum,e)=>sum+e.chart.notes.filter(n=>n.type<=4).length,0);ctx.fillText('残り '+remaining+' ノーツ',12,height-6)}drawBranchDetails(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.textAlign='center';const judgment=$('judgmentOverlay');judgment.textContent=feedback&&t-feedbackAt<.45?feedback:'';judgment.style.left=target+'px';judgment.style.top=Math.max(20,y-r-36)+'px';judgment.style.color=feedback==='不可'?'#aaa':feedback==='可'?'#fff':'#ffd565';judgment.style.opacity=fade.lane;$('status').style.opacity=1;if(state==='playing'&&t<(notes[0]?.time??0)-.2){ctx.font='700 15px sans-serif';ctx.fillStyle='#bfc2c3';ctx.fillText('まもなくスタート',width/2,height-18)}}
-async function choose(){if(importing||danRun)return;seekTarget=0;chart=charts[Number($('course').value)||0];audioBuffer=null;const wave=(chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase();const file=chart.audioFile||audioFiles.get(wave);loading=true;$('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=(chart.meta.SUBTITLE||'').replace(/^(--|\+\+)/,'')||'TJA譜面';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';try{if(file){chart.audioFile=file;audioBuffer=chart.preloadedAudio||await audio().decodeAudioData(await file.arrayBuffer());delete chart.preloadedAudio}$('fileinfo').textContent=demoMode?'オリジナルのリズム音で練習できます':file?'音源：'+file.name:wave?'音源未選択：'+chart.meta.WAVE+' を追加してください':'音源を追加すると演奏できます'}catch(e){$('fileinfo').textContent='音源を再生できません。MP3 / WAVなど別形式をお試しください。'}finally{loading=false;rememberDanCharts();reset();if(chart.warnings?.length)$('fileinfo').textContent+=' ／ 注意：'+chart.warnings.join('、')}}
+async function choose(){if(importing||danRun)return;seekTarget=0;let chosen=charts[Number($('course').value)||0];loading=true;try{if(chosen.serverEntry){chosen=await prepareServerChart(chosen)}}catch(e){loading=false;$('fileinfo').textContent='収録曲の読み込みエラー：'+e.message;renderSongSelection();return}chart=chosen;demoMode=!!chart.builtinDemo;audioBuffer=null;const wave=(chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase();const file=chart.audioFile||audioFiles.get(wave);loading=true;$('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=(chart.meta.SUBTITLE||'').replace(/^(--|\+\+)/,'')||'TJA譜面';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';try{if(file){chart.audioFile=file;audioBuffer=chart.preloadedAudio||await audio().decodeAudioData(await file.arrayBuffer());delete chart.preloadedAudio}$('fileinfo').textContent=demoMode?'オリジナルのリズム音で練習できます':file?'音源：'+file.name:wave?'音源未選択：'+chart.meta.WAVE+' を追加してください':'音源を追加すると演奏できます'}catch(e){$('fileinfo').textContent='音源を再生できません。MP3 / WAVなど別形式をお試しください。'}finally{loading=false;rememberDanCharts();reset();if(chart.warnings?.length)$('fileinfo').textContent+=' ／ 注意：'+chart.warnings.join('、')}}
 function fillCourses(){const s=$('course');s.replaceChildren();charts.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(c.meta.TITLE||'無題')+' / '+(names[c.meta.COURSE]||c.meta.COURSE||'おに')+' ★'+(c.meta.LEVEL||'?');s.append(o)})}
 
 function filePath(f){return (f.chartPath||f.webkitRelativePath||f.name).replace(/\\/g,'/').normalize('NFC')}
@@ -109,7 +109,7 @@ async function loadFiles(files){
 
   attachVideos([...danPool.map(e=>e.chart),...loaded],expanded);
   // Commit only after parsing succeeds; importing a broken package keeps the current song.
-  if(loaded.length){audioFiles=new Map();charts=loaded;demoMode=false;fillCourses()}
+  if(loaded.length){audioFiles=new Map();charts=[...loaded,...charts.filter(c=>c.serverEntry)];demoMode=false;fillCourses()}
   for(const f of sounds)if(sounds.filter(a=>a.name.toLowerCase()===f.name.toLowerCase()).length===1)audioFiles.set(f.name.toLowerCase(),f);
   if(!loaded.length&&sounds.length){const match=audioFiles.get((chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase());if(match)chart.audioFile=match}
   if(incoming)pendingDan=incoming;
@@ -117,7 +117,7 @@ async function loadFiles(files){
  }catch(e){$('fileinfo').textContent='読み込みエラー：'+e.message;$('danError').textContent=$('fileinfo').textContent;return}finally{importing=false;loading=false;unlock();$('files').value='';$('folder').value=''}
  await tryStartPendingDan();
 }
-$('files').onchange=e=>loadFiles(e.target.files);$('folder').onchange=e=>loadFiles(e.target.files);$('course').onchange=choose;$('demo').onclick=()=>{if(loading||importing||danRun)return;demoMode=true;charts=parseTJA(demo).charts;fillCourses();choose()};$('pause').onclick=togglePause;document.querySelectorAll('[data-hit]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();if(autoInputLocked())return;b.setPointerCapture(e.pointerId);b.classList.add('active');hit(Number(b.dataset.hit))});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>b.classList.remove('active'))});window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;const key=e.key.toLowerCase();if(e.repeat)return;if(['d','f','j','k'].includes(key)){e.preventDefault();hit(key==='d'||key==='k'?2:1)}else if(key==='escape'||key===' '){e.preventDefault();togglePause()}});document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')togglePause()});window.addEventListener('resize',resize);$('speed').onchange=draw;initPractice();initDan();charts=parseTJA(demo).charts;fillCourses();choose();new ResizeObserver(resize).observe(canvas);
+$('files').onchange=e=>loadFiles(e.target.files);$('folder').onchange=e=>loadFiles(e.target.files);$('course').onchange=choose;$('demo').onclick=()=>{if(loading||importing||danRun)return;demoMode=true;charts=parseTJA(demo).charts.map(c=>({...c,builtinDemo:true}));fillCourses();choose()};$('pause').onclick=togglePause;document.querySelectorAll('[data-hit]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();if(autoInputLocked())return;b.setPointerCapture(e.pointerId);b.classList.add('active');hit(Number(b.dataset.hit))});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>b.classList.remove('active'))});window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;const key=e.key.toLowerCase();if(e.repeat)return;if(['d','f','j','k'].includes(key)){e.preventDefault();hit(key==='d'||key==='k'?2:1)}else if(key==='escape'||key===' '){e.preventDefault();togglePause()}});document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')togglePause()});window.addEventListener('resize',resize);$('speed').onchange=draw;initPractice();initDan();charts=parseTJA(demo).charts.map(c=>({...c,builtinDemo:true}));fillCourses();choose();new ResizeObserver(resize).observe(canvas);
 
 async function decodeDanText(file){const bytes=await file.arrayBuffer();try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{return new TextDecoder('shift-jis').decode(bytes)}}
 
@@ -306,7 +306,7 @@ function renderSongSelection(){
    for(const e of entries){const opt=document.createElement('option');opt.value=e.index;opt.textContent=(names[e.c.meta.COURSE]||e.c.meta.COURSE||'難易度不明')+' ★'+(e.c.meta.LEVEL||'?');select.append(opt)}
    select.value=selected.index;
    select.onchange=async()=>{if(loading||importing)return;$('course').value=select.value;const pending=choose();renderSongSelection();await pending};
-   label.append(select);panel.append(label);
+   label.append(select);panel.append(label,featureBadges([c]));
    const info=document.createElement('p'),duration=Math.max(0,c.duration||0,c===chart?audioBuffer?.duration||0:0);
    info.textContent=c.bpm+' BPM ／ '+Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0')+' ／ '+c.notes.filter(n=>n.type<=4).length+' ノーツ';panel.append(info);
    if(c.meta.SUBTITLE){const sub=document.createElement('p');sub.textContent=c.meta.SUBTITLE.replace(/^(--|\+\+)/,'');panel.append(sub)}
@@ -317,6 +317,80 @@ function renderSongSelection(){
    }
    panel.append(actions);
   }
-  item.append(heading,panel);host.append(item);
+  const badges=featureBadges(entries.map(e=>e.c));heading.append(badges);item.append(heading,panel);host.append(item);
  }
 }
+
+function chartFeatures(c){
+ const result={soflan:!!c.features?.soflan,fadeout:!!c.features?.fadeout,mv:!!(c.videoFile||c.meta.VIDEO)};
+ if(c._tja){
+  for(const line of c._tja.lines){
+   const match=line.match(/^#(BPMCHANGE|ABSCROLL|SCROLL)\s+([+-]?[\d.]+)/i);
+   if(match){const command=match[1].toUpperCase(),value=Number(match[2]);if(command==='BPMCHANGE'&&value!==c.bpm||command==='ABSCROLL'&&value!==1||command==='SCROLL'&&value<0)result.soflan=true}
+   if(/^#FADE\s*,\s*0\s*,/i.test(line))result.fadeout=true;
+  }
+ }
+ return result;
+}
+function featureBadges(list){
+ const box=document.createElement('span');box.className='feature-badges';
+ const flags=list.map(chartFeatures);
+ for(const [key,icon,label] of [['soflan','↔','ソフラン'],['fadeout','◐','フェードアウト'],['mv','▶','MV付き']]){
+  if(!flags.some(f=>f[key]))continue;
+  const badge=document.createElement('span');badge.className='feature-badge '+key;badge.title=label;badge.setAttribute('aria-label',label);badge.textContent=icon+' '+label;box.append(badge);
+ }
+ return box;
+}
+function serverURL(path,base){
+ const u=new URL(path,base);
+ if(u.origin!==location.origin||!['http:','https:'].includes(u.protocol))throw Error('収録曲は同じサイト内のパスを指定してください');
+ return u.href;
+}
+async function serverFile(url,name){
+ const res=await fetch(url);if(!res.ok)throw Error(name+' (HTTP '+res.status+')');
+ return new File([await res.blob()],name);
+}
+async function prepareServerChart(c){
+ const entry=c.serverEntry;
+ if(c.serverPlaceholder){
+  let parsed;
+  if(/\.(mcz|zip)(?:\?|$)/i.test(entry.url)){
+   const file=await serverFile(entry.url,decodeURIComponent(new URL(entry.url).pathname.split('/').pop()));
+   const files=await readChartArchive(file);parsed=[];
+   for(const f of files.filter(f=>/\.(mc|tja)$/i.test(f.name))){
+    let result;try{const bytes=await f.arrayBuffer();let source;try{source=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{source=new TextDecoder('shift-jis').decode(bytes)}result=/\.mc$/i.test(f.name)?parseMalody(source):parseTJA(source)}catch{continue}
+    for(const chart of result.charts){chart.sourcePath=filePath(f);const dir=chart.sourcePath.split('/').slice(0,-1).join('/');const wave=chart.meta.WAVE||'';chart.audioFile=files.find(x=>normalizedPath(filePath(x))===normalizedPath(dir+'/'+wave));parsed.push(chart)}
+   }
+   attachVideos(parsed,files);
+  }else{
+   const response=await fetch(entry.url);if(!response.ok)throw Error('譜面 HTTP '+response.status);
+   const bytes=await response.arrayBuffer();let source;try{source=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{source=new TextDecoder('shift-jis').decode(bytes)}
+   parsed=(/\.mc(?:\?|$)/i.test(entry.url)?parseMalody(source):parseTJA(source)).charts;
+   for(const chart of parsed){
+    const wave=entry.audio||chart.meta.WAVE,video=entry.video||chart.meta.VIDEO;
+    if(wave)chart.serverAudio=serverURL(wave,entry.url);
+    if(video){chart.serverVideo=serverURL(video,entry.url);chart.meta.VIDEO=video}
+   }
+  }
+  if(!parsed.length)throw Error('対応する譜面がありません');
+  for(const chart of parsed){chart.serverEntry=entry;chart.meta.TITLE=chart.meta.TITLE||entry.title;}
+  const index=charts.indexOf(c);charts.splice(index,1,...parsed);c=parsed[0];expandedSong=c.meta.TITLE;fillCourses();$('course').value=index;
+ }
+ if(c.serverAudio&&!c.audioFile)c.audioFile=await serverFile(c.serverAudio,c.meta.WAVE||'music');
+ if(c.serverVideo&&!c.videoFile)c.videoFile=await serverFile(c.serverVideo,c.meta.VIDEO||'video.mp4');
+ return c;
+}
+async function loadServerCatalog(){
+ try{
+  const url=new URL('songs/catalog.json',location.href),response=await fetch(url,{cache:'no-cache'});
+  if(response.status===404)return;if(!response.ok)throw Error('一覧 HTTP '+response.status);
+  const data=await response.json();if(!Array.isArray(data.songs))throw Error('songs配列が必要です');
+  const added=data.songs.map((e,i)=>{
+   if(typeof e.file!=='string'||!e.file||typeof e.title!=='string')throw Error('曲のtitleとfileを指定してください');
+   const entry={...e,url:serverURL(e.file,url)};
+   return {serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
+  });
+  charts.push(...added);const selected=charts.indexOf(chart);fillCourses();$('course').value=Math.max(0,selected);renderSongSelection();
+ }catch(e){$('fileinfo').textContent='収録曲一覧を読み込めません：'+e.message}
+}
+loadServerCatalog();

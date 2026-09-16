@@ -132,3 +132,10 @@ body.selecting .fields>label:first-child{display:none}
 .song-choice-panel p{margin:10px 0;overflow-wrap:anywhere}
 .song-choice-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 @media(max-width:600px){.song-choice-title{font-size:17px;padding:16px}.song-choice-panel{padding:14px}.song-choice-actions button{flex:1 1 160px}}
+
+.feature-badges{display:inline-flex;gap:6px;flex-wrap:wrap;vertical-align:middle;margin:6px 0 6px 12px;font-size:12px;font-weight:700;letter-spacing:0}
+.feature-badge{padding:4px 7px;border:1px solid #647083;border-radius:6px;color:#e4eaf0;background:#252e3b;white-space:nowrap}
+.feature-badge.soflan{border-color:#cfaa50;color:#ffdc86}
+.feature-badge.fadeout{border-color:#9477b9;color:#d7b9ff}
+.feature-badge.mv{border-color:#4d9fba;color:#8edcf4}
+.song-choice-panel>.feature-badges{display:flex;margin-left:0}

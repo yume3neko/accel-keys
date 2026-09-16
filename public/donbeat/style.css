@@ -114,3 +114,21 @@
 .pads,.pads *{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 button{touch-action:manipulation}
 .pads button{touch-action:none}
+
+/* Selection screen: one expanded song at a time. */
+#songSelection{display:none;margin:24px 0}
+body.selecting #songSelection{display:block}
+body.selecting .topline,body.selecting .game{display:none}
+body:not(.selecting) .settings,body:not(.selecting) main>footer{display:none}
+body.selecting .fields>label:first-child{display:none}
+.song-choice{border:1px solid #454a51;border-radius:10px;background:#1b2026;margin:10px 0;overflow:hidden}
+.song-choice-title{display:block;width:100%;border:0;border-radius:0;padding:18px 20px;text-align:left;font-size:20px;overflow-wrap:anywhere;writing-mode:horizontal-tb}
+.song-choice-title::after{content:'＋';float:right;color:#f8c259;margin-left:12px}
+.song-choice-title[aria-expanded=true]{color:#ffd178;background:#30291f}
+.song-choice-title[aria-expanded=true]::after{content:'−'}
+.song-choice-panel{padding:18px 20px;border-top:1px solid #514633}
+.song-choice-panel[hidden]{display:none}
+.song-choice-panel select{max-width:100%;padding:8px;color:#eee;background:#25292e;border:1px solid #555;border-radius:5px}
+.song-choice-panel p{margin:10px 0;overflow-wrap:anywhere}
+.song-choice-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+@media(max-width:600px){.song-choice-title{font-size:17px;padding:16px}.song-choice-panel{padding:14px}.song-choice-actions button{flex:1 1 160px}}

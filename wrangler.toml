@@ -6,3 +6,7 @@ pages_build_output_dir = "public"
 binding = "DB"
 database_name = "accel-keys-scores"
 database_id = "939304b7-dae3-4af1-b23f-9d0475917154"
+
+[[r2_buckets]]
+binding = "DONBEAT_BUCKET"
+bucket_name = "donbeat-songs"

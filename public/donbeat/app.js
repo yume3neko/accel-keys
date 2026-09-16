@@ -322,7 +322,7 @@ function renderSongSelection(){
 }
 
 function chartFeatures(c){
- const result={soflan:!!c.features?.soflan,fadeout:!!c.features?.fadeout,branch:!!c.features?.branch||!!c.branchEvents?.length,dummy:!!c.features?.dummy||!!c.dummyNotes?.length,damage:!!c.features?.damage||!!c.notes?.some(n=>n.type===9),mv:!!(c.features?.mv||c.videoFile||c.meta.VIDEO)};
+ const result={fadeOnNotes:!!c.features?.fadeOnNotes,scrollOnNotes:!!c.features?.scrollOnNotes,soflan:!!c.features?.soflan,fadeout:!!c.features?.fadeout,branch:!!c.features?.branch||!!c.branchEvents?.length,dummy:!!c.features?.dummy||!!c.dummyNotes?.length,damage:!!c.features?.damage||!!c.notes?.some(n=>n.type===9),mv:!!(c.features?.mv||c.videoFile||c.meta.VIDEO)};
  if(c._tja){
   for(const line of c._tja.lines){
    if(/^#BRANCHSTART\b/i.test(line))result.branch=true;
@@ -340,7 +340,7 @@ function featureBadges(list){
  const flags=list.map(chartFeatures);
  for(const [key,icon,label] of [['soflan','↔','ソフランあり'],['branch','⑂','譜面分岐あり'],['dummy','◇','ダミーノーツあり'],['damage','⚠','ダメージノーツあり'],['fadeout','◐','フェードアウトあり'],['mv','▶','MV付き']]){
   if(!flags.some(f=>f[key]))continue;
-  const badge=document.createElement('span');badge.className='feature-badge '+key;badge.title=label;badge.setAttribute('aria-label',label);badge.textContent=icon+' '+label;box.append(badge);
+  const badge=document.createElement('span');badge.className='feature-badge '+key+(key==='soflan'&&flags.some(f=>f.scrollOnNotes)?' scroll-on-notes':'')+(key==='fadeout'&&flags.some(f=>f.fadeOnNotes)?' fade-on-notes':'');badge.title=label;badge.setAttribute('aria-label',label);badge.textContent=icon+' '+label;box.append(badge);
  }
  return box;
 }

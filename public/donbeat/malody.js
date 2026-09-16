@@ -1,6 +1,34 @@
 (function(root){
 'use strict';
 function beat(b){if(!Array.isArray(b)||b.length!==3||!b.every(Number.isFinite)||b[2]<=0)throw Error('Malodyの拍位置が不正です。');return b[0]+b[1]/b[2]}
+
+function hasNoteScrollGimmick(notes,events){
+ return notes.some(n=>{
+  let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<=n.time)lo=mid+1;else hi=mid}
+  if((lo?events[lo-1].scroll??1:1)!==1)return true;
+  const end=n.end??n.time;
+  for(let i=lo;i<events.length&&events[i].time<end;){
+   let j=i;while(j+1<events.length&&events[j+1].time===events[i].time)j++;
+   if((events[j].scroll??1)!==1)return true;i=j+1;
+  }
+  return false;
+ });
+}
+
+
+function hasNoteFadeout(notes,fades){
+ const events=fades.slice().sort((a,b)=>a.time-b.time);
+ const targets=e=>e.mode==='all'?['info','lane','note','button']:[e.mode];
+ return events.some((e,i)=>{
+  if(e.direction!==0)return false;
+  return targets(e).some(target=>{
+   const restore=events.slice(i+1).find(f=>f.direction===1&&targets(f).includes(target));
+   const end=restore?restore.end:Infinity;
+   return notes.some(n=>n.time<end&&(n.end??n.time)>=e.time);
+  });
+ });
+}
+
 function parseMalody(text){
  const d=JSON.parse(text.replace(/^\uFEFF/,''));if(Number(d.meta?.mode)!==5)throw Error('Malodyは太鼓モード（mode:5）のみ対応しています。');
  if(!Array.isArray(d.time)||!d.time.length||!Array.isArray(d.note))throw Error('BPMまたは音符データがありません。');
@@ -38,7 +66,7 @@ function parseMalody(text){
  const visual=[];
  for(const e of events){distance+=(e.time-previous)*visualBpm/120*visualScroll;previous=e.time;if(e.bpm!==undefined)visualBpm=e.bpm;if(e.scroll!==undefined)visualScroll=e.scroll;if(e.hs!==undefined)visualHs=e.hs;jumpDistance+=(e.jump||0)/1000*visualBpm/120*visualScroll*visualHs;visual.push({time:e.time,distance,jumpDistance,rate:visualBpm/120*visualScroll,bpm:visualBpm,scroll:visualScroll,hs:visualHs})}
  const song=d.meta.song||{},version=d.meta.version||'Malody',level=Number.isFinite(d.meta.level)&&d.meta.level>0?d.meta.level:version.match(/[☆★]\s*(\d+)/)?.[1]||'?';
- const features={soflan:timing.some(e=>e.bpm!==timing[0].bpm)||effects.some(e=>(e.scroll!==undefined&&e.scroll!==1)||(e.hs!==undefined&&e.hs<0)),fadeout:effects.some(e=>e.fade===0)};
+ const features={fadeOnNotes:hasNoteFadeout(notes,fades),scrollOnNotes:hasNoteScrollGimmick(notes,visual),soflan:timing.some(e=>e.bpm!==timing[0].bpm)||effects.some(e=>(e.scroll!==undefined&&e.scroll!==1)||(e.hs!==undefined&&e.hs<0)),fadeout:effects.some(e=>e.fade===0)};
  return {charts:[{features,meta:{TITLE:song.titleorg||song.title||'無題',SUBTITLE:[song.artistorg||song.artist,d.meta.creator].filter(Boolean).join(' / '),COURSE:version,LEVEL:level,VIDEO:d.meta.video||'',WAVE:sound?.sound||''},notes:notes.filter(n=>!n.dummy),dummyNotes:notes.filter(n=>n.dummy),bars,measures,visual,fades,gogoEvents:effects.filter(e=>e.ggt!==undefined).map(e=>({time:seconds(e.position)-offset,active:!!e.ggt})),beats:[],bpm:timing[0].bpm,duration:seconds(lastBeat)-offset,warnings:[...warnings]}],warnings:[...warnings]};
 }
 async function readChartArchive(file){

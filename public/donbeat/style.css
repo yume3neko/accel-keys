@@ -139,3 +139,7 @@ body.selecting .fields>label:first-child{display:none}
 .feature-badge.fadeout{border-color:#9477b9;color:#d7b9ff}
 .feature-badge.mv{border-color:#4d9fba;color:#8edcf4}
 .song-choice-panel>.feature-badges{display:flex;margin-left:0}
+
+.feature-badge.soflan.scroll-on-notes{border-color:#e66b72;color:#ffadb2;background:#48232b}
+
+.feature-badge.fadeout.fade-on-notes{border-color:#e66b72;color:#ffadb2;background:#48232b}

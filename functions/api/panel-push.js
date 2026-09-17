@@ -1,17 +1,33 @@
 export async function onRequestPost(context) {
     const env = { DB: context.env.PANEL_DB };
+    const difficultyRanges = { easy: [1, 3], normal: [3, 7], hard: [5, 10], expert: [7, 15], master: [9, 17], lunatic: [12, 22], ura_easy: [1, 3], ura_normal: [3, 7], ura_hard: [5, 10], ura_expert: [7, 15], ura_master: [9, 17], ura_lunatic: [12, 22] };
+    function difficultyLabel(d) { return d.startsWith('ura_') ? '裏' + d.slice(4).toUpperCase() : d.toUpperCase(); }
+    function targetCount(difficulty, round) { const [min, max] = difficultyRanges[difficulty] ?? difficultyRanges.normal; return Math.min(max, min + Math.floor(round / 2)); }
+    function pattern(seed, round, count) { let x = (seed ^ Math.imul(round + 1, 0x9e3779b1)) >>> 0; const a = Array.from({ length: 25 }, (_, i) => i); for (let i = 24; i > 0; i--) {
+        x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
+        const j = x % (i + 1);
+        [a[i], a[j]] = [a[j], a[i]];
+    } return a.slice(0, count); }
+    function boardPattern(seed, round, difficulty) {
+        const cells = pattern(seed, round, targetCount(difficulty, round));
+        if (!difficulty.startsWith('ura_'))
+            return { safe: cells, damage: [], rate: 0 };
+        let x = (seed ^ Math.imul(round + 1, 0x85ebca6b) ^ 0xc2b2ae35) >>> 0;
+        const random = () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; };
+        const rates = { ura_easy: 10, ura_normal: 20, ura_hard: 30, ura_expert: 35, ura_master: 40 };
+        const rate = difficulty === 'ura_lunatic' ? 10 + Math.floor(random() * 41) : rates[difficulty] ?? 0;
+        const damage = cells.filter(() => random() * 100 < rate);
+        // A board must always have a normal target, including one-tile EASY boards.
+        if (damage.length === cells.length)
+            damage.splice(Math.floor(random() * damage.length), 1);
+        return { safe: cells.filter(i => !damage.includes(i)), damage, rate };
+    }
+    const ranges = difficultyRanges;
     const json = (data, status = 200) => Response.json(data, { status, headers: { "cache-control": "no-store" } });
     const makeCode = () => { const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join(""); };
     const clean = (s, n) => String(s ?? "").trim().slice(0, n);
     function db() { if (!env.DB)
         throw new Error("ゲームデータベースに接続できません"); return env.DB; }
-    const ranges = { easy: [1, 3], normal: [3, 7], hard: [5, 10], expert: [7, 15], master: [9, 17], lunatic: [12, 22] };
-    function targetCount(difficulty, round) { const [min, max] = ranges[difficulty] ?? ranges.normal; return Math.min(max, min + Math.floor(round / 2)); }
-    function targetPattern(seed, round, count) { let x = (seed ^ Math.imul(round + 1, 0x9e3779b1)) >>> 0; const a = Array.from({ length: 25 }, (_, i) => i); for (let i = 24; i > 0; i--) {
-        x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
-        const j = x % (i + 1);
-        [a[i], a[j]] = [a[j], a[i]];
-    } return a.slice(0, count); }
     const botSpecs = [[0, 0], [2, .75], [2.5, .77], [3, .77], [3.5, .80], [4, .85]];
     async function advanceBots(room, now) {
         const bots = await db().prepare("SELECT * FROM players WHERE room_code=? AND bot_level>0").bind(room.code).all();
@@ -33,7 +49,7 @@ export async function onRequestPost(context) {
                 x = Math.imul(x, 0x846ca68b);
                 x ^= x >>> 16;
                 if ((x >>> 0) / 4294967296 < accuracy) {
-                    const targets = targetPattern(room.seed, round, targetCount(room.difficulty, round));
+                    const targets = boardPattern(room.seed, round, room.difficulty).safe;
                     pressed.push(targets.find(i => !pressed.includes(i)));
                     combo++;
                     best = Math.max(best, combo);
@@ -51,6 +67,12 @@ export async function onRequestPost(context) {
                     score = Math.max(Math.min(0, bot.handicap), score - 50);
                     combo = 0;
                     mistakes++;
+                    const board = boardPattern(room.seed, round, room.difficulty);
+                    if (board.damage.length && ((x >>> 8) % Math.max(1, 25 - board.safe.length)) < board.damage.length) {
+                        round++;
+                        pressed = [];
+                        mistakes = 0;
+                    }
                 }
             }
             await db().prepare("UPDATE players SET score=?,combo=?,best_combo=?,current_round=?,pressed=?,mistakes=?,perfects=?,bot_tick=?,last_seen=? WHERE id=? AND bot_tick=? AND EXISTS(SELECT 1 FROM rooms WHERE code=? AND started_at=?)").bind(score, combo, best, round, JSON.stringify(pressed), mistakes, perfects, target, now, bot.id, bot.bot_tick, room.code, room.started_at).run();
@@ -162,6 +184,16 @@ export async function onRequestPost(context) {
                 if (message.startsWith("/")) {
                     if (room.host_id !== token)
                         return json({ error: "コマンドはホスト限定です" }, 403);
+                    if (message === "/kick") {
+                        const result = await db().batch([
+                            db().prepare("UPDATE rooms SET status='closed' WHERE code=? AND status='waiting'").bind(roomCode),
+                            ...["messages", "panel_readiness", "players"].map(table => db().prepare(`DELETE FROM ${table} WHERE room_code=? AND EXISTS(SELECT 1 FROM rooms WHERE code=? AND status='closed')`).bind(roomCode, roomCode)),
+                            db().prepare("DELETE FROM rooms WHERE code=? AND status='closed'").bind(roomCode)
+                        ]);
+                        if (!result[0].meta.changes)
+                            return json({ error: "待機中のみ解体できます" }, 409);
+                        return json({ disbanded: true });
+                    }
                     const bot = message.match(/^\/bot\s+(\d+)\s+([1-5])$/);
                     const handicap = message.match(/^\/handicap\s+(.+?)\s+([+-]?\d+)$/);
                     const kick = message.match(/^\/kick\s+(.+)$/);
@@ -243,7 +275,8 @@ export async function onRequestPost(context) {
                 const index = Number(b.index);
                 if (!Number.isInteger(index) || index < 0 || index > 24)
                     return json({ error: "無効なパネルです" }, 400);
-                const targets = targetPattern(room.seed, player.current_round, targetCount(room.difficulty || "normal", player.current_round));
+                const board = boardPattern(room.seed, player.current_round, room.difficulty || "normal");
+                const targets = board.safe;
                 const pressed = JSON.parse(player.pressed || "[]");
                 const correct = targets.includes(index) && !pressed.includes(index);
                 let score = player.score, combo = player.combo, best = player.best_combo, mistakes = player.mistakes, round = player.current_round, perfects = player.perfects;
@@ -266,6 +299,11 @@ export async function onRequestPost(context) {
                     score = Math.max(Math.min(0, player.handicap), score - 50);
                     combo = 0;
                     mistakes++;
+                    if (board.damage.includes(index)) {
+                        round++;
+                        pressed.length = 0;
+                        mistakes = 0;
+                    }
                 }
                 await db().prepare("UPDATE players SET score=?,combo=?,best_combo=?,current_round=?,pressed=?,mistakes=?,perfects=?,last_seen=? WHERE id=? AND room_code=?").bind(score, combo, best, round, JSON.stringify(pressed), mistakes, perfects, Date.now(), token, roomCode).run();
                 return json(await snapshot(roomCode, token));

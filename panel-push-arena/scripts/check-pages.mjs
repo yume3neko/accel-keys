@@ -79,3 +79,31 @@ assert.equal((await call(host,{action:'chat_send',code,message:'/kick 参加 者
 sql.prepare("UPDATE rooms SET status='playing' WHERE code=?").run(code);
 assert.equal((await call(host,{action:'chat_send',code,message:'/kick BOT2'})).status,409);
 console.log('PASS: kick host-only, self/unknown/duplicate rejection, spaced names, BOT removal, membership revoked, rejoin allowed and playing-phase rejection');
+const ts=(await import('typescript')).default;
+const rules=await import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(fs.readFileSync('lib/panel-rules.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.ES2022}}).outputText).toString('base64'));
+for(const difficulty of Object.keys(rules.difficultyRanges).filter(d=>d.startsWith('ura_'))){
+ const rates=new Set();
+ for(let round=0;round<150;round++){const b=rules.boardPattern(12345,round,difficulty);rates.add(b.rate);assert.ok(b.safe.length>0);assert.equal(b.safe.length+b.damage.length,rules.targetCount(difficulty,round));assert.ok(!b.safe.some(i=>b.damage.includes(i)));assert.deepEqual(b,rules.boardPattern(12345,round,difficulty));assert.ok(b.rate>=10&&b.rate<=50)}
+ if(difficulty==='ura_lunatic')assert.ok(rates.size>20);else assert.equal(rates.size,1);
+ const token='ura-'+difficulty;let r=await call(token,{action:'create',name:'裏テスト',difficulty});const code=r.data.room.code,id=r.data.meId;
+ await call(token,{action:'ready',code,ready:true});r=await call(token,{action:'start',code});assert.equal(r.status,200);
+ sql.prepare('UPDATE rooms SET started_at=? WHERE code=?').run(Date.now()-1,code);
+ let round=2,b;do{b=rules.boardPattern(r.data.room.seed,round++,difficulty)}while(!b.damage.length);round--;
+ sql.prepare('UPDATE players SET current_round=?,score=1000,combo=5 WHERE id=?').run(round,id);
+ r=await call(token,{action:'push',code,round,index:b.damage[0]});let p=r.data.players.find(p=>p.id===id);assert.equal(p.score,950);assert.equal(p.combo,0);assert.equal(p.round,round+1);assert.deepEqual(p.pressed,[]);assert.equal(p.perfects,0);
+ // Old queued inputs must not affect the replacement board.
+ r=await call(token,{action:'push',code,round,index:b.safe[0]});assert.equal(r.data.players.find(p=>p.id===id).score,950);
+ round++;b=rules.boardPattern(r.data.room.seed,round,difficulty);
+ for(const index of b.safe)r=await call(token,{action:'push',code,round,index});p=r.data.players.find(p=>p.id===id);assert.equal(p.round,round+1);assert.equal(p.perfects,1);
+}
+let d=await call('disband-host',{action:'create',name:'解体主'});const dc=d.data.room.code;
+await call('disband-guest',{action:'join',code:dc,name:'参加者'});
+assert.equal((await call('disband-guest',{action:'chat_send',code:dc,message:'/kick'})).status,403);
+await call('disband-host',{action:'chat_send',code:dc,message:'/bot 1 2'});
+assert.equal((await call('disband-host',{action:'chat_send',code:dc,message:'/kick   '})).data.disbanded,true);
+for(const table of ['players','messages','panel_readiness'])assert.equal(sql.prepare(`SELECT count(*) n FROM ${table} WHERE room_code=?`).get(dc).n,0);
+assert.equal(sql.prepare('SELECT count(*) n FROM rooms WHERE code=?').get(dc).n,0);
+assert.equal((await call('disband-guest',{action:'state',code:dc})).status,403);
+assert.equal((await call('disband-host',{action:'state',code:dc})).status,403);
+assert.equal((await call('new-guest',{action:'join',code:dc,name:'新規'})).status,404);
+console.log('PASS: six hidden difficulties, variable rates, safe-board guarantee, damage penalty/reset, stale inputs, clear without damage, and room disband');

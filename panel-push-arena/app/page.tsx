@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Difficulty, difficultyRanges, difficultyLabel, boardPattern } from "../lib/panel-rules";
 import { Crown, LogIn, MessageCircle, Plus, RotateCcw, Send, Sparkles, Target, Trophy, Users, Zap } from "lucide-react";
 
 type Player = { ready:boolean; id:string; name:string; score:number; combo:number; bestCombo:number; round:number; pressed:number[]; mistakes:number; perfects:number; online:boolean; handicap:number; botLevel:number };
-type Difficulty="easy"|"normal"|"hard"|"expert"|"master"|"lunatic";
 type Room = { code:string; status:"waiting"|"playing"|"finished"; hostId:string; duration:number; difficulty:Difficulty; seed:number; startedAt:number|null; endsAt:number|null };
 type ChatMessage={id:number;playerId:string;name:string;body:string;createdAt:number};
 type Snapshot = { room:Room; players:Player[]; messages:ChatMessage[]; now:number };
@@ -12,14 +12,6 @@ type Snapshot = { room:Room; players:Player[]; messages:ChatMessage[]; now:numbe
 const API = "/api/panel-push";
 const palette = ["#ff4d6d","#ff9f1c","#ffe047","#42e9a9","#28c7fa","#8b7bff"];
 
-function pattern(seed:number, round:number, count:number){
-  let x=(seed ^ Math.imul(round+1, 0x9e3779b1))>>>0;
-  const cells=Array.from({length:25},(_,i)=>i);
-  for(let i=24;i>0;i--){ x=(Math.imul(x,1664525)+1013904223)>>>0; const j=x%(i+1); [cells[i],cells[j]]=[cells[j],cells[i]]; }
-  return cells.slice(0,count);
-}
-const difficultyRanges:Record<Difficulty,[number,number]>={easy:[1,3],normal:[3,7],hard:[5,10],expert:[7,15],master:[9,17],lunatic:[12,22]};
-function targetCount(difficulty:Difficulty,round:number){const [min,max]=difficultyRanges[difficulty];return Math.min(max,min+Math.floor(round/2))}
 function deviceToken(){
   let token=localStorage.getItem("panel-push-token");
   if(!token){ token=crypto.randomUUID(); localStorage.setItem("panel-push-token",token); }
@@ -60,7 +52,8 @@ export default function Home(){
     try{await navigator.clipboard.writeText(inviteLink);setCopyMessage("招待リンクをコピーしました");}
     catch{setCopyMessage("下のリンク欄を長押ししてコピーしてください");}
   }
-  const active=useMemo(()=>room&&me?pattern(room.seed,me.round,targetCount(room.difficulty,me.round)):[],[room,me]);
+  const board=useMemo(()=>room&&me?boardPattern(room.seed,me.round,room.difficulty):{safe:[],damage:[],rate:0},[room,me]);
+  const active=board.safe;
   const clockOffset=useRef(0);
   const countdown=room?.status==="playing"&&room.startedAt?Math.max(0,Math.ceil((room.startedAt-tick-clockOffset.current)/1000)):0;
   const remaining=room?.endsAt?Math.min(room.duration,Math.max(0,Math.ceil((room.endsAt-tick-clockOffset.current)/1000))):room?.duration??60;
@@ -96,7 +89,7 @@ export default function Home(){
     return()=>lifecycle.abort();
   },[]);
   async function start(){ if(!room)return;setBusy(true);try{const d=await call({action:"start",code:room.code});clockOffset.current=d.now-Date.now();setSnapshot(d);setScreen("game");}catch(e){setError(e instanceof Error?e.message:"開始できませんでした");}finally{setBusy(false);} }
-  async function sendChat(){if(!room||!chatText.trim())return;const message=chatText.trim();setChatText("");try{const d=await call({action:"chat_send",code:room.code,message});setSnapshot(d);}catch(e){setChatText(message);setError(e instanceof Error?e.message:"送信できませんでした");}}
+  async function sendChat(){if(!room||!chatText.trim())return;const message=chatText.trim();setChatText("");try{const d=await call({action:"chat_send",code:room.code,message});if(d.disbanded){leave();setError("ルームを解体しました");return;}setSnapshot(d);}catch(e){setChatText(message);setError(e instanceof Error?e.message:"送信できませんでした");}}
   async function pushCell(index:number){
     if(!room||!me||room.status!=="playing"||countdown>0||remaining<=0)return;
     const round=me.round;const key=`${round}:${index}`;
@@ -113,7 +106,7 @@ export default function Home(){
     <section className="entry-card">
       <div className="eyebrow">PLAYER ENTRY</div><h2>対戦に参加</h2>
       <label>プレイヤー名<input value={name} onChange={e=>setName(e.target.value)} maxLength={12} placeholder="なまえを入力"/></label>
-      <div className="settings"><label>制限時間<select value={duration} onChange={e=>setDuration(+e.target.value)}><option value={30}>30秒</option><option value={60}>60秒</option><option value={90}>90秒</option></select></label><label>難易度<select value={difficulty} onChange={e=>setDifficulty(e.target.value as Difficulty)}><option value="easy">EASY（1–3枚）</option><option value="normal">NORMAL（3–7枚）</option><option value="hard">HARD（5–10枚）</option><option value="expert">EXPERT（7–15枚）</option><option value="master">MASTER（9–17枚）</option><option value="lunatic">LUNATIC（12–22枚）</option></select></label></div>
+      <div className="settings"><label>制限時間<select value={duration} onChange={e=>setDuration(+e.target.value)}><option value={30}>30秒</option><option value={60}>60秒</option><option value={90}>90秒</option></select></label><label>難易度<select value={difficulty} onChange={e=>setDifficulty(e.target.value as Difficulty)}>{Object.entries(difficultyRanges).map(([key,range])=><option key={key} value={key}>{difficultyLabel(key)}（{range[0]}–{range[1]}枚）</option>)}</select></label></div>
       <button className="primary" disabled={busy} onClick={()=>enter("create")}><Plus/>ルームを作る</button>
       <div className="or"><span/>または<span/></div>
       <div className="join-row"><input aria-label="ルームコード" value={joinCode} onChange={e=>setJoinCode(e.target.value.replace(/[^a-z0-9]/gi,"").slice(0,6))} placeholder="6桁コード"/><button disabled={busy||joinCode.length!==6} onClick={()=>enter("join")}><LogIn/>参加</button></div>
@@ -124,7 +117,7 @@ export default function Home(){
   if(screen==="lobby"&&room) return <main className="shell lobby-shell"><header className="mini-head"><b>PANEL <em>PUSH</em></b><button onClick={leave}>退出</button></header><section className="lobby-card">
     <div className="eyebrow">ROOM CODE</div><div className="room-code">{room.code}</div><p className="share-hint">このコードを対戦相手に共有してください</p>
     <div className="invite-share"><button type="button" className="settings-open" disabled={!inviteLink} onClick={copyInvite}>招待リンクをコピー</button><input aria-label="招待リンク" readOnly value={inviteLink} onFocus={e=>e.currentTarget.select()}/><p role="status">{copyMessage||"リンクを開くと参加コードが自動入力されます"}</p></div>
-    <div className="lobby-info"><span><Users/> {snapshot.players.length}人</span><span>{room.duration}秒</span><span>{room.difficulty.toUpperCase()} {difficultyRanges[room.difficulty][0]}–{difficultyRanges[room.difficulty][1]}枚</span></div>
+    <div className="lobby-info"><span><Users/> {snapshot.players.length}人</span><span>{room.duration}秒</span><span>{difficultyLabel(room.difficulty)} {difficultyRanges[room.difficulty][0]}–{difficultyRanges[room.difficulty][1]}枚</span></div>
     <div className="player-list">{snapshot.players.map((p,i)=><div className="player-wait" key={p.id}><span className="avatar" style={{background:palette[i%palette.length]}}>{p.name[0]}</span><strong>{p.name}{p.botLevel>0&&<small> Lv.{p.botLevel}</small>}{p.id===meId&&<small> YOU</small>}<small style={{display:"block"}}>ハンデ {p.handicap>=0?"+":""}{p.handicap}点</small></strong><small className={p.ready?"ready-label":"not-ready-label"}>{p.ready?"準備完了":"準備中"}</small>{p.id===room.hostId&&<Crown className="crown"/>}<i className={p.online?"online":"offline"}/></div>)}</div>
     <section className="lobby-chat"><h3><MessageCircle/> 待機チャット</h3><div className="chat-log">{snapshot.messages.length?snapshot.messages.map(m=><div className={m.playerId===meId?"chat-message mine":"chat-message"} key={m.id}><b>{m.name}</b><p>{m.body}</p></div>):<p className="chat-empty">まだメッセージはありません</p>}</div><div className="chat-compose"><input value={chatText} onChange={e=>setChatText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing)void sendChat()}} maxLength={120} placeholder="メッセージを入力"/><button onClick={sendChat} disabled={!chatText.trim()} aria-label="送信"><Send/></button></div></section>
     {isHost&&<><button className="settings-open" onClick={()=>{setDuration(room.duration);setDifficulty(room.difficulty);setSettingsError("");settingsDialog.current?.showModal()}}>ゲーム設定</button>
@@ -132,7 +125,7 @@ export default function Home(){
         <h2 id="settings-title">ゲーム設定</h2>
         <form onSubmit={e=>{e.preventDefault();void saveSettings()}}>
           <label>制限時間<select value={duration} onChange={e=>setDuration(Number(e.target.value))}>{[30,60,90].map(v=><option key={v} value={v}>{v}秒</option>)}</select></label>
-          <label>難易度<select value={difficulty} onChange={e=>setDifficulty(e.target.value as Difficulty)}>{Object.entries(difficultyRanges).map(([key,range])=><option key={key} value={key}>{key.toUpperCase()}（{range[0]}–{range[1]}枚）</option>)}</select></label>
+          <label>難易度<select value={difficulty} onChange={e=>setDifficulty(e.target.value as Difficulty)}>{Object.entries(difficultyRanges).map(([key,range])=><option key={key} value={key}>{difficultyLabel(key)}（{range[0]}–{range[1]}枚）</option>)}</select></label>
           {settingsError&&<p role="alert" className="error">{settingsError}</p>}
           <div className="settings-actions"><button type="button" onClick={()=>settingsDialog.current?.close()}>キャンセル</button><button type="submit" disabled={busy}>保存</button></div>
         </form>
@@ -147,7 +140,7 @@ export default function Home(){
   const ended=room.status==="finished"||remaining<=0;
   return <main className="game-shell"><header className="game-head"><b>PANEL <em>PUSH</em></b><div className="room-pill">ROOM {room.code}</div><div className="live"><i/> LIVE</div></header>
     <section className="game-stats"><div><small>SCORE</small><strong>{me.score.toLocaleString()}</strong></div><div className="timer"><small>TIME</small><strong>{remaining}</strong><span>SEC</span></div><div><small>COMBO</small><strong>{me.combo}<span>x</span></strong></div></section>
-    <section className="arena"><div className="board-wrap"><div className={`callout ${flash||""}`}>{flash==="miss"?"MISS  −50":flash==="perfect"?"PERFECT!  +BONUS":flash==="good"?"NICE!":"光っているパネルを全部押せ！"}</div><div className="board">{Array.from({length:25},(_,i)=>{const lit=countdown===0&&active.includes(i)&&!me.pressed.includes(i)&&!pendingCells.includes(`${me.round}:${i}`);return <button key={i} aria-label={`${i+1}番パネル${lit?" 光っています":""}`} className={lit?"panel lit":"panel"} style={lit?{"--panel-color":palette[(i+me.round)%palette.length]} as React.CSSProperties:undefined} onPointerDown={e=>{if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();void pushCell(i)}}><span>{lit&&<Sparkles/>}</span></button>})}</div><div className="round-label">ROUND <b>{me.round+1}</b><span>{active.filter(i=>!me.pressed.includes(i)&&!pendingCells.includes(`${me.round}:${i}`)).length} LEFT</span></div></div>
+    <section className="arena"><div className="board-wrap">{room.difficulty.startsWith("ura_")&&<p className="damage-hint">赤い×はダメージ：−50点・盤面リセット（出現率 {board.rate}%）</p>}<div className={`callout ${flash||""}`}>{flash==="miss"?"MISS  −50":flash==="perfect"?"PERFECT!  +BONUS":flash==="good"?"NICE!":"光っているパネルを全部押せ！"}</div><div className="board">{Array.from({length:25},(_,i)=>{const damage=countdown===0&&board.damage.includes(i);const lit=countdown===0&&active.includes(i)&&!me.pressed.includes(i)&&!pendingCells.includes(`${me.round}:${i}`);return <button key={i} aria-label={`${i+1}番パネル${damage?" ダメージパネル":lit?" 光っています":""}`} className={damage?"panel damage":lit?"panel lit":"panel"} style={lit?{"--panel-color":palette[(i+me.round)%palette.length]} as React.CSSProperties:undefined} onPointerDown={e=>{if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();void pushCell(i)}}><span>{damage?"×":lit&&<Sparkles/>}</span></button>})}</div><div className="round-label">ROUND <b>{me.round+1}</b><span>{active.filter(i=>!me.pressed.includes(i)&&!pendingCells.includes(`${me.round}:${i}`)).length} LEFT</span></div></div>
       <aside className="ranking"><div className="rank-title"><Trophy/> LIVE RANKING</div>{ranking.map((p,i)=><div className={`rank-row ${p.id===meId?"mine":""}`} key={p.id}><b className="place">{i+1}</b><span className="avatar" style={{background:palette[Math.max(0,snapshot!.players.findIndex(x=>x.id===p.id))%palette.length]}}>{p.name[0]}</span><div><strong>{p.name}</strong><small>ROUND {p.round+1} · {p.perfects} PERFECT</small></div><em>{p.score.toLocaleString()}</em></div>)}</aside>
     </section>
     {countdown>0&&<div className="countdown-overlay" role="status" aria-live="assertive"><span>まもなくスタート</span><strong>{countdown}</strong></div>}

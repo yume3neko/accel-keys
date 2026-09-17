@@ -9,7 +9,7 @@ type Room = { code:string; status:"waiting"|"playing"|"finished"; hostId:string;
 type ChatMessage={id:number;playerId:string;name:string;body:string;createdAt:number};
 type Snapshot = { room:Room; players:Player[]; messages:ChatMessage[]; now:number };
 
-const API = "/api/game";
+const API = "/api/panel-push";
 const palette = ["#ff4d6d","#ff9f1c","#ffe047","#42e9a9","#28c7fa","#8b7bff"];
 
 function pattern(seed:number, round:number, count:number){

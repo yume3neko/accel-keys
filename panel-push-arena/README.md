@@ -25,16 +25,20 @@
 
 ```bash
 pnpm install
-pnpm run db:generate
-pnpm run dev
+node scripts/build-pages.mjs
+node scripts/check-pages.mjs
 ```
 
-ゲームデータにはCloudflare D1を使用します。`drizzle/`のマイグレーションをD1へ適用し、Workerの`DB`バインディングに接続してください。
+ゲームデータには専用のCloudflare D1 `panel-push-db` を使用します。空のデータベースには `pages-init.sql` を実行してください。接続名はリポジトリ直下の `wrangler.toml` にある `PANEL_DB` です。既存ゲームの `DB` は変更しません。
 
 ## ビルド
 
 ```bash
-pnpm run build
+node scripts/build-pages.mjs
 ```
 
-Cloudflareでは、静的なPagesのみではなくAPIとD1を実行できるWorkers構成が必要です。Cloudflareダッシュボードの「Workers & Pages」からGitHubリポジトリを連携し、ビルド後のWorkerをデプロイしてください。
+`pages-output/` の index.html、game.js、game.css、favicon.svg をリポジトリの `public/panel-push/` に配置し、pages-function.js を `functions/api/panel-push.js` に配置します。これらの生成物はリポジトリに同梱しています。Pagesのビルドコマンドは空欄、出力先は既存どおり `public` です。
+
+公開先: https://yume3neko.pages.dev/panel-push/
+
+データベース初期化とPagesのデプロイ成功の両方が必要です。ローカルの処理確認はSQLiteによるもので、本番のD1接続確認は別途行います。

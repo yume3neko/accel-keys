@@ -20,3 +20,9 @@
 .settings-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
 .settings-actions button{padding:10px 18px;border:1px solid #41475f;border-radius:8px;background:#24283a;color:#fff}
 .settings-actions button[type=submit]{background:#28c7fa;color:#071117}
+.board{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));width:100%;touch-action:none}
+.panel{position:relative;min-width:0;min-height:0;overflow:hidden;touch-action:none;transition:filter .1s;transform:none}
+.panel:active{transform:none}
+.panel span{position:absolute;inset:5px;width:auto;height:auto;pointer-events:none}
+.panel.lit{animation:panel-glow .9s infinite alternate}
+@keyframes panel-glow{to{filter:brightness(1.23)}}

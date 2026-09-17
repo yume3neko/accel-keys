@@ -38,6 +38,9 @@ export default function Home(){
   const [error,setError]=useState(""); const [busy,setBusy]=useState(false); const [tick,setTick]=useState(Date.now());
   const [flash,setFlash]=useState<"good"|"miss"|"perfect"|null>(null); const flashTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const inputQueue=useRef<Promise<void>>(Promise.resolve());
+  const pendingInputs=useRef(new Set<string>());
+  const inputVersion=useRef(0);
+  const [pendingCells,setPendingCells]=useState<string[]>([]);
   const settingsDialog=useRef<HTMLDialogElement>(null);
   const [settingsError,setSettingsError]=useState("");
   async function saveSettings(){if(!room)return;setBusy(true);setSettingsError("");try{setSnapshot(await call({action:"settings",code:room.code,duration,difficulty}));settingsDialog.current?.close()}catch(e){setSettingsError(e instanceof Error?e.message:"変更できませんでした")}finally{setBusy(false)}}
@@ -47,7 +50,9 @@ export default function Home(){
 
   const refresh=useCallback(async()=>{
     if(!room?.code) return;
-    try { const data=await call({action:"state",code:room.code}); setSnapshot(data); if(data.room.status==="playing") setScreen("game"); }
+    const version=inputVersion.current;
+    if(pendingInputs.current.size)return;
+    try { const data=await call({action:"state",code:room.code}); if(version!==inputVersion.current||pendingInputs.current.size)return; setSnapshot(data); if(data.room.status==="playing") setScreen("game"); }
     catch(e){ setError(e instanceof Error?e.message:"通信エラー"); }
   },[room?.code]);
 
@@ -69,10 +74,13 @@ export default function Home(){
   async function start(){ if(!room)return;setBusy(true);try{const d=await call({action:"start",code:room.code});setSnapshot(d);setScreen("game");}catch(e){setError(e instanceof Error?e.message:"開始できませんでした");}finally{setBusy(false);} }
   async function sendChat(){if(!room||!chatText.trim())return;const message=chatText.trim();setChatText("");try{const d=await call({action:"chat_send",code:room.code,message});setSnapshot(d);}catch(e){setChatText(message);setError(e instanceof Error?e.message:"送信できませんでした");}}
   async function pushCell(index:number){
-    if(!room||!me||room.status!=="playing")return;
-    const wanted=active.includes(index)&&!me.pressed.includes(index); const willPerfect=wanted&&me.pressed.length+1===active.length&&me.mistakes===0;
+    if(!room||!me||room.status!=="playing"||remaining<=0)return;
+    const round=me.round;const key=`${round}:${index}`;
+    if(pendingInputs.current.has(key)||me.pressed.includes(index))return;
+    const wanted=active.includes(index); const willPerfect=wanted&&me.pressed.length+pendingCells.filter(k=>k.startsWith(`${round}:`)&&active.includes(Number(k.split(":")[1]))).length+1===active.length&&me.mistakes===0;
+    pendingInputs.current.add(key);setPendingCells([...pendingInputs.current]);inputVersion.current++;
     setFlash(willPerfect?"perfect":wanted?"good":"miss"); if(flashTimer.current)clearTimeout(flashTimer.current);flashTimer.current=setTimeout(()=>setFlash(null),350);
-    inputQueue.current=inputQueue.current.then(async()=>{try{const current=snapshot?.players.find(p=>p.id===meId);const d=await call({action:"push",code:room.code,index,round:current?.round??me.round});setSnapshot(d);}catch(e){setError(e instanceof Error?e.message:"入力を送れませんでした");}});
+    inputQueue.current=inputQueue.current.then(async()=>{try{const d=await call({action:"push",code:room.code,index,round});setSnapshot(d);}catch(e){setError(e instanceof Error?e.message:"入力を送れませんでした");}finally{pendingInputs.current.delete(key);setPendingCells([...pendingInputs.current]);inputVersion.current++;}});
   }
   function leave(){setSnapshot(null);setMeId("");setScreen("home");setError("");}
 
@@ -113,7 +121,7 @@ export default function Home(){
   const ended=room.status==="finished"||remaining<=0;
   return <main className="game-shell"><header className="game-head"><b>PANEL <em>PUSH</em></b><div className="room-pill">ROOM {room.code}</div><div className="live"><i/> LIVE</div></header>
     <section className="game-stats"><div><small>SCORE</small><strong>{me.score.toLocaleString()}</strong></div><div className="timer"><small>TIME</small><strong>{remaining}</strong><span>SEC</span></div><div><small>COMBO</small><strong>{me.combo}<span>x</span></strong></div></section>
-    <section className="arena"><div className="board-wrap"><div className={`callout ${flash||""}`}>{flash==="miss"?"MISS  −50":flash==="perfect"?"PERFECT!  +BONUS":flash==="good"?"NICE!":"光っているパネルを全部押せ！"}</div><div className="board">{Array.from({length:25},(_,i)=>{const lit=active.includes(i)&&!me.pressed.includes(i);return <button key={i} aria-label={`${i+1}番パネル${lit?" 光っています":""}`} className={lit?"panel lit":"panel"} style={lit?{"--panel-color":palette[(i+me.round)%palette.length]} as React.CSSProperties:undefined} onPointerDown={()=>pushCell(i)}><span>{lit&&<Sparkles/>}</span></button>})}</div><div className="round-label">ROUND <b>{me.round+1}</b><span>{active.length-me.pressed.length} LEFT</span></div></div>
+    <section className="arena"><div className="board-wrap"><div className={`callout ${flash||""}`}>{flash==="miss"?"MISS  −50":flash==="perfect"?"PERFECT!  +BONUS":flash==="good"?"NICE!":"光っているパネルを全部押せ！"}</div><div className="board">{Array.from({length:25},(_,i)=>{const lit=active.includes(i)&&!me.pressed.includes(i)&&!pendingCells.includes(`${me.round}:${i}`);return <button key={i} aria-label={`${i+1}番パネル${lit?" 光っています":""}`} className={lit?"panel lit":"panel"} style={lit?{"--panel-color":palette[(i+me.round)%palette.length]} as React.CSSProperties:undefined} onPointerDown={e=>{if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();void pushCell(i)}}><span>{lit&&<Sparkles/>}</span></button>})}</div><div className="round-label">ROUND <b>{me.round+1}</b><span>{active.filter(i=>!me.pressed.includes(i)&&!pendingCells.includes(`${me.round}:${i}`)).length} LEFT</span></div></div>
       <aside className="ranking"><div className="rank-title"><Trophy/> LIVE RANKING</div>{ranking.map((p,i)=><div className={`rank-row ${p.id===meId?"mine":""}`} key={p.id}><b className="place">{i+1}</b><span className="avatar" style={{background:palette[Math.max(0,snapshot!.players.findIndex(x=>x.id===p.id))%palette.length]}}>{p.name[0]}</span><div><strong>{p.name}</strong><small>ROUND {p.round+1} · {p.perfects} PERFECT</small></div><em>{p.score.toLocaleString()}</em></div>)}</aside>
     </section>
     {ended&&<div className="result-overlay"><section className="result-card"><div className="eyebrow">TIME UP</div><Trophy className="big-trophy"/><h2>{ranking[0]?.id===meId?"あなたの勝利！":"ゲーム終了！"}</h2><div className="podium">{ranking.slice(0,3).map((p,i)=><div key={p.id}><span>{i+1}</span><strong>{p.name}</strong><b>{p.score.toLocaleString()}</b></div>)}</div><div className="result-actions">{isHost&&<button className="primary" onClick={start}><RotateCcw/>もう一度</button>}<button onClick={leave}>タイトルへ</button></div></section></div>}

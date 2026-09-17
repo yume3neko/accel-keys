@@ -12,18 +12,64 @@ export async function onRequestPost(context) {
         const j = x % (i + 1);
         [a[i], a[j]] = [a[j], a[i]];
     } return a.slice(0, count); }
+    const botSpecs = [[0, 0], [2, .75], [2.5, .77], [3, .77], [3.5, .80], [4, .85]];
+    async function advanceBots(room, now) {
+        const bots = await db().prepare("SELECT * FROM players WHERE room_code=? AND bot_level>0").bind(room.code).all();
+        for (const bot of bots.results) {
+            const [speed, accuracy] = botSpecs[bot.bot_level];
+            const target = Math.floor(Math.max(0, Math.min(now, room.ends_at) - room.started_at) * speed / 1000);
+            if (target <= bot.bot_tick)
+                continue;
+            let score = bot.score, combo = bot.combo, best = bot.best_combo, round = bot.current_round, mistakes = bot.mistakes, perfects = bot.perfects;
+            let pressed = JSON.parse(bot.pressed);
+            let salt = 0;
+            for (const char of bot.id)
+                salt = (Math.imul(salt, 31) + char.charCodeAt(0)) >>> 0;
+            for (let tick = bot.bot_tick + 1; tick <= target; tick++) {
+                let x = (room.seed ^ salt ^ Math.imul(tick, 0x9e3779b1)) >>> 0;
+                x ^= x >>> 16;
+                x = Math.imul(x, 0x7feb352d);
+                x ^= x >>> 15;
+                x = Math.imul(x, 0x846ca68b);
+                x ^= x >>> 16;
+                if ((x >>> 0) / 4294967296 < accuracy) {
+                    const targets = targetPattern(room.seed, round, targetCount(room.difficulty, round));
+                    pressed.push(targets.find(i => !pressed.includes(i)));
+                    combo++;
+                    best = Math.max(best, combo);
+                    score += 100 + Math.min(combo, 20) * 5;
+                    if (pressed.length === targets.length) {
+                        score += 250 + (mistakes === 0 ? 500 : 0);
+                        if (mistakes === 0)
+                            perfects++;
+                        round++;
+                        mistakes = 0;
+                        pressed = [];
+                    }
+                }
+                else {
+                    score = Math.max(Math.min(0, bot.handicap), score - 50);
+                    combo = 0;
+                    mistakes++;
+                }
+            }
+            await db().prepare("UPDATE players SET score=?,combo=?,best_combo=?,current_round=?,pressed=?,mistakes=?,perfects=?,bot_tick=?,last_seen=? WHERE id=? AND bot_tick=? AND EXISTS(SELECT 1 FROM rooms WHERE code=? AND started_at=?)").bind(score, combo, best, round, JSON.stringify(pressed), mistakes, perfects, target, now, bot.id, bot.bot_tick, room.code, room.started_at).run();
+        }
+    }
     async function snapshot(roomCode, token) {
         const now = Date.now();
         let room = await db().prepare("SELECT * FROM rooms WHERE code=?").bind(roomCode).first();
         if (!room)
             throw new Error("ルームが見つかりません");
+        if (room.status === "playing")
+            await advanceBots(room, now);
         if (room.status === "playing" && room.ends_at && now >= room.ends_at) {
             await db().prepare("UPDATE rooms SET status='finished' WHERE code=?").bind(roomCode).run();
             room = { ...room, status: "finished" };
         }
-        const rows = await db().prepare("SELECT id,name,score,combo,best_combo,current_round,pressed,mistakes,perfects,last_seen FROM players WHERE room_code=? ORDER BY joined_at").bind(roomCode).all();
+        const rows = await db().prepare("SELECT id,name,score,combo,best_combo,current_round,pressed,mistakes,perfects,last_seen,handicap,bot_level FROM players WHERE room_code=? ORDER BY joined_at").bind(roomCode).all();
         const chats = room.status === "waiting" ? await db().prepare("SELECT id,player_id,name,body,created_at FROM messages WHERE room_code=? ORDER BY id DESC LIMIT 50").bind(roomCode).all() : { results: [] };
-        return { room: { code: room.code, status: room.status, hostId: room.host_id, duration: room.duration, difficulty: room.difficulty || "normal", seed: room.seed, startedAt: room.started_at, endsAt: room.ends_at }, players: rows.results.map((p) => ({ id: p.id, name: p.name, score: p.score, combo: p.combo, bestCombo: p.best_combo, round: p.current_round, pressed: JSON.parse(p.pressed || "[]"), mistakes: p.mistakes, perfects: p.perfects, online: now - p.last_seen < 9000 })), messages: [...chats.results].reverse().map((m) => ({ id: m.id, playerId: m.player_id, name: m.name, body: m.body, createdAt: m.created_at })), now, meId: token };
+        return { room: { code: room.code, status: room.status, hostId: room.host_id, duration: room.duration, difficulty: room.difficulty || "normal", seed: room.seed, startedAt: room.started_at, endsAt: room.ends_at }, players: rows.results.map((p) => ({ id: p.id, name: p.name, score: p.score, combo: p.combo, bestCombo: p.best_combo, round: p.current_round, pressed: JSON.parse(p.pressed || "[]"), mistakes: p.mistakes, perfects: p.perfects, handicap: p.handicap, botLevel: p.bot_level, online: p.bot_level > 0 || now - p.last_seen < 9000 })), messages: [...chats.results].reverse().map((m) => ({ id: m.id, playerId: m.player_id, name: m.name, body: m.body, createdAt: m.created_at })), now, meId: token };
     }
     async function POST(request) {
         try {
@@ -78,20 +124,71 @@ export async function onRequestPost(context) {
             const room = await db().prepare("SELECT * FROM rooms WHERE code=?").bind(roomCode).first();
             if (!room)
                 return json({ error: "ルームが見つかりません" }, 404);
+            if (b.action === "settings") {
+                if (room.host_id !== token)
+                    return json({ error: "ホストだけが変更できます" }, 403);
+                if (room.status !== "waiting")
+                    return json({ error: "設定変更は開始前のみです" }, 409);
+                if (![30, 60, 90].includes(Number(b.duration)) || !Object.keys(ranges).includes(String(b.difficulty)))
+                    return json({ error: "無効な設定です" }, 400);
+                await db().prepare("UPDATE rooms SET duration=?,difficulty=? WHERE code=? AND status='waiting'").bind(b.duration, b.difficulty, roomCode).run();
+                return json(await snapshot(roomCode, token));
+            }
             if (b.action === "chat_send") {
                 if (room.status !== "waiting")
                     return json({ error: "チャットは待機画面でのみ使えます" }, 409);
                 const message = clean(b.message, 120);
                 if (!message)
                     return json({ error: "メッセージを入力してください" }, 400);
-                await db().prepare("INSERT INTO messages(room_code,player_id,name,body,created_at) VALUES(?,?,?,?,?)").bind(roomCode, token, player.name, message, Date.now()).run();
+                let announcement = message;
+                if (message.startsWith("/")) {
+                    if (room.host_id !== token)
+                        return json({ error: "コマンドはホスト限定です" }, 403);
+                    const bot = message.match(/^\/bot\s+(\d+)\s+([1-5])$/);
+                    const handicap = message.match(/^\/handicap\s+(.+?)\s+([+-]?\d+)$/);
+                    if (bot) {
+                        const count = Number(bot[1]), level = Number(bot[2]);
+                        const existing = await db().prepare("SELECT COUNT(*) c FROM players WHERE room_code=?").bind(roomCode).first();
+                        if (count < 1 || count > 8 - existing.c)
+                            return json({ error: "BOTは1人以上、合計8人まで追加できます" }, 400);
+                        const rows = await db().prepare("SELECT name FROM players WHERE room_code=?").bind(roomCode).all();
+                        const names = new Set(rows.results.map((p) => p.name));
+                        const inserts = [];
+                        let n = 1;
+                        for (let i = 0; i < count; i++) {
+                            while (names.has("BOT" + n))
+                                n++;
+                            const name = "BOT" + n++;
+                            names.add(name);
+                            inserts.push(db().prepare("INSERT INTO players(id,room_code,name,joined_at,last_seen,bot_level) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rooms WHERE code=? AND status='waiting')").bind("bot-" + crypto.randomUUID(), roomCode, name, Date.now() + i, Date.now(), level, roomCode));
+                        }
+                        await db().batch(inserts);
+                        announcement = "BOTを" + count + "人追加しました（Lv." + level + "）";
+                    }
+                    else if (handicap) {
+                        let name = handicap[1].trim();
+                        if (name.startsWith('"') && name.endsWith('"'))
+                            name = name.slice(1, -1);
+                        const points = Number(handicap[2]);
+                        if (!Number.isSafeInteger(points) || Math.abs(points) > 1000000)
+                            return json({ error: "ハンデは−1000000〜1000000の整数です" }, 400);
+                        const candidates = await db().prepare("SELECT id FROM players WHERE room_code=? AND name=?").bind(roomCode, name).all();
+                        if (candidates.results.length !== 1)
+                            return json({ error: candidates.results.length ? "同じ名前が複数あります。別の名前で参加してください" : "プレイヤーが見つかりません" }, 400);
+                        await db().prepare("UPDATE players SET handicap=? WHERE id=? AND room_code=? AND EXISTS(SELECT 1 FROM rooms WHERE code=? AND status='waiting')").bind(points, candidates.results[0].id, roomCode, roomCode).run();
+                        announcement = name + " のハンデを " + (points >= 0 ? "+" : "") + points + " 点に設定しました";
+                    }
+                    else
+                        return json({ error: "書式: /bot 人数 レベル(1-5) または /handicap プレイヤー名 点数" }, 400);
+                }
+                await db().prepare("INSERT INTO messages(room_code,player_id,name,body,created_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rooms WHERE code=? AND status='waiting')").bind(roomCode, token, player.name, announcement, Date.now(), roomCode).run();
                 return json(await snapshot(roomCode, token));
             }
             if (b.action === "start") {
                 if (room.host_id !== token)
                     return json({ error: "ホストだけが開始できます" }, 403);
                 const now = Date.now();
-                await db().batch([db().prepare("UPDATE rooms SET status='playing',seed=?,started_at=?,ends_at=? WHERE code=?").bind(Math.floor(Math.random() * 2147483647), now, now + room.duration * 1000, roomCode), db().prepare("UPDATE players SET score=0,combo=0,best_combo=0,current_round=0,pressed='[]',mistakes=0,perfects=0,last_seen=? WHERE room_code=?").bind(now, roomCode)]);
+                await db().batch([db().prepare("UPDATE rooms SET status='playing',seed=?,started_at=?,ends_at=? WHERE code=?").bind(Math.floor(Math.random() * 2147483647), now, now + room.duration * 1000, roomCode), db().prepare("UPDATE players SET score=handicap,bot_tick=0,combo=0,best_combo=0,current_round=0,pressed='[]',mistakes=0,perfects=0,last_seen=? WHERE room_code=?").bind(now, roomCode)]);
                 return json(await snapshot(roomCode, token));
             }
             if (b.action === "push") {
@@ -122,7 +219,7 @@ export async function onRequestPost(context) {
                     }
                 }
                 else {
-                    score = Math.max(0, score - 50);
+                    score = Math.max(Math.min(0, player.handicap), score - 50);
                     combo = 0;
                     mistakes++;
                 }

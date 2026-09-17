@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {onRequestPost} from '../pages-output/pages-function.js';
 const sql=new DatabaseSync(':memory:');sql.exec(fs.readFileSync('pages-init.sql','utf8'));
+sql.exec(fs.readFileSync('commands-migration.sql','utf8'));
 const db={
  prepare(text){return {bind(...args){
   const statement=sql.prepare(text);
@@ -29,3 +30,24 @@ for(const [difficulty,min,max] of [['easy',1,3],['normal',3,7],['hard',5,10],['e
  assert.equal((await call(host,{action:'push',code,round:101,index:0})).data.players.find(p=>p.id===id).round,101);
 }
 console.log('PASS: 6 difficulties, progression/caps, two-player rooms, host checks, lobby-only chat, scoring and timeout');
+const host='commands-host',guest='commands-guest';
+let r=await call(host,{action:'create',name:'主催'});const code=r.data.room.code;
+await call(guest,{action:'join',code,name:'参加 者'});
+assert.equal((await call(guest,{action:'chat_send',code,message:'/bot 1 5'})).status,403);
+assert.equal((await call(guest,{action:'settings',code,duration:90,difficulty:'master'})).status,403);
+assert.equal((await call(host,{action:'chat_send',code,message:'/bot 0 1'})).status,400);
+assert.equal((await call(host,{action:'chat_send',code,message:'/bot 7 5'})).status,400);
+for(let level=1;level<=5;level++)assert.equal((await call(host,{action:'chat_send',code,message:'/bot 1 '+level})).status,200);
+assert.equal((await call(host,{action:'chat_send',code,message:'/handicap 参加 者 1200'})).status,200);
+assert.equal((await call(host,{action:'chat_send',code,message:'/handicap 主催 -500'})).status,200);
+assert.equal((await call(host,{action:'chat_send',code,message:'/handicap 不在 10'})).status,400);
+r=await call(host,{action:'settings',code,duration:90,difficulty:'master'});assert.equal(r.data.room.difficulty,'master');assert.equal(r.data.room.duration,90);
+r=await call(host,{action:'start',code});assert.equal(r.data.players.find(p=>p.name==='参加 者').score,1200);assert.equal(r.data.players.find(p=>p.name==='主催').score,-500);
+assert.equal((await call(host,{action:'settings',code,duration:30,difficulty:'easy'})).status,409);
+assert.equal((await call(host,{action:'chat_send',code,message:'/bot 1 1'})).status,409);
+sql.prepare('UPDATE rooms SET started_at=?,ends_at=? WHERE code=?').run(Date.now()-10000,Date.now()+80000,code);
+await Promise.all([call(host,{action:'state',code}),call(guest,{action:'state',code})]);
+const bots=sql.prepare('SELECT * FROM players WHERE room_code=? AND bot_level>0 ORDER BY bot_level').all(code);
+assert.deepEqual(bots.map(b=>b.bot_tick),[20,25,30,35,40]);assert.ok(bots.every(b=>b.score>0));
+const scores=bots.map(b=>b.score);await call(host,{action:'state',code});assert.deepEqual(sql.prepare('SELECT score FROM players WHERE room_code=? AND bot_level>0 ORDER BY bot_level').all(code).map(b=>b.score),scores);
+console.log('PASS: BOT levels/rates, no duplicate ticks, signed handicap, name with spaces, command validation, settings permissions and phase checks');

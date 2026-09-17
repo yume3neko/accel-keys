@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Crown, LogIn, MessageCircle, Plus, RotateCcw, Send, Sparkles, Target, Trophy, Users, Zap } from "lucide-react";
 
-type Player = { id:string; name:string; score:number; combo:number; bestCombo:number; round:number; pressed:number[]; mistakes:number; perfects:number; online:boolean };
+type Player = { id:string; name:string; score:number; combo:number; bestCombo:number; round:number; pressed:number[]; mistakes:number; perfects:number; online:boolean; handicap:number; botLevel:number };
 type Difficulty="easy"|"normal"|"hard"|"expert"|"master"|"lunatic";
 type Room = { code:string; status:"waiting"|"playing"|"finished"; hostId:string; duration:number; difficulty:Difficulty; seed:number; startedAt:number|null; endsAt:number|null };
 type ChatMessage={id:number;playerId:string;name:string;body:string;createdAt:number};
@@ -38,6 +38,9 @@ export default function Home(){
   const [error,setError]=useState(""); const [busy,setBusy]=useState(false); const [tick,setTick]=useState(Date.now());
   const [flash,setFlash]=useState<"good"|"miss"|"perfect"|null>(null); const flashTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const inputQueue=useRef<Promise<void>>(Promise.resolve());
+  const settingsDialog=useRef<HTMLDialogElement>(null);
+  const [settingsError,setSettingsError]=useState("");
+  async function saveSettings(){if(!room)return;setBusy(true);setSettingsError("");try{setSnapshot(await call({action:"settings",code:room.code,duration,difficulty}));settingsDialog.current?.close()}catch(e){setSettingsError(e instanceof Error?e.message:"変更できませんでした")}finally{setBusy(false)}}
   const room=snapshot?.room; const me=snapshot?.players.find(p=>p.id===meId); const isHost=room?.hostId===meId;
   const active=useMemo(()=>room&&me?pattern(room.seed,me.round,targetCount(room.difficulty,me.round)):[],[room,me]);
   const remaining=room?.endsAt?Math.max(0,Math.ceil((room.endsAt-tick)/1000)):room?.duration??60;
@@ -89,8 +92,18 @@ export default function Home(){
   if(screen==="lobby"&&room) return <main className="shell lobby-shell"><header className="mini-head"><b>PANEL <em>PUSH</em></b><button onClick={leave}>退出</button></header><section className="lobby-card">
     <div className="eyebrow">ROOM CODE</div><div className="room-code">{room.code}</div><p className="share-hint">このコードを対戦相手に共有してください</p>
     <div className="lobby-info"><span><Users/> {snapshot.players.length}人</span><span>{room.duration}秒</span><span>{room.difficulty.toUpperCase()} {difficultyRanges[room.difficulty][0]}–{difficultyRanges[room.difficulty][1]}枚</span></div>
-    <div className="player-list">{snapshot.players.map((p,i)=><div className="player-wait" key={p.id}><span className="avatar" style={{background:palette[i%palette.length]}}>{p.name[0]}</span><strong>{p.name}{p.id===meId&&<small> YOU</small>}</strong>{p.id===room.hostId&&<Crown className="crown"/>}<i className={p.online?"online":"offline"}/></div>)}</div>
+    <div className="player-list">{snapshot.players.map((p,i)=><div className="player-wait" key={p.id}><span className="avatar" style={{background:palette[i%palette.length]}}>{p.name[0]}</span><strong>{p.name}{p.botLevel>0&&<small> Lv.{p.botLevel}</small>}{p.id===meId&&<small> YOU</small>}<small style={{display:"block"}}>ハンデ {p.handicap>=0?"+":""}{p.handicap}点</small></strong>{p.id===room.hostId&&<Crown className="crown"/>}<i className={p.online?"online":"offline"}/></div>)}</div>
     <section className="lobby-chat"><h3><MessageCircle/> 待機チャット</h3><div className="chat-log">{snapshot.messages.length?snapshot.messages.map(m=><div className={m.playerId===meId?"chat-message mine":"chat-message"} key={m.id}><b>{m.name}</b><p>{m.body}</p></div>):<p className="chat-empty">まだメッセージはありません</p>}</div><div className="chat-compose"><input value={chatText} onChange={e=>setChatText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing)void sendChat()}} maxLength={120} placeholder="メッセージを入力"/><button onClick={sendChat} disabled={!chatText.trim()} aria-label="送信"><Send/></button></div></section>
+    {isHost&&<><button className="settings-open" onClick={()=>{setDuration(room.duration);setDifficulty(room.difficulty);setSettingsError("");settingsDialog.current?.showModal()}}>ゲーム設定</button>
+      <dialog ref={settingsDialog} className="game-settings-dialog" aria-labelledby="settings-title">
+        <h2 id="settings-title">ゲーム設定</h2>
+        <form onSubmit={e=>{e.preventDefault();void saveSettings()}}>
+          <label>制限時間<select value={duration} onChange={e=>setDuration(Number(e.target.value))}>{[30,60,90].map(v=><option key={v} value={v}>{v}秒</option>)}</select></label>
+          <label>難易度<select value={difficulty} onChange={e=>setDifficulty(e.target.value as Difficulty)}>{Object.entries(difficultyRanges).map(([key,range])=><option key={key} value={key}>{key.toUpperCase()}（{range[0]}–{range[1]}枚）</option>)}</select></label>
+          {settingsError&&<p role="alert" className="error">{settingsError}</p>}
+          <div className="settings-actions"><button type="button" onClick={()=>settingsDialog.current?.close()}>キャンセル</button><button type="submit" disabled={busy}>保存</button></div>
+        </form>
+      </dialog></>}
     {isHost?<button className="primary start" disabled={busy} onClick={start}><Zap/>ゲームスタート</button>:<div className="waiting"><span/><span/><span/> ホストの開始を待っています</div>}
     {error&&<p className="error">{error}</p>}
   </section></main>;

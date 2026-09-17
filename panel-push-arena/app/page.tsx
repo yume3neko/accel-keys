@@ -33,6 +33,12 @@ async function call(body:Record<string,unknown>){
 export default function Home(){
   const [screen,setScreen]=useState<"home"|"lobby"|"game">("home");
   const [name,setName]=useState(""); const [joinCode,setJoinCode]=useState("");
+  const [inviteLink,setInviteLink]=useState("");
+  const [copyMessage,setCopyMessage]=useState("");
+  useEffect(()=>{
+    const code=new URLSearchParams(window.location.search).get("code")?.trim().toUpperCase();
+    if(code&&/^[A-Z0-9]{6}$/.test(code))setJoinCode(code);
+  },[]);
   const [snapshot,setSnapshot]=useState<Snapshot|null>(null); const [meId,setMeId]=useState("");
   const [duration,setDuration]=useState(60); const [difficulty,setDifficulty]=useState<Difficulty>("normal"); const [chatText,setChatText]=useState("");
   const [error,setError]=useState(""); const [busy,setBusy]=useState(false); const [tick,setTick]=useState(Date.now());
@@ -45,6 +51,15 @@ export default function Home(){
   const [settingsError,setSettingsError]=useState("");
   async function saveSettings(){if(!room)return;setBusy(true);setSettingsError("");try{setSnapshot(await call({action:"settings",code:room.code,duration,difficulty}));settingsDialog.current?.close()}catch(e){setSettingsError(e instanceof Error?e.message:"変更できませんでした")}finally{setBusy(false)}}
   const room=snapshot?.room; const me=snapshot?.players.find(p=>p.id===meId); const isHost=room?.hostId===meId;
+  useEffect(()=>{
+    setCopyMessage("");
+    if(!room?.code){setInviteLink("");return;}
+    const url=new URL(window.location.href);url.search="";url.hash="";url.searchParams.set("code",room.code);setInviteLink(url.toString());
+  },[room?.code]);
+  async function copyInvite(){
+    try{await navigator.clipboard.writeText(inviteLink);setCopyMessage("招待リンクをコピーしました");}
+    catch{setCopyMessage("下のリンク欄を長押ししてコピーしてください");}
+  }
   const active=useMemo(()=>room&&me?pattern(room.seed,me.round,targetCount(room.difficulty,me.round)):[],[room,me]);
   const clockOffset=useRef(0);
   const countdown=room?.status==="playing"&&room.startedAt?Math.max(0,Math.ceil((room.startedAt-tick-clockOffset.current)/1000)):0;
@@ -104,6 +119,7 @@ export default function Home(){
 
   if(screen==="lobby"&&room) return <main className="shell lobby-shell"><header className="mini-head"><b>PANEL <em>PUSH</em></b><button onClick={leave}>退出</button></header><section className="lobby-card">
     <div className="eyebrow">ROOM CODE</div><div className="room-code">{room.code}</div><p className="share-hint">このコードを対戦相手に共有してください</p>
+    <div className="invite-share"><button type="button" className="settings-open" disabled={!inviteLink} onClick={copyInvite}>招待リンクをコピー</button><input aria-label="招待リンク" readOnly value={inviteLink} onFocus={e=>e.currentTarget.select()}/><p role="status">{copyMessage||"リンクを開くと参加コードが自動入力されます"}</p></div>
     <div className="lobby-info"><span><Users/> {snapshot.players.length}人</span><span>{room.duration}秒</span><span>{room.difficulty.toUpperCase()} {difficultyRanges[room.difficulty][0]}–{difficultyRanges[room.difficulty][1]}枚</span></div>
     <div className="player-list">{snapshot.players.map((p,i)=><div className="player-wait" key={p.id}><span className="avatar" style={{background:palette[i%palette.length]}}>{p.name[0]}</span><strong>{p.name}{p.botLevel>0&&<small> Lv.{p.botLevel}</small>}{p.id===meId&&<small> YOU</small>}<small style={{display:"block"}}>ハンデ {p.handicap>=0?"+":""}{p.handicap}点</small></strong><small className={p.ready?"ready-label":"not-ready-label"}>{p.ready?"準備完了":"準備中"}</small>{p.id===room.hostId&&<Crown className="crown"/>}<i className={p.online?"online":"offline"}/></div>)}</div>
     <section className="lobby-chat"><h3><MessageCircle/> 待機チャット</h3><div className="chat-log">{snapshot.messages.length?snapshot.messages.map(m=><div className={m.playerId===meId?"chat-message mine":"chat-message"} key={m.id}><b>{m.name}</b><p>{m.body}</p></div>):<p className="chat-empty">まだメッセージはありません</p>}</div><div className="chat-compose"><input value={chatText} onChange={e=>setChatText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing)void sendChat()}} maxLength={120} placeholder="メッセージを入力"/><button onClick={sendChat} disabled={!chatText.trim()} aria-label="送信"><Send/></button></div></section>

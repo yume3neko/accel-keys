@@ -67,18 +67,21 @@ export async function onRequestPost(context) {
             await db().prepare("UPDATE rooms SET status='finished' WHERE code=?").bind(roomCode).run();
             room = { ...room, status: "finished" };
         }
-        const rows = await db().prepare("SELECT id,name,score,combo,best_combo,current_round,pressed,mistakes,perfects,last_seen,handicap,bot_level FROM players WHERE room_code=? ORDER BY joined_at").bind(roomCode).all();
+        const rows = await db().prepare("SELECT COALESCE((SELECT ready FROM panel_readiness WHERE player_id=players.id AND room_code=players.room_code),0) AS ready,id,name,score,combo,best_combo,current_round,pressed,mistakes,perfects,last_seen,handicap,bot_level FROM players WHERE room_code=? ORDER BY joined_at").bind(roomCode).all();
         const chats = room.status === "waiting" ? await db().prepare("SELECT id,player_id,name,body,created_at FROM messages WHERE room_code=? ORDER BY id DESC LIMIT 50").bind(roomCode).all() : { results: [] };
-        return { room: { code: room.code, status: room.status, hostId: room.host_id, duration: room.duration, difficulty: room.difficulty || "normal", seed: room.seed, startedAt: room.started_at, endsAt: room.ends_at }, players: rows.results.map((p) => ({ id: p.id, name: p.name, score: p.score, combo: p.combo, bestCombo: p.best_combo, round: p.current_round, pressed: JSON.parse(p.pressed || "[]"), mistakes: p.mistakes, perfects: p.perfects, handicap: p.handicap, botLevel: p.bot_level, online: p.bot_level > 0 || now - p.last_seen < 9000 })), messages: [...chats.results].reverse().map((m) => ({ id: m.id, playerId: m.player_id, name: m.name, body: m.body, createdAt: m.created_at })), now, meId: token };
+        return { room: { code: room.code, status: room.status, hostId: room.host_id, duration: room.duration, difficulty: room.difficulty || "normal", seed: room.seed, startedAt: room.started_at, endsAt: room.ends_at }, players: rows.results.map((p) => ({ id: p.id, name: p.name, score: p.score, combo: p.combo, bestCombo: p.best_combo, round: p.current_round, pressed: JSON.parse(p.pressed || "[]"), mistakes: p.mistakes, perfects: p.perfects, handicap: p.handicap, botLevel: p.bot_level, ready: p.bot_level > 0 || !!p.ready, online: p.bot_level > 0 || now - p.last_seen < 9000 })), messages: [...chats.results].reverse().map((m) => ({ id: m.id, playerId: m.player_id, name: m.name, body: m.body, createdAt: m.created_at })), now, meId: token };
     }
     async function POST(request) {
         try {
+            await db().prepare("CREATE TABLE IF NOT EXISTS panel_readiness (player_id TEXT PRIMARY KEY, room_code TEXT NOT NULL, ready INTEGER NOT NULL DEFAULT 0)").bind().run();
             const b = await request.json();
             const secret = clean(b.token, 64);
             if (!secret)
                 return json({ error: "端末IDがありません" }, 400);
             const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret));
             const token = Array.from(new Uint8Array(digest), v => v.toString(16).padStart(2, '0')).join('');
+            if (b.action === "create" || b.action === "join")
+                await db().prepare("DELETE FROM panel_readiness WHERE player_id=?").bind(token).run();
             if (b.action === "create") {
                 const name = clean(b.name, 12);
                 if (!name)
@@ -124,6 +127,20 @@ export async function onRequestPost(context) {
             const room = await db().prepare("SELECT * FROM rooms WHERE code=?").bind(roomCode).first();
             if (!room)
                 return json({ error: "ルームが見つかりません" }, 404);
+            if (b.action === "ready") {
+                if (room.status !== "waiting" || typeof b.ready !== "boolean")
+                    return json({ error: "準備は待機中のみ変更できます" }, 409);
+                await db().prepare("INSERT INTO panel_readiness(player_id,room_code,ready) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM rooms WHERE code=? AND status='waiting') ON CONFLICT(player_id) DO UPDATE SET room_code=excluded.room_code,ready=excluded.ready").bind(token, roomCode, b.ready ? 1 : 0, roomCode).run();
+                return json(await snapshot(roomCode, token));
+            }
+            if (b.action === "lobby") {
+                if (room.host_id !== token)
+                    return json({ error: "ホストだけが変更できます" }, 403);
+                if (room.status !== "finished")
+                    return json({ error: "試合終了後のみ戻れます" }, 409);
+                await db().batch([db().prepare("UPDATE rooms SET status='waiting',started_at=NULL,ends_at=NULL WHERE code=? AND status='finished'").bind(roomCode), db().prepare("DELETE FROM panel_readiness WHERE room_code=?").bind(roomCode)]);
+                return json(await snapshot(roomCode, token));
+            }
             if (b.action === "settings") {
                 if (room.host_id !== token)
                     return json({ error: "ホストだけが変更できます" }, 403);
@@ -132,6 +149,7 @@ export async function onRequestPost(context) {
                 if (![30, 60, 90].includes(Number(b.duration)) || !Object.keys(ranges).includes(String(b.difficulty)))
                     return json({ error: "無効な設定です" }, 400);
                 await db().prepare("UPDATE rooms SET duration=?,difficulty=? WHERE code=? AND status='waiting'").bind(b.duration, b.difficulty, roomCode).run();
+                await db().prepare("DELETE FROM panel_readiness WHERE room_code=?").bind(roomCode).run();
                 return json(await snapshot(roomCode, token));
             }
             if (b.action === "chat_send") {
@@ -181,18 +199,27 @@ export async function onRequestPost(context) {
                     else
                         return json({ error: "書式: /bot 人数 レベル(1-5) または /handicap プレイヤー名 点数" }, 400);
                 }
+                if (message.startsWith("/"))
+                    await db().prepare("DELETE FROM panel_readiness WHERE room_code=?").bind(roomCode).run();
                 await db().prepare("INSERT INTO messages(room_code,player_id,name,body,created_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rooms WHERE code=? AND status='waiting')").bind(roomCode, token, player.name, announcement, Date.now(), roomCode).run();
                 return json(await snapshot(roomCode, token));
             }
             if (b.action === "start") {
                 if (room.host_id !== token)
                     return json({ error: "ホストだけが開始できます" }, 403);
-                const now = Date.now();
-                await db().batch([db().prepare("UPDATE rooms SET status='playing',seed=?,started_at=?,ends_at=? WHERE code=?").bind(Math.floor(Math.random() * 2147483647), now, now + room.duration * 1000, roomCode), db().prepare("UPDATE players SET score=handicap,bot_tick=0,combo=0,best_combo=0,current_round=0,pressed='[]',mistakes=0,perfects=0,last_seen=? WHERE room_code=?").bind(now, roomCode)]);
+                if (room.status !== "waiting")
+                    return json({ error: "待機中のみ開始できます" }, 409);
+                const now = Date.now(), startsAt = now + 3000;
+                const result = await db().batch([
+                    db().prepare("UPDATE rooms SET status='playing',seed=?,started_at=?,ends_at=? WHERE code=? AND status='waiting' AND NOT EXISTS(SELECT 1 FROM players p LEFT JOIN panel_readiness r ON r.player_id=p.id AND r.room_code=p.room_code WHERE p.room_code=? AND p.bot_level=0 AND (COALESCE(r.ready,0)=0 OR p.last_seen<?))").bind(Math.floor(Math.random() * 2147483647), startsAt, startsAt + room.duration * 1000, roomCode, roomCode, now - 9000),
+                    db().prepare("UPDATE players SET score=handicap,bot_tick=0,combo=0,best_combo=0,current_round=0,pressed='[]',mistakes=0,perfects=0 WHERE room_code=? AND EXISTS(SELECT 1 FROM rooms WHERE code=? AND started_at=?)").bind(roomCode, roomCode, startsAt)
+                ]);
+                if (!result[0].meta.changes)
+                    return json({ error: "全員がオンラインで準備完了になるまでお待ちください" }, 409);
                 return json(await snapshot(roomCode, token));
             }
             if (b.action === "push") {
-                if (room.status !== "playing" || Date.now() >= room.ends_at)
+                if (room.status !== "playing" || Date.now() < room.started_at || Date.now() >= room.ends_at)
                     return json(await snapshot(roomCode, token));
                 if (Number(b.round) !== player.current_round)
                     return json(await snapshot(roomCode, token));

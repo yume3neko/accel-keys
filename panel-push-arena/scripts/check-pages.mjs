@@ -7,7 +7,7 @@ sql.exec(fs.readFileSync('commands-migration.sql','utf8'));
 const db={
  prepare(text){return {bind(...args){
   const statement=sql.prepare(text);
-  return {async first(){return statement.get(...args)??null},async all(){return {results:statement.all(...args)}},async run(){return statement.run(...args)}};
+  return {async first(){return statement.get(...args)??null},async all(){return {results:statement.all(...args)}},async run(){return {meta:{changes:statement.run(...args).changes}}}};
  }}},
  async batch(items){return Promise.all(items.map(x=>x.run()))}
 };
@@ -18,7 +18,15 @@ for(const [difficulty,min,max] of [['easy',1,3],['normal',3,7],['hard',5,10],['e
  assert.equal((await call(guest,{action:'join',code,name:'ゲスト'})).status,200);
  assert.equal((await call(guest,{action:'chat_send',code,message:'よろしく！'})).data.messages.length,1);
  assert.equal((await call(guest,{action:'start',code})).status,403);
- r=await call(host,{action:'start',code});const seed=r.data.room.seed;
+ assert.equal((await call(host,{action:'start',code})).status,409);
+ await call(host,{action:'ready',code,ready:true});
+ assert.equal((await call(host,{action:'start',code})).status,409);
+ await call(guest,{action:'ready',code,ready:true});
+ r=await call(host,{action:'start',code});assert.equal(r.status,200);assert.equal(r.data.room.endsAt-r.data.room.startedAt,60000);assert.ok(r.data.room.startedAt>r.data.now);
+ const early=await call(host,{action:'push',code,index:0,round:0});assert.equal(early.data.players.find(p=>p.id===id).score,0);
+ assert.equal((await call(host,{action:'start',code})).status,409);
+ sql.prepare('UPDATE rooms SET started_at=? WHERE code=?').run(Date.now()-1,code);
+ const seed=r.data.room.seed;
  assert.equal((await call(guest,{action:'chat_send',code,message:'試合中'})).status,409);
  for(const round of [0,2,100]){
   sql.prepare("UPDATE players SET current_round=?,pressed='[]',mistakes=0,score=0,combo=0 WHERE id=?").run(round,id);
@@ -42,7 +50,8 @@ assert.equal((await call(host,{action:'chat_send',code,message:'/handicap 参加
 assert.equal((await call(host,{action:'chat_send',code,message:'/handicap 主催 -500'})).status,200);
 assert.equal((await call(host,{action:'chat_send',code,message:'/handicap 不在 10'})).status,400);
 r=await call(host,{action:'settings',code,duration:90,difficulty:'master'});assert.equal(r.data.room.difficulty,'master');assert.equal(r.data.room.duration,90);
-r=await call(host,{action:'start',code});assert.equal(r.data.players.find(p=>p.name==='参加 者').score,1200);assert.equal(r.data.players.find(p=>p.name==='主催').score,-500);
+await call(host,{action:'ready',code,ready:true});await call(guest,{action:'ready',code,ready:true});
+r=await call(host,{action:'start',code});assert.equal(r.status,200);assert.ok(r.data.players.filter(p=>p.botLevel).every(p=>p.ready));assert.equal(r.data.players.find(p=>p.name==='参加 者').score,1200);assert.equal(r.data.players.find(p=>p.name==='主催').score,-500);
 assert.equal((await call(host,{action:'settings',code,duration:30,difficulty:'easy'})).status,409);
 assert.equal((await call(host,{action:'chat_send',code,message:'/bot 1 1'})).status,409);
 sql.prepare('UPDATE rooms SET started_at=?,ends_at=? WHERE code=?').run(Date.now()-10000,Date.now()+80000,code);
@@ -51,3 +60,10 @@ const bots=sql.prepare('SELECT * FROM players WHERE room_code=? AND bot_level>0 
 assert.deepEqual(bots.map(b=>b.bot_tick),[20,25,30,35,40]);assert.ok(bots.every(b=>b.score>0));
 const scores=bots.map(b=>b.score);await call(host,{action:'state',code});assert.deepEqual(sql.prepare('SELECT score FROM players WHERE room_code=? AND bot_level>0 ORDER BY bot_level').all(code).map(b=>b.score),scores);
 console.log('PASS: BOT levels/rates, no duplicate ticks, signed handicap, name with spaces, command validation, settings permissions and phase checks');
+
+sql.prepare("UPDATE rooms SET status='finished' WHERE code=?").run(code);
+assert.equal((await call(guest,{action:'lobby',code})).status,403);
+r=await call(host,{action:'lobby',code});assert.equal(r.data.room.status,'waiting');assert.ok(r.data.players.filter(p=>!p.botLevel).every(p=>!p.ready));
+await call(host,{action:'ready',code,ready:true});await call(guest,{action:'ready',code,ready:true});
+r=await call(host,{action:'settings',code,duration:30,difficulty:'easy'});assert.ok(r.data.players.filter(p=>!p.botLevel).every(p=>!p.ready));
+console.log('PASS: all-player readiness gate, three-second countdown, early input block, bot readiness, rematch and settings reset');

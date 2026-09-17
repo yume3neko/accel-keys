@@ -31,3 +31,4 @@ button,input,select{font:inherit}button{color:inherit}h1,h2,p{margin-top:0}
 .panel span{position:absolute;inset:5px;width:auto;height:auto;pointer-events:none}
 .panel.lit{animation:panel-glow .9s infinite alternate}
 @keyframes panel-glow{to{filter:brightness(1.23)}}
+.countdown-overlay{position:fixed;inset:0;z-index:12;background:#080a10dc;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;color:#fff}.countdown-overlay span{font-size:1.2rem;font-weight:800}.countdown-overlay strong{font-size:clamp(6rem,25vw,12rem);color:var(--cyan);font-variant-numeric:tabular-nums}.ready-label{color:#42e9a9!important}.not-ready-label{color:#9297ae!important}

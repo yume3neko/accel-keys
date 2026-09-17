@@ -89,10 +89,10 @@ for(const difficulty of Object.keys(rules.difficultyRanges).filter(d=>d.startsWi
  await call(token,{action:'ready',code,ready:true});r=await call(token,{action:'start',code});assert.equal(r.status,200);
  sql.prepare('UPDATE rooms SET started_at=? WHERE code=?').run(Date.now()-1,code);
  let round=2,b;do{b=rules.boardPattern(r.data.room.seed,round++,difficulty)}while(!b.damage.length);round--;
- sql.prepare('UPDATE players SET current_round=?,score=1000,combo=5 WHERE id=?').run(round,id);
- r=await call(token,{action:'push',code,round,index:b.damage[0]});let p=r.data.players.find(p=>p.id===id);assert.equal(p.score,950);assert.equal(p.combo,0);assert.equal(p.round,round+1);assert.deepEqual(p.pressed,[]);assert.equal(p.perfects,0);
+ sql.prepare('UPDATE players SET current_round=?,score=5000,combo=5 WHERE id=?').run(round,id);
+ r=await call(token,{action:'push',code,round,index:b.damage[0]});let p=r.data.players.find(p=>p.id===id);assert.equal(p.score,3000);assert.equal(p.combo,0);assert.equal(p.round,round+1);assert.deepEqual(p.pressed,[]);assert.equal(p.perfects,0);
  // Old queued inputs must not affect the replacement board.
- r=await call(token,{action:'push',code,round,index:b.safe[0]});assert.equal(r.data.players.find(p=>p.id===id).score,950);
+ r=await call(token,{action:'push',code,round,index:b.safe[0]});assert.equal(r.data.players.find(p=>p.id===id).score,3000);
  round++;b=rules.boardPattern(r.data.room.seed,round,difficulty);
  for(const index of b.safe)r=await call(token,{action:'push',code,round,index});p=r.data.players.find(p=>p.id===id);assert.equal(p.round,round+1);assert.equal(p.perfects,1);
 }

@@ -64,11 +64,12 @@ export async function onRequestPost(context) {
                     }
                 }
                 else {
-                    score = Math.max(Math.min(0, bot.handicap), score - 50);
+                    const board = boardPattern(room.seed, round, room.difficulty);
+                    const damage = board.damage.length > 0 && ((x >>> 8) % Math.max(1, 25 - board.safe.length)) < board.damage.length;
+                    score = Math.max(Math.min(0, bot.handicap), score - (damage ? 2000 : 50));
                     combo = 0;
                     mistakes++;
-                    const board = boardPattern(room.seed, round, room.difficulty);
-                    if (board.damage.length && ((x >>> 8) % Math.max(1, 25 - board.safe.length)) < board.damage.length) {
+                    if (damage) {
                         round++;
                         pressed = [];
                         mistakes = 0;
@@ -296,7 +297,7 @@ export async function onRequestPost(context) {
                     }
                 }
                 else {
-                    score = Math.max(Math.min(0, player.handicap), score - 50);
+                    score = Math.max(Math.min(0, player.handicap), score - (board.damage.includes(index) ? 2000 : 50));
                     combo = 0;
                     mistakes++;
                     if (board.damage.includes(index)) {

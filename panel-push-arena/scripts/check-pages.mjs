@@ -67,3 +67,15 @@ r=await call(host,{action:'lobby',code});assert.equal(r.data.room.status,'waitin
 await call(host,{action:'ready',code,ready:true});await call(guest,{action:'ready',code,ready:true});
 r=await call(host,{action:'settings',code,duration:30,difficulty:'easy'});assert.ok(r.data.players.filter(p=>!p.botLevel).every(p=>!p.ready));
 console.log('PASS: all-player readiness gate, three-second countdown, early input block, bot readiness, rematch and settings reset');
+assert.equal((await call(guest,{action:'chat_send',code,message:'/kick 主催'})).status,403);
+assert.equal((await call(host,{action:'chat_send',code,message:'/kick 主催'})).status,400);
+assert.equal((await call(host,{action:'chat_send',code,message:'/kick 不在'})).status,400);
+r=await call(host,{action:'chat_send',code,message:'/kick 参加 者'});assert.equal(r.status,200);assert.ok(!r.data.players.some(p=>p.name==='参加 者'));
+assert.equal((await call(guest,{action:'state',code})).status,403);
+r=await call(host,{action:'chat_send',code,message:'/kick BOT1'});assert.equal(r.status,200);assert.ok(!r.data.players.some(p=>p.name==='BOT1'));
+assert.equal((await call(guest,{action:'join',code,name:'参加 者'})).status,200);
+await call('duplicate',{action:'join',code,name:'参加 者'});
+assert.equal((await call(host,{action:'chat_send',code,message:'/kick 参加 者'})).status,400);
+sql.prepare("UPDATE rooms SET status='playing' WHERE code=?").run(code);
+assert.equal((await call(host,{action:'chat_send',code,message:'/kick BOT2'})).status,409);
+console.log('PASS: kick host-only, self/unknown/duplicate rejection, spaced names, BOT removal, membership revoked, rejoin allowed and playing-phase rejection');

@@ -164,6 +164,7 @@ export async function onRequestPost(context) {
                         return json({ error: "コマンドはホスト限定です" }, 403);
                     const bot = message.match(/^\/bot\s+(\d+)\s+([1-5])$/);
                     const handicap = message.match(/^\/handicap\s+(.+?)\s+([+-]?\d+)$/);
+                    const kick = message.match(/^\/kick\s+(.+)$/);
                     if (bot) {
                         const count = Number(bot[1]), level = Number(bot[2]);
                         const existing = await db().prepare("SELECT COUNT(*) c FROM players WHERE room_code=?").bind(roomCode).first();
@@ -196,8 +197,24 @@ export async function onRequestPost(context) {
                         await db().prepare("UPDATE players SET handicap=? WHERE id=? AND room_code=? AND EXISTS(SELECT 1 FROM rooms WHERE code=? AND status='waiting')").bind(points, candidates.results[0].id, roomCode, roomCode).run();
                         announcement = name + " のハンデを " + (points >= 0 ? "+" : "") + points + " 点に設定しました";
                     }
+                    else if (kick) {
+                        let name = kick[1].trim();
+                        if (name.startsWith('"') && name.endsWith('"'))
+                            name = name.slice(1, -1);
+                        const matches = await db().prepare("SELECT id FROM players WHERE room_code=? AND name=?").bind(roomCode, name).all();
+                        if (matches.results.length !== 1)
+                            return json({ error: matches.results.length ? "同じ名前が複数あるため対象を特定できません" : "プレイヤーが見つかりません" }, 400);
+                        const target = matches.results[0].id;
+                        if (target === room.host_id)
+                            return json({ error: "ホスト自身はキックできません" }, 400);
+                        const removed = await db().prepare("DELETE FROM players WHERE id=? AND room_code=? AND EXISTS(SELECT 1 FROM rooms WHERE code=? AND status='waiting')").bind(target, roomCode, roomCode).run();
+                        if (!removed.meta.changes)
+                            return json({ error: "開始済み、または対象が退出済みです" }, 409);
+                        await db().prepare("DELETE FROM panel_readiness WHERE player_id=? AND room_code=?").bind(target, roomCode).run();
+                        announcement = name + " をルームから退出させました";
+                    }
                     else
-                        return json({ error: "書式: /bot 人数 レベル(1-5) または /handicap プレイヤー名 点数" }, 400);
+                        return json({ error: "書式: /bot 人数 レベル(1-5)、/handicap プレイヤー名 点数、/kick 対象ユーザー名" }, 400);
                 }
                 if (message.startsWith("/"))
                     await db().prepare("DELETE FROM panel_readiness WHERE room_code=?").bind(roomCode).run();

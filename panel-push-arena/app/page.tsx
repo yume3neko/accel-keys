@@ -73,7 +73,11 @@ export default function Home(){
     const version=inputVersion.current;
     if(pendingInputs.current.size)return;
     try { const data=await call({action:"state",code:room.code}); if(version!==inputVersion.current||pendingInputs.current.size)return; clockOffset.current=data.now-Date.now();setSnapshot(data); if(data.room.status==="playing") setScreen("game");else if(data.room.status==="waiting")setScreen("lobby"); }
-    catch(e){ setError(e instanceof Error?e.message:"通信エラー"); }
+    catch(e){
+      if(e instanceof Error&&e.message==="このルームに参加していません"){
+        setSnapshot(null);setMeId("");setScreen("home");setError("ルームから退出しました。ホストによりキックされたか、別のルームへ移動しています。");
+      }else setError(e instanceof Error?e.message:"通信エラー");
+    }
   },[room?.code]);
 
   useEffect(()=>{ if(!room?.code)return; const id=setInterval(refresh,850); return()=>clearInterval(id); },[room?.code,refresh]);

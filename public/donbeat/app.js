@@ -213,7 +213,21 @@ function drawBranchLaneShade(t,y,r,opacity){
 }
 function judge(n,error){n.branchQuality=error<=judgmentWindows().good?1:error<=judgmentWindows().ok?.5:0;const before=score;judgeCore(n,error);branchScoreLog.push({time:n.time,score:score-before});}
 function addRollHits(r,count=1){const before=r.hits||0;addRollHitsCore(r,count);const hits=(r.hits||0)-before;if(hits>0)branchRollLog.push({time:time(),hits});}
-function branchDetails(e){
+function branchReachableRoutes(e){
+ const routeAt=v=>v>=e.high?'M':v>=e.low?'E':'N',set=new Set(),eps=1e-7;
+ let values;
+ if(e.kind==='p'){
+  values=[0,100,e.low,e.high,e.low-eps,e.low+eps,e.high-eps,e.high+eps]
+   .map(v=>Math.max(0,Math.min(100,v)));
+ }else{
+  const top=Math.max(0,e.low,e.high)+1;
+  values=[0,top,e.low,e.high,e.low-eps,e.low+eps,e.high-eps,e.high+eps]
+   .map(v=>Math.max(0,v));
+ }
+ for(const v of values)if(Number.isFinite(v))set.add(routeAt(v));
+ return ['N','E','M'].filter(r=>set.has(r));
+}
+function branchDetails(e,decideRandom=false){
  const at=branchJudgeTime(e);
  const from=Math.max(-Infinity,...(chart.sections||[]).filter(t=>t<=at));
  const judged=notes.filter(n=>n.type<=4&&n.time>=from&&n.time<at);
@@ -221,11 +235,18 @@ function branchDetails(e){
  if(e.kind==='p'){const done=judged.filter(n=>n.done);value=done.length?done.reduce((sum,n)=>sum+(n.branchQuality||0),0)/done.length*100:0;}
  else if(e.kind==='r')value=branchRollLog.filter(x=>x.time>=from&&x.time<at).reduce((sum,x)=>sum+x.hits,0);
  else value=branchScoreLog.filter(x=>x.time>=from&&x.time<at).reduce((sum,x)=>sum+x.score,0);
- const forcedRoute=['N','E','M'].includes(chart?._branchForce)?chart._branchForce:null;
- let route=forcedRoute||(value>=e.high?'M':value>=e.low?'E':'N');
- const locked=!forcedRoute&&(chart.holds||[]).some(t=>t>=from&&t<=at);
- if(locked)route=branchChoices[branchChoices.length-1]||'N';
- return {value,route,locked,forced:!!forcedRoute};
+ const mode=chart?._branchForce||null,fixed=['N','E','M'].includes(mode)?mode:null;
+ const autoRoute=value>=e.high?'M':value>=e.low?'E':'N';
+ const levelHeld=(chart.holds||[]).some(t=>t<=at);
+ const available=branchReachableRoutes(e);
+ let route=autoRoute,locked=false,random=false,forced=false;
+ if(fixed){route=fixed;forced=true}
+ else if(levelHeld){route=branchChoices[branchChoices.length-1]||'N';locked=true}
+ else if(mode==='random'){
+  if(available.length<=1){route=available[0]||autoRoute;forced=true}
+  else{random=true;if(decideRandom)route=available[Math.floor(Math.random()*available.length)]}
+ }
+ return {value,route,locked,forced,random,available};
 }
 function updateBranchRoute(){
  if(danRun||!chart.branchEvents?.length)return;
@@ -233,7 +254,7 @@ function updateBranchRoute(){
  while(branchChoices.length<chart.branchEvents.length){
   const index=branchChoices.length,e=chart.branchEvents[index],judgeAt=branchJudgeTime(e);if(now<judgeAt)break;
   for(const n of notes){if(n.type<=4&&!n.done&&!n.ghost&&n.time<judgeAt){if(auto)judge(n,0);else if(now>n.time+judgmentWindows().miss)judge(n,1)}}
-  const detail=branchDetails(e),fromRoute=branchChoices[branchChoices.length-1]||'N';
+  const detail=branchDetails(e,true),fromRoute=branchChoices[branchChoices.length-1]||'N';
   branchChoices.push(detail.route);
   const old=notes;chart=rebuildTjaBranches(chart,branchChoices);
   const prior=new Map(old.filter(n=>n.time<e.time).map(n=>[n.time+':'+n.type,n]));
@@ -260,7 +281,7 @@ function drawBranchDetails(t,opacity){
  const names={N:'普通',E:'玄人',M:'達人'},unit=e.kind==='p'?'%':e.kind==='r'?'打':'点';
  ctx.save();ctx.globalAlpha=opacity;ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillStyle='#fff';ctx.font='700 12px sans-serif';
  const max=e.kind==='p'?100:Infinity,routeAt=v=>v>=e.high?'M':v>=e.low?'E':'N',forced=routeAt(0)===routeAt(max);
- const text=d.forced?'分岐先固定 → '+names[d.route]:forced?'強制分岐 → '+names[routeAt(0)]: (e.kind==='p'?'精度':e.kind==='r'?'連打':'スコア')+' '+d.value.toFixed(e.kind==='p'?1:0)+unit+' / '+(e.low>=e.high?'達人 '+e.high+unit+'以上':'玄人 '+e.low+'・達人 '+e.high)+' → '+names[d.route]+(d.locked?'（固定）':'');
+ const randomNames=d.available.map(r=>names[r]).join(' / ');const text=d.locked?'LEVELHOLD → '+names[d.route]+'固定':d.random?'ランダム → '+randomNames:d.forced?(chart?._branchForce&&chart._branchForce!=='random'?'分岐先固定 → ':'強制分岐 → ')+names[d.route]:forced?'強制分岐 → '+names[routeAt(0)]: (e.kind==='p'?'精度':e.kind==='r'?'連打':'スコア')+' '+d.value.toFixed(e.kind==='p'?1:0)+unit+' / '+(e.low>=e.high?'達人 '+e.high+unit+'以上':'玄人 '+e.low+'・達人 '+e.high)+' → '+names[d.route];
  ctx.fillText(text,width-12,height-6);ctx.restore();
 }
 

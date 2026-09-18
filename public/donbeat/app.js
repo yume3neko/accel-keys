@@ -30,7 +30,7 @@ function togglePause(){if(state==='playing'){pausedTime=time();state='paused';st
 function unlock(){['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=false);}
 function update(){$('score').textContent=String(score).padStart(7,'0');$('combo').textContent=combo;$('good').textContent=good;$('ok').textContent=ok;$('miss').textContent=miss;$('roll').textContent=rolls;$('gauge').style.width=soul+'%';$('gaugeText').textContent=Math.floor(soul)+'%';updateDanHUD()}
 function judgmentWindows(){const level=Number(chart?.meta?.LEVEL);return Number.isFinite(level)&&level>0&&level<=5?{good:.041708,ok:.108442,miss:.125125}:{good:.025025,ok:.075075,miss:.108442}}
-function judgeCore(n,error){notifyDanJudgment(error);n.done=true;const total=chart.notes.filter(n=>n.type<=4).length;if(error<=judgmentWindows().good){good++;score+=Math.floor(1000000/Math.max(1,total)/10)*10;soul=Math.min(100,soul+130/soulNoteCount());feedback='良'}else if(error<=judgmentWindows().ok){ok++;score+=Math.floor(1000000/Math.max(1,total)/2/10)*10;soul=Math.min(100,soul+65/soulNoteCount());feedback='可'}else{miss++;combo=0;soul=Math.max(0,soul-260/soulNoteCount());feedback='不可';feedbackAt=time();update();return}combo++;maxCombo=Math.max(combo,maxCombo);feedbackAt=time();update()}
+function judgeCore(n,error){notifyDanJudgment(error);n.done=true;const total=branchReferenceNoteCount(chart);if(error<=judgmentWindows().good){good++;score+=Math.floor(1000000/Math.max(1,total)/10)*10;soul=Math.min(100,soul+130/soulNoteCount());feedback='良'}else if(error<=judgmentWindows().ok){ok++;score+=Math.floor(1000000/Math.max(1,total)/2/10)*10;soul=Math.min(100,soul+65/soulNoteCount());feedback='可'}else{miss++;combo=0;soul=Math.max(0,soul-260/soulNoteCount());feedback='不可';feedbackAt=time();update();return}combo++;maxCombo=Math.max(combo,maxCombo);feedbackAt=time();update()}
 // Auto balloon ceiling for this game: 60 hits/sec, independent of display refresh rate.
 const AUTO_BALLOON_MAX_HZ=60;
 function autoBalloonHits(n,t){
@@ -121,7 +121,7 @@ $('files').onchange=e=>loadFiles(e.target.files);$('folder').onchange=e=>loadFil
 
 async function decodeDanText(file){const bytes=await file.arrayBuffer();try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{return new TextDecoder('shift-jis').decode(bytes)}}
 
-function soulNoteCount(){return Math.max(1,danRun?danRun.config.songs.reduce((sum,e)=>sum+e.chart.notes.filter(n=>n.type<=4).length,0):chart.notes.filter(n=>n.type<=4).length)}
+function soulNoteCount(){return Math.max(1,danRun?danRun.config.songs.reduce((sum,e)=>sum+branchReferenceNoteCount(e.chart),0):branchReferenceNoteCount(chart))}
 
 function applyVolumes(){const music=Number($('musicVolume').value||0),effects=Number($('effectVolume').value||0);if(musicGain)musicGain.gain.value=music/100;if(effectGain)effectGain.gain.value=effects/100;$('musicVolumeValue').textContent=music+'%';$('effectVolumeValue').textContent=effects+'%';}
 $('musicVolume').oninput=applyVolumes;$('effectVolume').oninput=applyVolumes;
@@ -366,7 +366,7 @@ function renderSongSelection(){
    select.onchange=async()=>{if(loading||importing)return;$('course').value=select.value;const pending=choose();renderSongSelection();await pending};
    label.append(select);panel.append(label,featureBadges([c]));
    const info=document.createElement('p'),duration=Math.max(0,c.duration||0,c===chart?audioBuffer?.duration||0:0);
-   info.textContent=c.bpm+' BPM ／ '+Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0')+' ／ '+c.notes.filter(n=>n.type<=4).length+' ノーツ';panel.append(info);
+   info.textContent=c.bpm+' BPM ／ '+Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0')+' ／ '+branchReferenceNoteCount(c)+' ノーツ';panel.append(info);
    if(c.meta.SUBTITLE){const sub=document.createElement('p');sub.textContent=c.meta.SUBTITLE.replace(/^(--|\+\+)/,'');panel.append(sub)}
    const status=document.createElement('p');status.className='muted';status.textContent=loading?'音源を読み込み中…':demoMode?'練習曲':audioBuffer?'演奏できます':'音源を追加してください';panel.append(status);
    const actions=document.createElement('div');actions.className='song-choice-actions';

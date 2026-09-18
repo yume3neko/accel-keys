@@ -9,7 +9,7 @@ function practicePlan(chart,target,automatic){
 let seekTarget=0;
 function openSeek(){
  if(loading||importing||danRun||state==='playing'||state==='paused'||(!demoMode&&!audioBuffer))return;
- const input=$('seekSeconds');input.min=Math.min(0,chart.measures?.[0]?.time||0);input.max=Math.max(Number(input.min),chart.duration-.001);
+ const input=$('seekSeconds');input.min=Math.min(0,chart.measures?.[0]?.time||0);input.max=Math.max(Number(input.min),(chart.features?.hbscroll&&Number.isFinite(chart._hbAudioEnd)?chart._hbAudioEnd:chart.duration)-.001);
  seekTarget=Math.max(Number(input.min),Math.min(Number(input.max),seekTarget));input.value=seekTarget.toFixed(2);$('seekError').textContent='';
  $('seekHint').textContent=false?'オート：指定位置までの通常音符を全良として集計して開始します。':'手動：2小節前から助走し、コンボ0で開始。オート：指定位置まで全良として開始します。';
  $('seekDialog').showModal();renderSeek();locateSeek();

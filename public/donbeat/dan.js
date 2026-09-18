@@ -2,7 +2,7 @@
 const danPool=[],danMetrics={ok:{label:'可',direction:'max'},miss:{label:'不可',direction:'max'},good:{label:'良',direction:'min'},rolls:{label:'連打',direction:'min'},score:{label:'スコア',direction:'min'},allcombo:{label:'たたけた数',direction:'min'},maxCombo:{label:'最大コンボ',direction:'min'}};
 let danRun=null,danTimer=null,danNextId=1;
 function danNode(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n}
-function rememberDanCharts(){for(const c of charts){const old=danPool.findIndex(e=>c.sourcePath&&e.chart.sourcePath===c.sourcePath&&e.chart.meta.COURSE===c.meta.COURSE&&e.chart!==c);if(old>=0)danPool.splice(old,1);if(!danPool.some(e=>e.chart===c))danPool.push({id:String(danNextId++),chart:c,demo:demoMode})}if($('danDialog').open)refreshDanSongs()}
+function rememberDanCharts(){for(const c of charts){const old=danPool.findIndex(e=>c.sourcePath&&e.chart.sourcePath===c.sourcePath&&e.chart.meta.COURSE===c.meta.COURSE&&e.chart!==c);if(old>=0)danPool.splice(old,1);const demo=!!c.builtinDemo,entry=danPool.find(e=>e.chart===c);if(entry)entry.demo=demo;else danPool.push({id:String(danNextId++),chart:c,demo})}if($('danDialog').open)refreshDanSongs()}
 function danSongLabel(entry){const c=entry.chart;return (c.meta.TITLE||'無題')+' / '+(names[c.meta.COURSE]||c.meta.COURSE||'おに')+(entry.demo?'（練習曲）':c.audioFile?'':'（音源未選択）')}
 let pendingDan=null;
 function danPreviewTitle(c){if(!c)return '？？？';const title=(c.meta.TITLE||'').normalize('NFC').trim(),file=(c.importName||c.sourcePath||'').split('/').pop().replace(/\.[^.]+$/,'').normalize('NFC').trim();return title&&title===file?title:'？？？'}

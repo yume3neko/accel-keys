@@ -64,7 +64,7 @@ function resolveDanConfig(preview=false,onlyIndex=null){
  if(!matches.length)matches=danPool.filter(e=>(e.chart.meta.TITLE||'').normalize('NFC')===song.chart.normalize('NFC'));
  if(song.course!==undefined){const courses={easy:0,normal:1,hard:2,oni:3,edit:4};matches=matches.filter(e=>{if(/\.mc$/i.test(e.chart.sourcePath||''))return false;const course=String(e.chart.meta.COURSE||'Oni').trim().toLowerCase();return (Object.hasOwn(courses,course)?courses[course]:/^[0-4]$/.test(course)?Number(course):-1)===song.course});}
  if(matches.length!==1)throw Error((i+1)+'曲目：'+danPendingTitle(song,i)+(matches.length?' が複数あります。難易度番号や譜面の相対パスで特定してください。':' に一致する譜面・難易度がありません。指定を確認して譜面を追加してください。'));
- if(!preview&&!matches[0].chart.audioFile)throw Error((i+1)+'曲目の音源 '+(matches[0].chart.meta.WAVE||'')+' が未読込です。');return matches[0];});
+ if(!preview&&!matches[0].chart.audioFile)throw Error((i+1)+'曲目の音源 '+(matches[0].chart.meta.WAVE||'')+' が未読込です。');return {...matches[0],demo:!!matches[0].chart.builtinDemo};});
  return {...c,songs:selected.filter(Boolean),auto:false};
 }
 async function tryStartPendingDan(){if(!pendingDan||!pendingDan.armed||danRun)return;refreshDanSongs();} 

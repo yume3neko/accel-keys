@@ -438,10 +438,67 @@ body { background: #000; overflow: hidden; display: flex; justify-content: cente
     z-index: 10;
     pointer-events: none;
 }
+
+/* ===== 2026 visual refresh ===== */
+:root { color-scheme: dark; --cyan:#65f6ff; --violet:#a970ff; --pink:#ff5ca8; --panel:rgba(8,14,34,.78); }
+body {
+    background:
+        radial-gradient(circle at 50% 110%, rgba(85,52,180,.38), transparent 45%),
+        linear-gradient(160deg, #030612 0%, #081226 55%, #12091e 100%);
+    font-family: Inter, "Noto Sans JP", system-ui, sans-serif;
+}
+#gameCanvas { background:#050916; border-inline:1px solid rgba(101,246,255,.18); box-shadow:0 0 80px rgba(58,98,255,.2); }
+#ui, #bossUI {
+    top:max(10px, env(safe-area-inset-top));
+    padding:10px 12px; border:1px solid rgba(255,255,255,.12); border-radius:14px;
+    background:var(--panel); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    box-shadow:0 10px 35px rgba(0,0,0,.28); line-height:1.45;
+}
+#ui { left:max(10px, env(safe-area-inset-left)); }
+#bossUI { right:max(10px, env(safe-area-inset-right)); }
+#bossHpBar { width:min(42vw,250px); height:10px; overflow:hidden; border-radius:999px; }
+#bossHpFill { border-radius:999px; }
+#startScreen, #difficultyScreen, #practiceScreen, #pauseMenu, #gameOver, #resultScreen {
+    width:min(92vw,440px); max-height:92dvh; overflow:auto; padding:28px 24px;
+    border:1px solid rgba(101,246,255,.38); border-radius:24px;
+    background:linear-gradient(145deg,rgba(11,19,45,.96),rgba(18,8,35,.94));
+    box-shadow:0 24px 80px rgba(0,0,0,.55), inset 0 1px rgba(255,255,255,.08);
+    backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+}
+#startScreen h1 { font-size:clamp(28px,8vw,42px); letter-spacing:.08em; margin-bottom:8px; }
+#startScreen .subtitle { color:#9aa9c8; font-size:11px; letter-spacing:.22em; margin-bottom:22px; }
+#startScreen .controlCard { margin:14px 0 18px; padding:13px; border-radius:14px; background:rgba(255,255,255,.045); }
+#startScreen button, #difficultyScreen button, #practiceScreen button, #pauseMenu button, #gameOver button, #resultScreen button {
+    border-radius:12px; min-height:46px; font-weight:700; letter-spacing:.04em;
+}
+.difficultyGrid { gap:10px; }
+.difficultyBtn { border-width:1px; border-radius:14px; background:rgba(255,255,255,.035); }
+.difficultyBtn .diffDesc { line-height:1.45; }
+#pauseBtn { bottom:max(14px, env(safe-area-inset-bottom)); left:max(14px, env(safe-area-inset-left)); border-radius:50%; }
+#bombBtn {
+    position:absolute; right:max(14px,env(safe-area-inset-right)); bottom:max(14px,env(safe-area-inset-bottom));
+    width:68px; height:68px; display:none; place-items:center; z-index:40; pointer-events:all;
+    border:1px solid rgba(255,170,0,.9); border-radius:50%; color:#ffe19a;
+    background:radial-gradient(circle,rgba(255,139,31,.42),rgba(68,17,45,.9));
+    box-shadow:0 0 0 5px rgba(255,170,0,.09),0 8px 28px rgba(0,0,0,.4); font:800 11px/1 system-ui;
+}
+#bombBtn:active { transform:scale(.92); filter:brightness(1.35); }
+#dangerMeter { position:absolute; left:50%; bottom:max(18px,env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:9;
+    width:min(42vw,190px); height:6px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; pointer-events:none; display:none; }
+#dangerFill { height:100%; width:0; border-radius:inherit; background:linear-gradient(90deg,#65f6ff,#ffcc57,#ff456f); transition:width .12s; }
+@media (max-width:520px) {
+    #ui { font-size:11px; padding:8px 9px; }
+    #bossUI { font-size:11px; padding:8px 9px; }
+    #bossName { max-width:42vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #difficultyDisplay { top:auto; bottom:max(92px,calc(env(safe-area-inset-bottom) + 86px)); }
+    #startScreen, #difficultyScreen, #practiceScreen { padding:22px 16px; }
+}
 </style>
 </head>
 <body>
 <canvas id="gameCanvas"></canvas>
+<button id="bombBtn" type="button" aria-label="ボムを使う">BOMB</button>
+<div id="dangerMeter"><div id="dangerFill"></div></div>
 <!-- ポーズボタン -->
 <button id="pauseBtn" onclick="togglePause()">⏸</button>
 
@@ -459,27 +516,27 @@ body { background: #000; overflow: hidden; display: flex; justify-content: cente
     <div class="difficultyGrid">
         <button class="difficultyBtn easy" onclick="selectDifficulty('EASY')">
             <span class="diffName">EASY</span>
-            <span class="diffDesc">HP7 / BOMB10 / 弾速0.4倍 / 判定0.5倍 / スペル4まで</span>
+            <span class="diffDesc">入門向け・広い安全地帯 / スペル4まで</span>
         </button>
         <button class="difficultyBtn normal" onclick="selectDifficulty('NORMAL')">
             <span class="diffName">NORMAL</span>
-            <span class="diffDesc">HP5 / BOMB7 / 弾速0.5倍 / 判定0.6倍 / スペル4まで</span>
+            <span class="diffDesc">標準的な密度と弾速 / スペル4まで</span>
         </button>
         <button class="difficultyBtn hard" onclick="selectDifficulty('HARD')">
             <span class="diffName">HARD</span>
-            <span class="diffDesc">HP4 / BOMB5 / 弾速0.7倍 / 判定0.8倍 / スペル6まで</span>
+            <span class="diffDesc">弾幕らしい読み合い / スペル6まで</span>
         </button>
         <button class="difficultyBtn extra" onclick="selectDifficulty('EXTRA')">
             <span class="diffName">EXTRA</span>
-            <span class="diffDesc">HP3 / BOMB4 / 弾速1.0倍 / 判定1.0倍 / スペル8まで</span>
+            <span class="diffDesc">高密度・上級者向け / スペル8まで</span>
         </button>
         <button class="difficultyBtn lunatic" onclick="selectDifficulty('LUNATIC')">
             <span class="diffName">LUNATIC</span>
-            <span class="diffDesc">HP3 / BOMB3 / 弾速1.0倍 / 判定1.0倍 / スペル10まで</span>
+            <span class="diffDesc">全スペル解放・最高難度</span>
         </button>
         <button class="difficultyBtn lunaticextra" onclick="selectDifficulty('LUNATICEXTRA')">
             <span class="diffName">LUNATIC EXTRA</span>
-            <span class="diffDesc">HP2 / BOMB2 / 弾速1.25倍 / 判定1.0倍 / スペル10まで</span>
+            <span class="diffDesc">独自弾幕を含む極限モード</span>
         </button>
     </div>
     <button id="diffBackBtn" onclick="backToTitleFromDifficulty()">◀ タイトルに戻る</button>
@@ -549,12 +606,13 @@ body { background: #000; overflow: hidden; display: flex; justify-content: cente
 <div id="watchModeIndicator">鑑賞モード</div>
 <div id="difficultyDisplay"></div>
 <div id="startScreen">
-    <h1>弾幕シューティング</h1>
-    <p><span class="highlight">1本指でタッチ</span>：移動+自動射撃</p>
-    <p><span class="highlight">2本指でタッチ</span>：ボム発動</p>
-    <p>HP最大5 / BOMB最大6</p>
-    <p>被弾でBOMB=3, 全敵弾削除</p>
-    <p>敵40体撃破でボス戦開始！</p>
+    <h1>STELLAR VEIL</h1>
+    <p class="subtitle">BULLET HELL SHOOTER</p>
+    <div class="controlCard">
+        <p><span class="highlight">ドラッグ</span>：移動＋自動射撃</p>
+        <p><span class="highlight">BOMBボタン / 2本指</span>：緊急回避</p>
+        <p>弾の輪郭ではなく、自機中央の白い点が当たり判定です</p>
+    </div>
     <button id="startBtn" onclick="startGame()">START</button>
     <button id="watchModeBtn" onclick="startWatchMode()">鑑賞モード 👁</button>
     <button id="practiceMenuBtn" onclick="openPracticeScreen()">練習モード ▶</button>
@@ -592,18 +650,18 @@ window.addEventListener('resize', resizeCanvas);
 
 // ========== 難易度設定 ==========
 const DIFFICULTY = {
-    EASY:         { name: 'EASY',         hp: 7, heal: 3, bomb: 10, rate: 0.40, hit: 0.50, graze: 4, bossHp: 0.50, time: 0.40, maxSpell: 4, color: '#00ff88',
-        stage: { spawnInterval: 90, maxEnemies: 4, totalEnemies: 25, enemySpeed: 0.7, bulletSpeed: 0.7, shootInterval: 130 } },
-    NORMAL:       { name: 'NORMAL',       hp: 5, heal: 3, bomb: 7,  rate: 0.50, hit: 0.60, graze: 2, bossHp: 0.75, time: 0.65, maxSpell: 4, color: '#00ccff',
-        stage: { spawnInterval: 80, maxEnemies: 5, totalEnemies: 30, enemySpeed: 0.85, bulletSpeed: 0.85, shootInterval: 110 } },
-    HARD:         { name: 'HARD',         hp: 4, heal: 2, bomb: 5,  rate: 0.70, hit: 0.80, graze: 1, bossHp: 0.90, time: 0.80, maxSpell: 6, color: '#ffaa00',
-        stage: { spawnInterval: 65, maxEnemies: 5, totalEnemies: 35, enemySpeed: 1.0, bulletSpeed: 1.0, shootInterval: 95 } },
-    EXTRA:        { name: 'EXTRA',        hp: 3, heal: 1, bomb: 4,  rate: 1.00, hit: 1.00, graze: 0, bossHp: 1.00, time: 1.00, maxSpell: 8, color: '#ff00ff',
-        stage: { spawnInterval: 55, maxEnemies: 6, totalEnemies: 40, enemySpeed: 1.1, bulletSpeed: 1.0, shootInterval: 90 } },
-    LUNATIC:      { name: 'LUNATIC',      hp: 3, heal: 0, bomb: 3,  rate: 1.00, hit: 1.00, graze: 0, bossHp: 1.00, time: 1.00, maxSpell: 10, color: '#ff0000',
-        stage: { spawnInterval: 45, maxEnemies: 6, totalEnemies: 45, enemySpeed: 1.2, bulletSpeed: 1.1, shootInterval: 80 } },
-    LUNATICEXTRA: { name: 'LUNATIC EXTRA', hp: 3, heal: 0, bomb: 3,  rate: 1.00, hit: 1.00, graze: 0, bossHp: 1.00, time: 1.00, maxSpell: 10, color: '#ff0044',
-        stage: { spawnInterval: 40, maxEnemies: 7, totalEnemies: 50, enemySpeed: 1.3, bulletSpeed: 1.2, shootInterval: 70 } }
+    EASY:         { name: 'EASY',         hp: 7, heal: 3, bomb: 8, rate: 0.55, hit: 0.62, graze: 3, bossHp: 0.62, time: 0.65, maxSpell: 4, color: '#00ff88', bulletCap: 260,
+        stage: { spawnInterval: 82, maxEnemies: 4, totalEnemies: 24, enemySpeed: 0.72, bulletSpeed: 0.68, shootInterval: 125 } },
+    NORMAL:       { name: 'NORMAL',       hp: 5, heal: 2, bomb: 6, rate: 0.68, hit: 0.72, graze: 2, bossHp: 0.78, time: 0.78, maxSpell: 4, color: '#00ccff', bulletCap: 360,
+        stage: { spawnInterval: 72, maxEnemies: 5, totalEnemies: 30, enemySpeed: 0.86, bulletSpeed: 0.82, shootInterval: 108 } },
+    HARD:         { name: 'HARD',         hp: 4, heal: 1, bomb: 5, rate: 0.82, hit: 0.86, graze: 1, bossHp: 0.92, time: 0.90, maxSpell: 6, color: '#ffaa00', bulletCap: 480,
+        stage: { spawnInterval: 62, maxEnemies: 5, totalEnemies: 35, enemySpeed: 1.0, bulletSpeed: 0.96, shootInterval: 94 } },
+    EXTRA:        { name: 'EXTRA',        hp: 4, heal: 1, bomb: 4, rate: 0.94, hit: 0.96, graze: 0, bossHp: 1.00, time: 1.00, maxSpell: 8, color: '#ff00ff', bulletCap: 620,
+        stage: { spawnInterval: 54, maxEnemies: 6, totalEnemies: 40, enemySpeed: 1.08, bulletSpeed: 1.0, shootInterval: 88 } },
+    LUNATIC:      { name: 'LUNATIC',      hp: 3, heal: 0, bomb: 3, rate: 1.04, hit: 1.00, graze: 0, bossHp: 1.05, time: 1.05, maxSpell: 10, color: '#ff335e', bulletCap: 760,
+        stage: { spawnInterval: 47, maxEnemies: 6, totalEnemies: 44, enemySpeed: 1.16, bulletSpeed: 1.08, shootInterval: 80 } },
+    LUNATICEXTRA: { name: 'LUNATIC EXTRA', hp: 3, heal: 0, bomb: 3, rate: 1.12, hit: 1.00, graze: 0, bossHp: 1.10, time: 1.10, maxSpell: 10, color: '#ff0044', bulletCap: 900,
+        stage: { spawnInterval: 42, maxEnemies: 7, totalEnemies: 48, enemySpeed: 1.24, bulletSpeed: 1.15, shootInterval: 74 } }
 };
 
 let currentDifficulty = 'EXTRA';
@@ -669,6 +727,7 @@ let spell8PartStart = { score: 0, hits: 0, bombs: 0 };
 
 // 被弾時敵弾一括削除フラグ
 let clearEnemyBulletsOnHit = false;
+let stageGraceFrames = 0;
 
 // プレイヤー死亡演出
 let playerDying = false;
@@ -837,6 +896,10 @@ canvas.addEventListener('mousemove', (e) => {
 });
 canvas.addEventListener('mouseup', () => { if (isWatchMode) return; isTouching = false; isShooting = false; touches = []; });
 canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); if (!isWatchMode) triggerBomb(); });
+const bombButton = document.getElementById('bombBtn');
+['pointerdown', 'touchstart'].forEach(type => bombButton.addEventListener(type, (e) => {
+    e.preventDefault(); e.stopPropagation(); triggerBomb();
+}, { passive: false }));
 
 // ========== ユーティリティ関数 ==========
 function getElement(id) { return document.getElementById(id); }
@@ -930,6 +993,15 @@ function updateUI() {
     } else {
         diffDisp.style.display = 'none';
     }
+    const bombBtn = getElement('bombBtn');
+    if (bombBtn) {
+        bombBtn.style.display = gameState === 'playing' && !isWatchMode ? 'grid' : 'none';
+        bombBtn.textContent = singlePhaseMode ? 'BOMB ∞' : `BOMB ${player.bomb}`;
+        bombBtn.disabled = bombCooldown > 0 || (!singlePhaseMode && player.bomb <= 0);
+        bombBtn.style.opacity = bombBtn.disabled ? '.42' : '1';
+    }
+    const dangerMeter = getElement('dangerMeter');
+    if (dangerMeter && gameState !== 'playing') dangerMeter.style.display = 'none';
 }
 
 function getDamageMultiplier() {
@@ -1124,6 +1196,7 @@ function spawnEnemy() {
 }
 
 function enemyShoot(enemy) {
+    if (stageGraceFrames > 0) return;
     enemy.shootTimer++;
     if (enemy.shootTimer < enemy.shootInterval) return;
     enemy.shootTimer = 0;
@@ -2390,6 +2463,7 @@ if (gameState === 'dying') {
     }
     if (gameState !== 'playing') return;
     frame++;
+    if (stageGraceFrames > 0) stageGraceFrames--;
     
     player.grazeLevel = getGrazeLevel();
     if (bombCooldown > 0) bombCooldown--;
@@ -2423,10 +2497,11 @@ if (gameState === 'dying') {
         if (bullet.y < -20) return false;
         let hit = false;
         enemies.forEach(enemy => {
-            if (Math.abs(bullet.x - enemy.x) < (bullet.width / 2 + enemy.width / 2) && Math.abs(bullet.y - enemy.y) < (bullet.height / 2 + enemy.height / 2)) {
+            if (!enemy.dead && enemy.hp > 0 && Math.abs(bullet.x - enemy.x) < (bullet.width / 2 + enemy.width / 2) && Math.abs(bullet.y - enemy.y) < (bullet.height / 2 + enemy.height / 2)) {
                 enemy.hp -= bullet.damage;
                 hit = true; createExplosion(bullet.x, bullet.y, bullet.color, 3);
                 if (enemy.hp <= 0) {
+                    enemy.dead = true;
                     score += 100; enemiesDefeated++;
                     createExplosion(enemy.x, enemy.y, enemy.color, 25);
                     if (enemiesDefeated >= getDiff().stage.totalEnemies && gamePhase === 'stage') { enemies = []; enemyBullets = []; spawnBoss(); }
@@ -2458,9 +2533,10 @@ if (gameState === 'dying') {
         if (h.x < -20 || h.x > canvas.width + 20 || h.y < -20 || h.y > canvas.height + 20) return false;
         let hit = false;
         enemies.forEach(enemy => {
-            if (Math.hypot(h.x - enemy.x, h.y - enemy.y) < enemy.width / 2 + h.radius) {
+            if (!enemy.dead && enemy.hp > 0 && Math.hypot(h.x - enemy.x, h.y - enemy.y) < enemy.width / 2 + h.radius) {
                 enemy.hp -= h.damage; hit = true; createExplosion(h.x, h.y, h.color, 5);
                 if (enemy.hp <= 0) {
+                    enemy.dead = true;
                     score += 100; enemiesDefeated++; createExplosion(enemy.x, enemy.y, enemy.color, 25);
                     if (enemiesDefeated >= getDiff().stage.totalEnemies && gamePhase === 'stage') { enemies = []; enemyBullets = []; spawnBoss(); }
                     if (enemiesDefeated >= Math.floor(getDiff().stage.totalEnemies * 0.6) && gamePhase === 'stage2') { enemies = []; enemyBullets = []; spawnBossAfterStage2(); }
@@ -2503,12 +2579,25 @@ if (gameState === 'dying') {
         if (bullet.x < -50 || bullet.x > canvas.width + 50 || bullet.y < -50 || bullet.y > canvas.height + 50) return false;
         if (player.invincible <= 0) {
             const dist = Math.hypot(bullet.x - player.x, bullet.y - player.y);
-            if (dist < 25 && dist > hitR) { player.grazeCount++; score++; }
+            if (dist < 25 && dist > hitR && !bullet.grazed) {
+                bullet.grazed = true;
+                player.grazeCount++;
+                score += 5;
+            }
             if (dist < hitR) { playerHit(); return false; }
         }
         return true;
     });
     if (pendingBullets.length) enemyBullets.push(...pendingBullets);
+    const bulletCap = getDiff().bulletCap || 700;
+    if (enemyBullets.length > bulletCap) enemyBullets.splice(0, enemyBullets.length - bulletCap);
+
+    const danger = getElement('dangerMeter');
+    const dangerFill = getElement('dangerFill');
+    if (danger && dangerFill) {
+        danger.style.display = gameState === 'playing' ? 'block' : 'none';
+        dangerFill.style.width = Math.min(100, enemyBullets.length / bulletCap * 100) + '%';
+    }
     
     particles = particles.filter(p => { p.update(); return p.particles.length > 0; });
     
@@ -3188,7 +3277,7 @@ function resetGame() {
     traceLog('resetGame() called');
     resizeCanvas();
     const d = getDiff();
-    score = 0; frame = 0; gamePhase = 'stage';
+    score = 0; frame = 0; gamePhase = 'stage'; stageGraceFrames = 120;
     player.x = canvas.width / 2; player.y = canvas.height - 100;
     if (singlePhaseMode) {
         player.life = 99; player.maxLife = 99;

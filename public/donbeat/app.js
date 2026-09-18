@@ -238,7 +238,7 @@ function updateBranchRoute(){
   notes=chart.notes.map(n=>prior.get(n.time+':'+n.type)||({...n,done:false,hits:0,ghost:false}));
   if(branchRank(fromRoute)!==branchRank(detail.route)){
    const selectedEvent=chart.branchEvents?.[index]||e,window=branchTransitionWindow(selectedEvent);
-   branchTransitions.push({start:judgeAt,end:window.end,from:fromRoute,to:detail.route,direction:branchRank(detail.route)>branchRank(fromRoute)?'down':'up'});
+   branchTransitions.push({start:window.start,end:window.end,from:fromRoute,to:detail.route,direction:branchRank(detail.route)>branchRank(fromRoute)?'down':'up'});
   }
  }
 }

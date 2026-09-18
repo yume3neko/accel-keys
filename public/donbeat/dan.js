@@ -13,7 +13,7 @@ function refreshDanSongs(){
  const c=pendingDan.config;box.append(danNode('h3',c.name));
  let totalCharts;try{totalCharts=resolveDanConfig(true).songs.map(e=>e.chart)}catch{}
  if(totalCharts){
- const count=totalCharts.reduce((sum,c)=>sum+c.notes.filter(n=>n.type<=4).length,0);
+ const count=totalCharts.reduce((sum,c)=>sum+branchReferenceNoteCount(c),0);
  const seconds=Math.ceil(totalCharts.reduce((sum,c)=>{const first=c.notes[0]?.time||0,lead=Math.min(0,first-4);let end=Math.max(0,c.duration||0);for(const n of c.notes)end=Math.max(end,(n.end??n.time)+.126);return sum+Math.max(end,c.preloadedAudio?.duration||0)-lead},0)+Math.max(0,totalCharts.length-1)*3);
  const duration=(seconds>=3600?Math.floor(seconds/3600)+'時間':'')+Math.floor(seconds%3600/60)+'分'+String(seconds%60).padStart(2,'0')+'秒';
  box.append(danNode('p','合計演奏時間（目安）：'+duration+'　／　合計ノーツ数：'+count.toLocaleString(),'dan-preview-totals'));
@@ -78,7 +78,7 @@ function danPossibleStats(songOnly){
  const current=danSongStats(),possible={...(songOnly?current:danStats())};let remaining=0;
  const t=time()-Number($('offset').value||0)/1000;
  const groups=[{chart,notes,current:true}];if(!songOnly)for(let i=danRun.index+1;i<danRun.config.songs.length;i++)groups.push({chart:danRun.config.songs[i].chart,notes:danRun.config.songs[i].chart.notes,current:false});
- for(const group of groups){const normalCount=group.chart.notes.filter(n=>n.type<=4).length,noteScore=Math.floor(1000000/Math.max(1,normalCount)/10)*10;
+ for(const group of groups){const normalCount=group.chart.notes.filter(n=>n.type<=4).length,noteScore=Math.floor(1000000/Math.max(1,branchReferenceNoteCount(group.chart))/10)*10;
   for(const n of group.notes){if(group.current&&n.done)continue;if(n.type===9){if(!danRun.config.auto)possible.miss++;continue;}if(n.type<=4){remaining++;possible.good++;possible.ok++;possible.miss++;possible.allcombo++;possible.score+=noteScore;continue}
    if(group.current&&n.end<t)continue;const hits=group.current?n.hits||0:0;let extra;
    if(danRun.config.auto)extra=Math.max(0,autoRollHits(n,n.end)-hits);
@@ -89,7 +89,7 @@ function danPossibleStats(songOnly){
  }
  possible.maxCombo=Math.max(possible.maxCombo,(songOnly?danRun.songCombo:combo)+remaining);return possible;
 }
-function danUnplayedMaximum(c){const normal=c.notes.filter(n=>n.type<=4).length,result={good:normal,ok:0,miss:0,maxCombo:normal,rolls:0,score:normal*Math.floor(1000000/Math.max(1,normal)/10)*10};for(const n of c.notes){if(n.type<5||n.type>7)continue;const hits=danRun.config.auto?autoRollHits(n,n.end):n.type===7?n.required:Infinity;result.rolls+=hits;result.score+=hits*100;if(n.type===7&&hits>=n.required)result.score+=5000}result.ok=normal;result.miss=normal+(danRun.config.auto?0:c.notes.filter(n=>n.type===9).length);result.allcombo=normal+result.rolls;return result}
+function danUnplayedMaximum(c){const normal=c.notes.filter(n=>n.type<=4).length,scoreBase=branchReferenceNoteCount(c),result={good:normal,ok:0,miss:0,maxCombo:normal,rolls:0,score:normal*Math.floor(1000000/Math.max(1,scoreBase)/10)*10};for(const n of c.notes){if(n.type<5||n.type>7)continue;const hits=danRun.config.auto?autoRollHits(n,n.end):n.type===7?n.required:Infinity;result.rolls+=hits;result.score+=hits*100;if(n.type===7&&hits>=n.required)result.score+=5000}result.ok=normal;result.miss=normal+(danRun.config.auto?0:c.notes.filter(n=>n.type===9).length);result.allcombo=normal+result.rolls;return result}
 function danCurrentFailed(){
  if(!danRun)return false;if(danRun.failed||danExceededMaximum())return true;
  const whole=danPossibleStats(false),current=danPossibleStats(true);

@@ -17,7 +17,7 @@ async function start(options={}){
  try{if(!options.seamless||audio().state==='suspended')await audio().resume();if(!options.seamless)await waitForLandscape()}catch(e){loading=false;$('status').textContent='音声を開始できません。もう一度お試しください。';return}loading=false;
  cancelAnimationFrame(raf);stopAudio();auto=danRun?danRun.config.auto:Boolean(options.auto);
  practiceTarget=Number.isFinite(options.target)?options.target:null;judgeFrom=practiceTarget??-Infinity;
- if(chart._tja){chart=rebuildTjaBranches(chart,[])}branchChoices=[];branchScoreLog=[];branchRollLog=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
+ if(chart._tja){chart=rebuildTjaBranches(chart,[])}branchChoices=[];branchScoreLog=[];branchRollLog=[];branchTransitions=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
  const plan=practiceTarget===null?null:practicePlan(chart,practiceTarget,auto);
  pausedTime=plan?plan.lead:Math.min(0,(notes[0]?.time||0)-4);
  // Manual pre-roll is visible but excluded from every judgment and score path.
@@ -65,7 +65,7 @@ function finish(){if(danRun){finishDanSong();return}pausedTime=time();state='res
 function loop(){updateBranchRoute();const t=time(),adjust=Number($('offset').value||0)/1000;updateDummyPlayback(t-adjust);for(const n of notes){if(n.done)continue;if(n.type===9){if(t-adjust>n.time+judgmentWindows().miss)n.done=true;continue}if(n.ghost){if(t>(n.end??n.time)+.15)n.done=true;continue}if(n.type<=4){if(auto&&t>=n.time+adjust){pulseAutoPad(n.type===1||n.type===3?1:2,n.type===3||n.type===4);tone(n.type===1||n.type===3?1:2);judge(n,0)}else if(t-adjust>n.time+judgmentWindows().miss)judge(n,1)}else if(auto){const count=autoRollHits(n,t-adjust)-n.hits;if(count>0){addRollHits(n,count);pulseAutoPad(n.type===7?1:n.hits%2+1);tone(n.type===7?1:n.hits%2+1)}}}if(danRun&&!danRun.failed&&danCurrentFailed()){danRun.failed=true;updateDanHUD()}$('status').textContent=danRun?.failed?'不合格確定 · この曲の終了まで演奏できます':!auto&&t-adjust<judgeFrom?'助走中 · 判定なし → '+judgeFrom.toFixed(2)+'秒から':auto?'オートプレイ中':practiceTarget===null?'演奏中':'途中から演奏中';draw();if(t>songDuration()){finish();return}raf=requestAnimationFrame(loop)}
 function resize(){const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);width=r.width;height=r.height;canvas.width=width*dpr;canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
 function isGogoTime(c,t){const events=c.gogoEvents||[];let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<=t)lo=mid+1;else hi=mid}return lo>0&&events[lo-1].active;}
-function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const t=time(),fade=applyChartFade(t),y=height*.5,target=width<600?76:125,speed=Number($('speed').value),r=Math.min(26,height*.19);updateVisualBpm(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.clearRect(0,0,width,height);ctx.fillStyle=chart.videoFile?'#171b2044':'#171b20';ctx.fillRect(0,y-r-20,width,2*r+40);if(isGogoTime(chart,t)){const glow=ctx.createLinearGradient(0,0,width,0);glow.addColorStop(0,'rgba(240,120,40,0.35)');glow.addColorStop(1,'rgba(240,120,40,0)');ctx.fillStyle=glow;ctx.fillRect(0,y-r-20,width,2*r+40)}if(!danRun&&chart.branchEvents?.length&&(state==='playing'||state==='paused')){const route=branchChoices[branchChoices.length-1]||'N',colors={N:'255,255,255',E:'85,187,210',M:'181,105,235'},rgb=colors[route],shade=ctx.createLinearGradient(width*.72,0,width,0);shade.addColorStop(0,'rgba('+rgb+',0)');shade.addColorStop(1,'rgba('+rgb+',0.35)');ctx.fillStyle=shade;ctx.fillRect(width*.72,y-r-20,width*.28,2*r+40);}ctx.strokeStyle='#333940';ctx.lineWidth=1;for(let i of [-1,1]){ctx.beginPath();ctx.moveTo(0,y+i*(r+20));ctx.lineTo(width,y+i*(r+20));ctx.stroke()}ctx.fillStyle='#f8c2590c';ctx.fillRect(0,0,target+40,height);const pos=n=>target+(chart.visual?malodyDistance(chart,n.time,n.scroll)-malodyDistance(chart,t,n.scroll):(n.time-t)*(n.bpm/120)*n.scroll)*speed*240;for(const b of chart.bars){const x=pos(b);if(x<0||x>width)continue;ctx.strokeStyle='#ffffff20';ctx.beginPath();ctx.moveTo(x,y-r-18);ctx.lineTo(x,y+r+18);ctx.stroke()}ctx.strokeStyle='#dbd3bd';ctx.lineWidth=3;ctx.beginPath();ctx.arc(target,y,r+8,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#d6c9a05c';ctx.lineWidth=1;ctx.beginPath();ctx.arc(target,y,r+14,0,Math.PI*2);ctx.stroke();const visibleNotes=renderNotes();for(let i=visibleNotes.length-1;i>=0;i--){const n=visibleNotes[i];if(n.done||(n.dummy&&t>(n.end??n.time)+.15))continue;let x=pos(n),nr=n.type===3||n.type===4||n.type===6?r*1.25:r;ctx.globalAlpha=(n.ghost?.25:1)*(n.dummy?(n.dummyOpacity??.7):1)*fade.note;if((n.type>=5&&n.type<=7)){let end=pos({...n,time:n.end});if(Math.max(x,end)<-50||Math.min(x,end)>width+50||t>n.end)continue;ctx.strokeStyle='#daa738';ctx.lineWidth=nr*1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(Math.max(target,x),y);ctx.lineTo(Math.max(target,end),y);ctx.stroke();x=Math.max(target,x)}else if(x< -50||x>width+50)continue;ctx.fillStyle=n.type===9?'#b569eb':(n.type>=5&&n.type<=7)?'#f5c757':n.type===1||n.type===3?'#f66b51':'#55bbd2';ctx.strokeStyle='#f4e8cc';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,nr,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#17242a';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${nr*.7}px sans-serif`;if(n.type===9){ctx.fillStyle='#fff';ctx.fillText('×',x,y)}if((n.type>=5&&n.type<=7))ctx.fillText(n.type===7?String(Math.max(0,n.required-n.hits)):(t>=n.time?String(n.hits||0):'連'),x,y)}if(danRun){ctx.globalAlpha=fade.lane;ctx.fillStyle='#fff';ctx.font='700 14px sans-serif';ctx.textAlign='left';ctx.textBaseline='bottom';const remaining=notes.filter(n=>n.type<=4&&!n.done).length+danRun.config.songs.slice(danRun.index+1).reduce((sum,e)=>sum+e.chart.notes.filter(n=>n.type<=4).length,0);ctx.fillText('残り '+remaining+' ノーツ',12,height-6)}drawBranchDetails(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.textAlign='center';const judgment=$('judgmentOverlay');judgment.textContent=feedback&&t-feedbackAt<.45?feedback:'';judgment.style.left=target+'px';judgment.style.top=Math.max(20,y-r-36)+'px';judgment.style.color=feedback==='不可'?'#aaa':feedback==='可'?'#fff':'#ffd565';judgment.style.opacity=fade.lane;$('status').style.opacity=1;if(state==='playing'&&t<(notes[0]?.time??0)-.2){ctx.font='700 15px sans-serif';ctx.fillStyle='#bfc2c3';ctx.fillText('まもなくスタート',width/2,height-18)}}
+function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const t=time(),fade=applyChartFade(t),y=height*.5,target=width<600?76:125,speed=Number($('speed').value),r=Math.min(26,height*.19);updateVisualBpm(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.clearRect(0,0,width,height);ctx.fillStyle=chart.videoFile?'#171b2044':'#171b20';ctx.fillRect(0,y-r-20,width,2*r+40);if(isGogoTime(chart,t)){const glow=ctx.createLinearGradient(0,0,width,0);glow.addColorStop(0,'rgba(240,120,40,0.35)');glow.addColorStop(1,'rgba(240,120,40,0)');ctx.fillStyle=glow;ctx.fillRect(0,y-r-20,width,2*r+40)}drawBranchLaneShade(t,y,r,fade.lane);ctx.strokeStyle='#333940';ctx.lineWidth=1;for(let i of [-1,1]){ctx.beginPath();ctx.moveTo(0,y+i*(r+20));ctx.lineTo(width,y+i*(r+20));ctx.stroke()}ctx.fillStyle='#f8c2590c';ctx.fillRect(0,0,target+40,height);const pos=n=>target+(chart.visual?malodyDistance(chart,n.time,n.scroll)-malodyDistance(chart,t,n.scroll):(n.time-t)*(n.bpm/120)*n.scroll)*speed*240;for(const b of chart.bars){const x=pos(b);if(x<0||x>width)continue;ctx.strokeStyle='#ffffff20';ctx.beginPath();ctx.moveTo(x,y-r-18);ctx.lineTo(x,y+r+18);ctx.stroke()}ctx.strokeStyle='#dbd3bd';ctx.lineWidth=3;ctx.beginPath();ctx.arc(target,y,r+8,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#d6c9a05c';ctx.lineWidth=1;ctx.beginPath();ctx.arc(target,y,r+14,0,Math.PI*2);ctx.stroke();const visibleNotes=renderNotes();for(let i=visibleNotes.length-1;i>=0;i--){const n=visibleNotes[i];if(n.done||(n.dummy&&t>(n.end??n.time)+.15))continue;let x=pos(n),nr=n.type===3||n.type===4||n.type===6?r*1.25:r;ctx.globalAlpha=(n.ghost?.25:1)*(n.dummy?(n.dummyOpacity??.7):1)*fade.note;if((n.type>=5&&n.type<=7)){let end=pos({...n,time:n.end});if(Math.max(x,end)<-50||Math.min(x,end)>width+50||t>n.end)continue;ctx.strokeStyle='#daa738';ctx.lineWidth=nr*1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(Math.max(target,x),y);ctx.lineTo(Math.max(target,end),y);ctx.stroke();x=Math.max(target,x)}else if(x< -50||x>width+50)continue;ctx.fillStyle=n.type===9?'#b569eb':(n.type>=5&&n.type<=7)?'#f5c757':n.type===1||n.type===3?'#f66b51':'#55bbd2';ctx.strokeStyle='#f4e8cc';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,nr,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#17242a';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${nr*.7}px sans-serif`;if(n.type===9){ctx.fillStyle='#fff';ctx.fillText('×',x,y)}if((n.type>=5&&n.type<=7))ctx.fillText(n.type===7?String(Math.max(0,n.required-n.hits)):(t>=n.time?String(n.hits||0):'連'),x,y)}if(danRun){ctx.globalAlpha=fade.lane;ctx.fillStyle='#fff';ctx.font='700 14px sans-serif';ctx.textAlign='left';ctx.textBaseline='bottom';const remaining=notes.filter(n=>n.type<=4&&!n.done).length+danRun.config.songs.slice(danRun.index+1).reduce((sum,e)=>sum+e.chart.notes.filter(n=>n.type<=4).length,0);ctx.fillText('残り '+remaining+' ノーツ',12,height-6)}drawBranchDetails(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.textAlign='center';const judgment=$('judgmentOverlay');judgment.textContent=feedback&&t-feedbackAt<.45?feedback:'';judgment.style.left=target+'px';judgment.style.top=Math.max(20,y-r-36)+'px';judgment.style.color=feedback==='不可'?'#aaa':feedback==='可'?'#fff':'#ffd565';judgment.style.opacity=fade.lane;$('status').style.opacity=1;if(state==='playing'&&t<(notes[0]?.time??0)-.2){ctx.font='700 15px sans-serif';ctx.fillStyle='#bfc2c3';ctx.fillText('まもなくスタート',width/2,height-18)}}
 async function choose(){if(importing||danRun)return;seekTarget=0;let chosen=charts[Number($('course').value)||0];loading=true;try{if(chosen.serverEntry){chosen=await prepareServerChart(chosen)}}catch(e){loading=false;$('fileinfo').textContent='収録曲の読み込みエラー：'+e.message;renderSongSelection();return}chart=chosen;demoMode=!!chart.builtinDemo;audioBuffer=null;const wave=(chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase();const file=chart.audioFile||audioFiles.get(wave);loading=true;$('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=(chart.meta.SUBTITLE||'').replace(/^(--|\+\+)/,'')||'TJA譜面';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';try{if(file){chart.audioFile=file;audioBuffer=chart.preloadedAudio||await audio().decodeAudioData(await file.arrayBuffer());delete chart.preloadedAudio}$('fileinfo').textContent=demoMode?'伴奏なし・打音のみで練習できます':file?'音源：'+file.name:wave?'音源未選択：'+chart.meta.WAVE+' を追加してください':'音源を追加すると演奏できます'}catch(e){$('fileinfo').textContent='音源を再生できません。MP3 / WAVなど別形式をお試しください。'}finally{loading=false;rememberDanCharts();reset();if(chart.warnings?.length)$('fileinfo').textContent+=' ／ 注意：'+chart.warnings.join('、')}}
 function fillCourses(){const s=$('course');s.replaceChildren();charts.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(c.meta.TITLE||'無題')+' / '+(names[c.meta.COURSE]||c.meta.COURSE||'おに')+' ★'+(c.meta.LEVEL||'?');s.append(o)})}
 
@@ -180,18 +180,48 @@ async function requestLandscape(){try{if(!document.fullscreenElement)await docum
 $('landscapeOpen').onclick=requestLandscape;
 
 
-var branchChoices=[],branchScoreLog=[],branchRollLog=[];
+var branchChoices=[],branchScoreLog=[],branchRollLog=[],branchTransitions=[];
+function branchJudgeTime(e){return Number.isFinite(e?.judgeTime)?e.judgeTime:e.time}
+function branchRank(route){return route==='M'?2:route==='E'?1:0}
+function branchTransitionWindow(e){
+ const start=branchJudgeTime(e),measures=chart.measures||[];
+ let index=measures.findIndex(m=>Math.abs(m.time-start)<1e-6||(m.time<=start&&m.end>start));
+ let end=index>=0?measures[Math.min(measures.length-1,index+1)]?.end:null;
+ if(!(end>start)){const one=Math.max(.001,e.time-start);end=e.time+one}
+ return {start,end};
+}
+function paintBranchShade(route,y,r,opacity,clipTop=null,clipHeight=null){
+ const colors={N:'255,255,255',E:'85,187,210',M:'181,105,235'},rgb=colors[route]||colors.N;
+ const left=width*.72,top=y-r-20,w=width*.28,h=2*r+40;
+ ctx.save();ctx.globalAlpha=opacity;
+ if(clipTop!==null&&clipHeight!==null){ctx.beginPath();ctx.rect(left,clipTop,w,Math.max(0,clipHeight));ctx.clip()}
+ const shade=ctx.createLinearGradient(left,0,width,0);shade.addColorStop(0,'rgba('+rgb+',0)');shade.addColorStop(1,'rgba('+rgb+',0.35)');
+ ctx.fillStyle=shade;ctx.fillRect(left,top,w,h);ctx.restore();
+}
+function drawBranchLaneShade(t,y,r,opacity){
+ if(danRun||!chart.branchEvents?.length||!(state==='playing'||state==='paused'))return;
+ const now=t-Number($('offset').value||0)/1000;
+ const active=[...branchTransitions].reverse().find(x=>now>=x.start&&now<x.end);
+ const route=branchChoices[branchChoices.length-1]||'N';
+ if(!active){paintBranchShade(route,y,r,opacity);return}
+ paintBranchShade(active.from,y,r,opacity);
+ const raw=Math.max(0,Math.min(1,(now-active.start)/Math.max(.001,active.end-active.start))),p=raw*raw*(3-2*raw);
+ const top=y-r-20,h=2*r+40;
+ if(active.direction==='down')paintBranchShade(active.to,y,r,opacity,top,h*p);
+ else paintBranchShade(active.to,y,r,opacity,top+h*(1-p),h*p);
+}
 function judge(n,error){n.branchQuality=error<=judgmentWindows().good?1:error<=judgmentWindows().ok?.5:0;const before=score;judgeCore(n,error);branchScoreLog.push({time:n.time,score:score-before});}
 function addRollHits(r,count=1){const before=r.hits||0;addRollHitsCore(r,count);const hits=(r.hits||0)-before;if(hits>0)branchRollLog.push({time:time(),hits});}
 function branchDetails(e){
- const from=Math.max(-Infinity,...(chart.sections||[]).filter(t=>t<=e.time));
- const judged=notes.filter(n=>n.type<=4&&n.time>=from&&n.time<e.time);
+ const at=branchJudgeTime(e);
+ const from=Math.max(-Infinity,...(chart.sections||[]).filter(t=>t<=at));
+ const judged=notes.filter(n=>n.type<=4&&n.time>=from&&n.time<at);
  let value=0;
  if(e.kind==='p'){const done=judged.filter(n=>n.done);value=done.length?done.reduce((sum,n)=>sum+(n.branchQuality||0),0)/done.length*100:0;}
- else if(e.kind==='r')value=branchRollLog.filter(x=>x.time>=from&&x.time<e.time).reduce((s,x)=>s+x.hits,0);
- else value=branchScoreLog.filter(x=>x.time>=from&&x.time<e.time).reduce((s,x)=>s+x.score,0);
+ else if(e.kind==='r')value=branchRollLog.filter(x=>x.time>=from&&x.time<at).reduce((sum,x)=>sum+x.hits,0);
+ else value=branchScoreLog.filter(x=>x.time>=from&&x.time<at).reduce((sum,x)=>sum+x.score,0);
  let route=value>=e.high?'M':value>=e.low?'E':'N';
- const locked=(chart.holds||[]).some(t=>t>=from&&t<=e.time);
+ const locked=(chart.holds||[]).some(t=>t>=from&&t<=at);
  if(locked)route=branchChoices[branchChoices.length-1]||'N';
  return {value,route,locked};
 }
@@ -199,26 +229,31 @@ function updateBranchRoute(){
  if(danRun||!chart.branchEvents?.length)return;
  const now=time()-Number($('offset').value||0)/1000;
  while(branchChoices.length<chart.branchEvents.length){
- const e=chart.branchEvents[branchChoices.length];if(now<e.time)break;
- for(const n of notes){if(n.type<=4&&!n.done&&!n.ghost&&n.time<e.time){if(auto)judge(n,0);else if(now>n.time+judgmentWindows().miss)judge(n,1)}}
- const detail=branchDetails(e);branchChoices.push(detail.route);
- const old=notes;chart=rebuildTjaBranches(chart,branchChoices);
- const prior=new Map(old.filter(n=>n.time<e.time).map(n=>[n.time+':'+n.type,n]));
- notes=chart.notes.map(n=>prior.get(n.time+':'+n.type)||({...n,done:false,hits:0,ghost:false}));
+  const index=branchChoices.length,e=chart.branchEvents[index],judgeAt=branchJudgeTime(e);if(now<judgeAt)break;
+  for(const n of notes){if(n.type<=4&&!n.done&&!n.ghost&&n.time<judgeAt){if(auto)judge(n,0);else if(now>n.time+judgmentWindows().miss)judge(n,1)}}
+  const detail=branchDetails(e),fromRoute=branchChoices[branchChoices.length-1]||'N';
+  branchChoices.push(detail.route);
+  const old=notes;chart=rebuildTjaBranches(chart,branchChoices);
+  const prior=new Map(old.filter(n=>n.time<e.time).map(n=>[n.time+':'+n.type,n]));
+  notes=chart.notes.map(n=>prior.get(n.time+':'+n.type)||({...n,done:false,hits:0,ghost:false}));
+  if(branchRank(fromRoute)!==branchRank(detail.route)){
+   const selectedEvent=chart.branchEvents?.[index]||e,window=branchTransitionWindow(selectedEvent);
+   branchTransitions.push({start:judgeAt,end:window.end,from:fromRoute,to:detail.route,direction:branchRank(detail.route)>branchRank(fromRoute)?'down':'up'});
+  }
  }
 }
 function drawBranchDetails(t,opacity){
  const bar=$('branchProgress'),active=state==='playing'||state==='paused';
  const e=!danRun&&active?chart.branchEvents?.[branchChoices.length]:null;
  bar.hidden=!e;if(!e)return;
- const now=t-Number($('offset').value||0)/1000;
- const previous=branchChoices.length?chart.branchEvents[branchChoices.length-1].time:Math.min(0,(chart.notes[0]?.time||0)-4);
- const start=Math.max(previous,...(chart.sections||[]).filter(x=>x<e.time));
- const progress=Math.max(0,Math.min(1,(now-start)/Math.max(.001,e.time-start)));
+ const now=t-Number($('offset').value||0)/1000,judgeAt=branchJudgeTime(e);
+ const previous=branchChoices.length?branchJudgeTime(chart.branchEvents[branchChoices.length-1]):Math.min(0,(chart.notes[0]?.time||0)-4);
+ const start=Math.max(previous,...(chart.sections||[]).filter(x=>x<judgeAt));
+ const progress=Math.max(0,Math.min(1,(now-start)/Math.max(.001,judgeAt-start)));
  $('branchProgressFill').style.width=(progress*100)+'%';bar.style.opacity=opacity;
  bar.setAttribute('aria-valuenow',String(Math.round(progress*100)));
- bar.setAttribute('aria-valuetext','次の分岐まで '+Math.max(0,e.time-now).toFixed(1)+'秒');
- bar.title='次の分岐まで '+Math.max(0,e.time-now).toFixed(1)+'秒';
+ bar.setAttribute('aria-valuetext','次の分岐判定まで '+Math.max(0,judgeAt-now).toFixed(1)+'秒');
+ bar.title='次の分岐判定まで '+Math.max(0,judgeAt-now).toFixed(1)+'秒';
  const d=branchDetails(e);
  const names={N:'普通',E:'玄人',M:'達人'},unit=e.kind==='p'?'%':e.kind==='r'?'打':'点';
  ctx.save();ctx.globalAlpha=opacity;ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillStyle='#fff';ctx.font='700 12px sans-serif';

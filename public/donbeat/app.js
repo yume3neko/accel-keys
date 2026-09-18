@@ -184,11 +184,12 @@ var branchChoices=[],branchScoreLog=[],branchRollLog=[],branchTransitions=[];
 function branchJudgeTime(e){return Number.isFinite(e?.judgeTime)?e.judgeTime:e.time}
 function branchRank(route){return route==='M'?2:route==='E'?1:0}
 function branchTransitionWindow(e){
- const start=e.time,measures=chart.measures||[];
+ const start=branchJudgeTime(e),end=e.time;
+ if(end>start)return {start,end};
+ const measures=chart.measures||[];
  let index=measures.findIndex(m=>Math.abs(m.time-start)<1e-6||(m.time<=start&&m.end>start));
- let end=index>=0?measures[index]?.end:null;
- if(!(end>start)){const one=Math.max(.001,e.time-branchJudgeTime(e));end=start+one}
- return {start,end};
+ const fallback=index>=0?measures[index]?.end:null;
+ return {start,end:fallback>start?fallback:start+.001};
 }
 function paintBranchShade(route,y,r,opacity,clipTop=null,clipHeight=null){
  const colors={N:'255,255,255',E:'85,187,210',M:'181,105,235'},rgb=colors[route]||colors.N;

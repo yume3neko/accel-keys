@@ -39,7 +39,7 @@
 
         // #ABSCROLL / Malody scroll effects are the scroll-gimmick family.
         // Negative effective speed is also treated as the red family.
-        const red=scroll!==1||effective<0;
+        const red=!!c.features?.hbscroll||c._tja?.scrollMode==='hb'||scroll!==1||effective<0;
         // BPM changes and ordinary forward #SCROLL / hs changes are yellow.
         const yellow=(baseBpm!==null&&bpm!==null&&bpm!==baseBpm)||(hs!==1&&effective>=0);
 

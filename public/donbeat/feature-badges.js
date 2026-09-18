@@ -104,6 +104,63 @@
     badge.title=title||label;
     badge.setAttribute('aria-label',title||label);
     box.append(badge);
+    return badge;
+  }
+
+  const branchNames={N:'普通',E:'玄人',M:'達人'};
+  function openBranchMenu(c){
+    let dialog=document.getElementById('branchForceDialog');
+    if(!dialog){
+      dialog=document.createElement('dialog');dialog.id='branchForceDialog';dialog.className='branch-force-dialog';
+      document.body.append(dialog);
+    }
+    const current=['N','E','M'].includes(c._branchForce)?c._branchForce:'auto';
+    dialog.replaceChildren();
+    const heading=document.createElement('h3');heading.textContent='譜面分岐の固定先';
+    const note=document.createElement('p');note.textContent='「自動判定」では譜面の分岐条件を使います。固定すると、すべての分岐で指定先を優先します。';
+    const options=document.createElement('div');options.className='branch-force-options';
+    for(const [value,label] of [['auto','自動判定'],['N','普通'],['E','玄人'],['M','達人']]){
+      const button=document.createElement('button');button.type='button';button.textContent=(current===value?'✓ ':'')+label;
+      if(current===value)button.className='primary';
+      button.onclick=()=>{
+        c._branchForce=value==='auto'?null:value;
+        if(c===chart)chart._branchForce=c._branchForce;
+        dialog.close();
+        renderSongSelection();
+      };
+      options.append(button);
+    }
+    const close=document.createElement('button');close.type='button';close.textContent='閉じる';close.onclick=()=>dialog.close();
+    dialog.append(heading,note,options,close);
+    dialog.showModal();
+  }
+
+  function optionCheck(labelText,checked,onchange){
+    const label=document.createElement('label');label.className='song-feature-option';
+    const input=document.createElement('input');input.type='checkbox';input.checked=checked;input.onchange=()=>onchange(input.checked);
+    label.append(input,document.createTextNode(' '+labelText));return label;
+  }
+
+  function injectSongOptions(){
+    document.querySelectorAll('.song-choice-panel:not([hidden])').forEach(panel=>{
+      if(panel.querySelector('.song-feature-options'))return;
+      const select=panel.querySelector('select');
+      const index=Number(select?.value);
+      const c=Number.isInteger(index)?charts[index]:null;
+      if(!c)return;
+      const flags=chartFeatures(c),options=document.createElement('div');options.className='song-feature-options';
+      if(flags.mv)options.append(optionCheck('MVを有効',c._mvEnabled!==false,enabled=>{
+        c._mvEnabled=enabled;
+        if(c===chart){chart._mvEnabled=enabled;syncMV()}
+      }));
+      if(flags.fadeout)options.append(optionCheck('フェードアウトを有効',c._fadeEnabled!==false,enabled=>{
+        c._fadeEnabled=enabled;
+        if(c===chart)chart._fadeEnabled=enabled;
+      }));
+      if(!options.children.length)return;
+      const badges=panel.querySelector('.feature-badges');
+      if(badges)badges.insertAdjacentElement('afterend',options);else panel.prepend(options);
+    });
   }
 
   featureBadges=function(list){
@@ -119,7 +176,14 @@
 
     if(flags.some(f=>f.scrollStop))addBadge(box,'scrollStop','⏸','譜面停止あり');
     if(flags.some(f=>f.reverseScroll))addBadge(box,'reverseScroll','↶','逆走あり');
-    if(flags.some(f=>f.branch))addBadge(box,'branch','⑂','譜面分岐あり');
+    if(flags.some(f=>f.branch)){
+      const c=list.length===1?list[0]:null,forced=c&&['N','E','M'].includes(c._branchForce)?c._branchForce:null;
+      const badge=addBadge(box,'branch','⑂',forced?'譜面分岐あり（'+branchNames[forced]+'固定）':'譜面分岐あり',forced?'クリックして固定先を変更':'クリックして分岐先を固定');
+      if(c){badge.classList.add('interactive');badge.setAttribute('role','button');badge.tabIndex=0;
+        const open=e=>{e.preventDefault();e.stopPropagation();openBranchMenu(c)};
+        badge.onclick=open;badge.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){open(e)}};
+      }
+    }
     if(flags.some(f=>f.dummy))addBadge(box,'dummy','◇','ダミーノーツあり');
     if(flags.some(f=>f.damage))addBadge(box,'damage','⚠','ダメージノーツあり');
 
@@ -136,6 +200,7 @@
     baseRenderSongSelection();
     document.querySelectorAll('.song-choice-title > .feature-badges').forEach(n=>n.remove());
     document.querySelectorAll('.song-choice-panel > .feature-badges:empty').forEach(n=>n.remove());
+    injectSongOptions();
   };
 
   const style=document.createElement('style');
@@ -146,6 +211,13 @@
     .feature-badge.badge-red{border-color:#e66b72;color:#ffadb2;background:#48232b}
     .feature-badge.badge-purple{border-color:#a86de8;color:#e2c1ff;background:#38264d}
     .feature-badge.soflan.scroll-on-notes,.feature-badge.fadeout.fade-on-notes{border-color:inherit;color:inherit;background:inherit}
+    .feature-badge.interactive{cursor:pointer;user-select:none}
+    .feature-badge.interactive:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+    .song-feature-options{display:flex;flex-wrap:wrap;gap:10px 16px;margin:8px 0 10px;padding:9px 11px;border:1px solid #343a43;border-radius:8px;background:#12171d}
+    .song-feature-option{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.9rem}
+    .song-feature-option input{width:18px;height:18px}
+    .branch-force-dialog{max-width:min(92vw,430px)}
+    .branch-force-dialog .branch-force-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}
   `;
   document.head.append(style);
 

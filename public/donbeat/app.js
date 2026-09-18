@@ -12,12 +12,25 @@ function time(){return state==='playing'?audioContext.currentTime-startAt:paused
 function stopAudio(){clearAutoPads();stopMV();if(source){try{source.stop()}catch{}source=null}}
 function scheduleAudio(t){stopAudio();if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
 function reset(){document.body.classList.add('selecting');dummyPlayback=null;balloonRolls=balloonPops=0;if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);$('status').textContent=demoMode||audioBuffer?'準備完了':'音源の追加が必要です';if(!demoMode&&!audioBuffer){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true;seek.disabled=true}renderSongSelection();draw()}
+function syncRebuiltChart(next){
+ let index=charts.indexOf(chart);
+ if(index<0){
+  const source=normalizedPath(chart?.sourcePath||''),course=String(chart?.meta?.COURSE||''),title=String(chart?.meta?.TITLE||'');
+  index=charts.findIndex(c=>
+   (source&&normalizedPath(c.sourcePath||'')===source&&String(c.meta?.COURSE||'')===course)||
+   (!source&&String(c.meta?.TITLE||'')===title&&String(c.meta?.COURSE||'')===course)
+  );
+ }
+ if(index>=0){charts[index]=next;$('course').value=index}
+ chart=next;
+ return next;
+}
 async function start(options={}){
  if(loading||importing||state==='playing'||(danRun&&!options.dan)||(!demoMode&&!audioBuffer))return;loading=true;enterPlayFullscreen();
  try{if(!options.seamless||audio().state==='suspended')await audio().resume();if(!options.seamless)await waitForLandscape()}catch(e){loading=false;$('status').textContent='音声を開始できません。もう一度お試しください。';return}loading=false;
  cancelAnimationFrame(raf);stopAudio();auto=danRun?danRun.config.auto:Boolean(options.auto);
  practiceTarget=Number.isFinite(options.target)?options.target:null;judgeFrom=practiceTarget??-Infinity;
- if(chart._tja){chart=rebuildTjaBranches(chart,[])}branchChoices=[];branchScoreLog=[];branchRollLog=[];branchTransitions=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
+ if(chart._tja){syncRebuiltChart(rebuildTjaBranches(chart,[]))}branchChoices=[];branchScoreLog=[];branchRollLog=[];branchTransitions=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
  const plan=practiceTarget===null?null:practicePlan(chart,practiceTarget,auto);
  pausedTime=plan?plan.lead:Math.min(0,(notes[0]?.time||0)-4);
  // Manual pre-roll is visible but excluded from every judgment and score path.
@@ -26,7 +39,7 @@ async function start(options={}){
  resetDummyPlayback(pausedTime);resetHibiki(pausedTime);startAt=audioContext.currentTime-pausedTime;scheduleAudio(pausedTime);state='playing';document.body.classList.remove('selecting');document.body.classList.add('playing');$('overlay').style.display='none';$('pause').disabled=false;setPauseIcon(false);['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
  update();resize();loop();
 }
-function togglePause(){if(state==='playing'){pausedTime=time();state='paused';stopAudio();draw();cancelAnimationFrame(raf);setPauseIcon(true);$('overlay').style.display='flex';$('overlay').replaceChildren();const h=document.createElement('h2');h.textContent='一時停止';const b=document.createElement('button');b.textContent='▶ 再開';b.className='primary';b.onclick=togglePause;const q=document.createElement('button');q.textContent='選曲に戻る';q.onclick=()=>{if(danRun)exitDan();else{unlock();reset()}};$('overlay').append(h,b,q)}else if(state==='paused'){audio().resume().then(()=>{startAt=audioContext.currentTime-pausedTime;scheduleAudio(pausedTime);state='playing';$('overlay').style.display='none';setPauseIcon(false);loop()})}}
+function togglePause(){if(state==='playing'){pausedTime=time();state='paused';stopAudio();draw();cancelAnimationFrame(raf);setPauseIcon(true);$('overlay').style.display='flex';$('overlay').replaceChildren();const h=document.createElement('h2');h.textContent='一時停止';const actions=document.createElement('div');actions.className='pause-actions';const b=document.createElement('button');b.textContent='▶ 再開';b.className='primary';b.onclick=togglePause;const restart=document.createElement('button');restart.textContent='↻ 最初から';restart.onclick=()=>{const automatic=danRun?danRun.config.auto:auto;if(danRun){exitDan();launchDan(automatic)}else{state='ready';start({auto:automatic})}};const q=document.createElement('button');q.textContent='選曲に戻る';q.onclick=()=>{if(danRun)exitDan();else{unlock();reset()}};actions.append(b,restart,q);$('overlay').append(h,actions)}else if(state==='paused'){audio().resume().then(()=>{startAt=audioContext.currentTime-pausedTime;scheduleAudio(pausedTime);state='playing';$('overlay').style.display='none';setPauseIcon(false);loop()})}}
 function unlock(){['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=false);}
 function update(){$('score').textContent=String(score).padStart(7,'0');$('combo').textContent=combo;$('good').textContent=good;$('ok').textContent=ok;$('miss').textContent=miss;$('roll').textContent=rolls;$('gauge').style.width=soul+'%';$('gaugeText').textContent=Math.floor(soul)+'%';updateDanHUD()}
 function judgmentWindows(){const level=Number(chart?.meta?.LEVEL);return Number.isFinite(level)&&level>0&&level<=5?{good:.041708,ok:.108442,miss:.125125}:{good:.025025,ok:.075075,miss:.108442}}
@@ -256,7 +269,7 @@ function updateBranchRoute(){
   for(const n of notes){if(n.type<=4&&!n.done&&!n.ghost&&n.time<judgeAt){if(auto)judge(n,0);else if(now>n.time+judgmentWindows().miss)judge(n,1)}}
   const detail=branchDetails(e,true),fromRoute=branchChoices[branchChoices.length-1]||'N';
   branchChoices.push(detail.route);
-  const old=notes;chart=rebuildTjaBranches(chart,branchChoices);
+  const old=notes;syncRebuiltChart(rebuildTjaBranches(chart,branchChoices));
   const prior=new Map(old.filter(n=>n.time<e.time).map(n=>[n.time+':'+n.type,n]));
   notes=chart.notes.map(n=>prior.get(n.time+':'+n.type)||({...n,done:false,hits:0,ghost:false}));
   if(branchRank(fromRoute)!==branchRank(detail.route)){

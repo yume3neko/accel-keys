@@ -130,7 +130,7 @@ $('volumeOpen').onclick=()=>$('volumeDialog').showModal();$('volumeClose').oncli
 
 function attachVideos(list,files){for(const c of list){const name=c.meta.VIDEO;if(typeof name!=='string'||!name)continue;const dir=(c.sourcePath||'').split('/').slice(0,-1).join('/');let matches=files.filter(f=>normalizedPath(filePath(f))===normalizedPath(dir+'/'+name));if(!matches.length)matches=files.filter(f=>normalizedPath(f.name)===normalizedPath(name.split('/').pop()));if(matches.length===1)c.videoFile=matches[0];}}
 function stopMV(){const v=$('mv');if(v&&typeof v.pause==='function')v.pause();mvPlaying=false;}
-function syncMV(){const v=$('mv');if(!v||typeof v.play!=='function')return;const file=chart?.videoFile||null;
+function syncMV(){const v=$('mv');if(!v||typeof v.play!=='function')return;const file=chart?._mvEnabled===false?null:(chart?.videoFile||null);
  if(file!==mvFile){stopMV();if(mvURL)URL.revokeObjectURL(mvURL);mvFile=file;mvURL=file?URL.createObjectURL(file):null;v.removeAttribute('src');if(mvURL)v.src=mvURL;v.load();v.parentElement.classList.toggle('has-mv',!!file);v.onerror=()=>{v.parentElement.classList.remove('has-mv');};}
  if(!file)return;const t=time();if(state!=='playing'||t<0){stopMV();return}if(v.readyState<1)return;
  const desired=Math.min(t,Number.isFinite(v.duration)?v.duration:t);if(Math.abs(v.currentTime-desired)>.2)v.currentTime=desired;
@@ -142,7 +142,7 @@ function chartFadeAt(events,t){
  for(const e of [...(events||[])].sort((a,b)=>a.time-b.time)){if(e.time>t)break;for(const key of e.mode==='all'?keys:[e.mode]){if(!keys.includes(key))continue;const from=valueAt(tracks[key],e.time);tracks[key]={from,to:e.direction,time:e.time,end:e.end};}}
  return Object.fromEntries(keys.map(key=>[key,valueAt(tracks[key],t)]));
 }
-function applyChartFade(t){const fade=state==='playing'?chartFadeAt(chart.fades,t):{info:1,lane:1,note:1,button:1};document.querySelectorAll('.scorebar,#danHud,.song-progress').forEach(n=>n.style.opacity=fade.info);document.querySelectorAll('.pads').forEach(n=>n.style.opacity=fade.button);const lane=canvas.parentElement;if(lane){lane.style.backgroundColor=chart.videoFile?'rgba(16,19,23,'+(.267*fade.lane)+')':'rgba(16,19,23,'+fade.lane+')';lane.style.borderColor='rgba(68,68,68,'+fade.lane+')'}return fade;}
+function applyChartFade(t){const fade=state==='playing'&&chart?._fadeEnabled!==false?chartFadeAt(chart.fades,t):{info:1,lane:1,note:1,button:1};document.querySelectorAll('.scorebar,#danHud,.song-progress').forEach(n=>n.style.opacity=fade.info);document.querySelectorAll('.pads').forEach(n=>n.style.opacity=fade.button);const lane=canvas.parentElement;if(lane){const mvActive=chart?._mvEnabled!==false&&!!chart.videoFile;lane.style.backgroundColor=mvActive?'rgba(16,19,23,'+(.267*fade.lane)+')':'rgba(16,19,23,'+fade.lane+')';lane.style.borderColor='rgba(68,68,68,'+fade.lane+')'}return fade;}
 
 // Four beats per revolution at x1; signed scroll supports stops and reverse motion.
 var hibikiMotion;
@@ -221,10 +221,11 @@ function branchDetails(e){
  if(e.kind==='p'){const done=judged.filter(n=>n.done);value=done.length?done.reduce((sum,n)=>sum+(n.branchQuality||0),0)/done.length*100:0;}
  else if(e.kind==='r')value=branchRollLog.filter(x=>x.time>=from&&x.time<at).reduce((sum,x)=>sum+x.hits,0);
  else value=branchScoreLog.filter(x=>x.time>=from&&x.time<at).reduce((sum,x)=>sum+x.score,0);
- let route=value>=e.high?'M':value>=e.low?'E':'N';
- const locked=(chart.holds||[]).some(t=>t>=from&&t<=at);
+ const forcedRoute=['N','E','M'].includes(chart?._branchForce)?chart._branchForce:null;
+ let route=forcedRoute||(value>=e.high?'M':value>=e.low?'E':'N');
+ const locked=!forcedRoute&&(chart.holds||[]).some(t=>t>=from&&t<=at);
  if(locked)route=branchChoices[branchChoices.length-1]||'N';
- return {value,route,locked};
+ return {value,route,locked,forced:!!forcedRoute};
 }
 function updateBranchRoute(){
  if(danRun||!chart.branchEvents?.length)return;
@@ -259,7 +260,7 @@ function drawBranchDetails(t,opacity){
  const names={N:'普通',E:'玄人',M:'達人'},unit=e.kind==='p'?'%':e.kind==='r'?'打':'点';
  ctx.save();ctx.globalAlpha=opacity;ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillStyle='#fff';ctx.font='700 12px sans-serif';
  const max=e.kind==='p'?100:Infinity,routeAt=v=>v>=e.high?'M':v>=e.low?'E':'N',forced=routeAt(0)===routeAt(max);
- const text=forced?'強制分岐 → '+names[routeAt(0)]: (e.kind==='p'?'精度':e.kind==='r'?'連打':'スコア')+' '+d.value.toFixed(e.kind==='p'?1:0)+unit+' / '+(e.low>=e.high?'達人 '+e.high+unit+'以上':'玄人 '+e.low+'・達人 '+e.high)+' → '+names[d.route]+(d.locked?'（固定）':'');
+ const text=d.forced?'分岐先固定 → '+names[d.route]:forced?'強制分岐 → '+names[routeAt(0)]: (e.kind==='p'?'精度':e.kind==='r'?'連打':'スコア')+' '+d.value.toFixed(e.kind==='p'?1:0)+unit+' / '+(e.low>=e.high?'達人 '+e.high+unit+'以上':'玄人 '+e.low+'・達人 '+e.high)+' → '+names[d.route]+(d.locked?'（固定）':'');
  ctx.fillText(text,width-12,height-6);ctx.restore();
 }
 

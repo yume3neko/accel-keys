@@ -114,12 +114,12 @@
       dialog=document.createElement('dialog');dialog.id='branchForceDialog';dialog.className='branch-force-dialog';
       document.body.append(dialog);
     }
-    const current=['N','E','M'].includes(c._branchForce)?c._branchForce:'auto';
+    const current=['N','E','M','random'].includes(c._branchForce)?c._branchForce:'auto';
     dialog.replaceChildren();
-    const heading=document.createElement('h3');heading.textContent='譜面分岐の固定先';
-    const note=document.createElement('p');note.textContent='「自動判定」では譜面の分岐条件を使います。固定すると、すべての分岐で指定先を優先します。';
+    const heading=document.createElement('h3');heading.textContent='譜面分岐モード';
+    const note=document.createElement('p');note.textContent='「ランダム」は到達可能な分岐先だけを抽選します。強制分岐とLEVELHOLDは譜面指定を優先します。';
     const options=document.createElement('div');options.className='branch-force-options';
-    for(const [value,label] of [['auto','自動判定'],['N','普通'],['E','玄人'],['M','達人']]){
+    for(const [value,label] of [['auto','自動判定'],['random','ランダム'],['N','普通'],['E','玄人'],['M','達人']]){
       const button=document.createElement('button');button.type='button';button.textContent=(current===value?'✓ ':'')+label;
       if(current===value)button.className='primary';
       button.onclick=()=>{
@@ -177,8 +177,9 @@
     if(flags.some(f=>f.scrollStop))addBadge(box,'scrollStop','⏸','譜面停止あり');
     if(flags.some(f=>f.reverseScroll))addBadge(box,'reverseScroll','↶','逆走あり');
     if(flags.some(f=>f.branch)){
-      const c=list.length===1?list[0]:null,forced=c&&['N','E','M'].includes(c._branchForce)?c._branchForce:null;
-      const badge=addBadge(box,'branch','⑂',forced?'譜面分岐あり（'+branchNames[forced]+'固定）':'譜面分岐あり',forced?'クリックして固定先を変更':'クリックして分岐先を固定');
+      const c=list.length===1?list[0]:null,forced=c&&['N','E','M'].includes(c._branchForce)?c._branchForce:null,random=c?._branchForce==='random';
+      const label=forced?'譜面分岐あり（'+branchNames[forced]+'固定）':random?'譜面分岐あり（ランダム）':'譜面分岐あり';
+      const badge=addBadge(box,'branch','⑂',label,random?'クリックしてランダム設定を変更':forced?'クリックして固定先を変更':'クリックして分岐モードを変更');
       if(c){badge.classList.add('interactive');badge.setAttribute('role','button');badge.tabIndex=0;
         const open=e=>{e.preventDefault();e.stopPropagation();openBranchMenu(c)};
         badge.onclick=open;badge.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){open(e)}};

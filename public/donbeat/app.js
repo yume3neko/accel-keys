@@ -25,12 +25,17 @@ function syncRebuiltChart(next){
  chart=next;
  return next;
 }
+function branchPreviewChoices(decided,currentRoute='N'){
+ const count=chart?.branchEvents?.length||decided.length;
+ const route=['N','E','M'].includes(currentRoute)?currentRoute:'N';
+ return [...decided,...Array(Math.max(0,count-decided.length)).fill(route)];
+}
 async function start(options={}){
  if(loading||importing||state==='playing'||(danRun&&!options.dan)||(!demoMode&&!audioBuffer))return;loading=true;enterPlayFullscreen();
  try{if(!options.seamless||audio().state==='suspended')await audio().resume();if(!options.seamless)await waitForLandscape()}catch(e){loading=false;$('status').textContent='音声を開始できません。もう一度お試しください。';return}loading=false;
  cancelAnimationFrame(raf);stopAudio();auto=danRun?danRun.config.auto:Boolean(options.auto);
  practiceTarget=Number.isFinite(options.target)?options.target:null;judgeFrom=practiceTarget??-Infinity;pauseResumeUntil=-Infinity;
- if(chart._tja){syncRebuiltChart(rebuildTjaBranches(chart,[]))}branchChoices=[];branchScoreLog=[];branchRollLog=[];branchTransitions=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
+ if(chart._tja){syncRebuiltChart(rebuildTjaBranches(chart,branchPreviewChoices([],'N')))}branchChoices=[];branchScoreLog=[];branchRollLog=[];branchTransitions=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
  const plan=practiceTarget===null?null:practicePlan(chart,practiceTarget,auto);
  pausedTime=plan?plan.lead:Math.min(0,(notes[0]?.time||0)-4);
  // Manual pre-roll is visible but excluded from every judgment and score path.
@@ -385,7 +390,7 @@ function updateBranchRoute(){
   const detail=branchDetails(e,true),fromRoute=branchChoices[branchChoices.length-1]||'N';
   const oldChart=chart,old=notes,outgoingVisual=renderNotes().filter(n=>!n.done&&n.time>=e.time).map(n=>({...n}));
   branchChoices.push(detail.route);
-  syncRebuiltChart(rebuildTjaBranches(chart,branchChoices));
+  syncRebuiltChart(rebuildTjaBranches(chart,branchPreviewChoices(branchChoices,detail.route)));
   const prior=new Map(old.filter(n=>n.time<e.time).map(n=>[n.time+':'+n.type,n]));
   notes=chart.notes.map(n=>prior.get(n.time+':'+n.type)||({...n,done:false,hits:0,ghost:false}));
   if(branchRank(fromRoute)!==branchRank(detail.route)){

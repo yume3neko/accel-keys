@@ -120,7 +120,7 @@ function danConditionView(c,i,value,pending=false){const red=c.red[i],gold=c.gol
  const track=danNode('div',undefined,'exam-track'+(second?' second-stage':'')),fill=danNode('i');
  const goldPass=danPass(value,gold,c,i),redPass=danPass(value,red,c,i);
  const danger=down&&!pending&&!goldPass&&redPass&&stage.remaining<5;
- fill.className=(pending?'':goldPass?'rainbow':redPass?'yellow':'red')+(danger?' danger':'');fill.style.width=ratio*100+'%';track.append(fill);
+ fill.className=(pending?'':down?(goldPass?'rainbow':redPass?'yellow':'black'):(goldPass?'rainbow':redPass?'yellow':'red'))+(danger?' danger':'');fill.style.width=ratio*100+'%';track.append(fill);
  const mark=danNode('em',undefined,kind==='赤'?'border-red':'border-gold');mark.style.left=down?'0%':'100%';mark.title=kind+' '+target+danLabel(c,i);track.append(mark);
  track.setAttribute('role','meter');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax',String(Math.max(1,capacity)));track.setAttribute('aria-valuenow',String(amount));track.setAttribute('aria-label',danMetrics[c.type].label+' '+kind+(down?'合格までの残り':'合格への進捗'));
  if(danger)track.className+=' danger';box.append(track,danNode('small',(second?'② ':'① ')+kind+' '+target+danLabel(c,i)+' ／ 赤 '+red+'・金 '+gold));return box;}

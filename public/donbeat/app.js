@@ -564,7 +564,7 @@ function serverURL(path,base){
 }
 async function serverFile(url,name){
  const res=await fetch(url);if(!res.ok)throw Error(name+' (HTTP '+res.status+')');
- return new File([await res.blob()],name);
+ const blob=await res.blob();return new File([blob],name,{type:blob.type});
 }
 async function prepareServerChart(c){
  const entry=c.serverEntry;
@@ -584,9 +584,10 @@ async function prepareServerChart(c){
    const bytes=await response.arrayBuffer();let source;try{source=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{source=new TextDecoder('shift-jis').decode(bytes)}
    parsed=(/\.mc(?:\?|$)/i.test(entry.url)?parseMalody(source):parseTJA(source)).charts;
    for(const chart of parsed){
-    const wave=entry.audio||chart.meta.WAVE,video=entry.video||chart.meta.VIDEO;
+    const wave=entry.audio||chart.meta.WAVE,video=entry.video||chart.meta.VIDEO,spinner=entry.spinner;
     if(wave)chart.serverAudio=serverURL(wave,entry.url);
     if(video){if(entry.videoParts?.length)chart.serverVideoParts=entry.videoParts.map(p=>serverURL(p,entry.url));else chart.serverVideo=serverURL(video,entry.url);chart.meta.VIDEO=video}
+    if(spinner)chart.serverSpinner=serverURL(spinner,entry.url);
    }
   }
   if(!parsed.length)throw Error('対応する譜面がありません');
@@ -596,6 +597,7 @@ async function prepareServerChart(c){
  if(c.serverAudio&&!c.audioFile)c.audioFile=await serverFile(c.serverAudio,c.meta.WAVE||'music');
  if(c.serverVideoParts&&!c.videoFile){const parts=[];for(const url of c.serverVideoParts)parts.push(await serverFile(url,'part'));c.videoFile=new File(parts,c.meta.VIDEO||'video.mp4',{type:'video/mp4'})}
  if(c.serverVideo&&!c.videoFile)c.videoFile=await serverFile(c.serverVideo,c.meta.VIDEO||'video.mp4');
+ if(c.serverSpinner&&!c.spinnerFile){const name=decodeURIComponent(new URL(c.serverSpinner).pathname.split('/').pop())||'spinner.png';c.spinnerFile=await serverFile(c.serverSpinner,name)}
  return c;
 }
 async function loadServerCatalog(){

@@ -46,8 +46,43 @@ function branchReferenceNoteCount(chart){
  chart._branchMasterNoteCount=Math.max(1,count);
  return chart._branchMasterNoteCount;
 }
+function branchReachableRoutesForCount(e){
+ const routeAt=v=>v>=e.high?'M':v>=e.low?'E':'N',set=new Set(),eps=1e-7;
+ let values;
+ if(e.kind==='p'){
+  values=[0,100,e.low,e.high,e.low-eps,e.low+eps,e.high-eps,e.high+eps].map(v=>Math.max(0,Math.min(100,v)));
+ }else{
+  const top=Math.max(0,e.low,e.high)+1;
+  values=[0,top,e.low,e.high,e.low-eps,e.low+eps,e.high-eps,e.high+eps].map(v=>Math.max(0,v));
+ }
+ for(const v of values)if(Number.isFinite(v))set.add(routeAt(v));
+ return ['N','E','M'].filter(r=>set.has(r));
+}
+function branchNoteCountRange(chart){
+ const plain=Math.max(0,(chart?.notes||[]).filter(n=>n.type<=4).length);
+ if(!chart?._tja||!chart.branchEvents?.length)return {min:plain,max:plain};
+ if(chart._branchNoteCountRange)return chart._branchNoteCountRange;
+ try{
+  const events=chart.branchEvents,baseChoices=events.map(e=>branchReachableRoutesForCount(e)[0]||'N');
+  const count=choices=>compile({...chart._tja.meta},chart._tja.lines,new Set(),choices).notes.filter(n=>n.type<=4).length;
+  const base=count(baseChoices);
+  let min=base,max=base;
+  for(let i=0;i<events.length;i++){
+   const deltas=[];
+   for(const route of branchReachableRoutesForCount(events[i])){
+    const choices=[...baseChoices];choices[i]=route;deltas.push(count(choices)-base);
+   }
+   if(deltas.length){min+=Math.min(...deltas);max+=Math.max(...deltas)}
+  }
+  chart._branchNoteCountRange={min:Math.max(0,min),max:Math.max(0,max)};
+ }catch{
+  chart._branchNoteCountRange={min:plain,max:plain};
+ }
+ return chart._branchNoteCountRange;
+}
 root.rebuildTjaBranches=(chart,choices)=>({...chart,...compile({...chart._tja.meta},chart._tja.lines,new Set(),choices)});
 root.branchReferenceNoteCount=branchReferenceNoteCount;
+root.branchNoteCountRange=branchNoteCountRange;
 root.parseTJA=parseTJA;
-if(typeof module!=='undefined')module.exports={parseTJA,branchReferenceNoteCount};
+if(typeof module!=='undefined')module.exports={parseTJA,branchReferenceNoteCount,branchNoteCountRange};
 })(typeof window!=='undefined'?window:globalThis);

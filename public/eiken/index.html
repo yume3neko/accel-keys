@@ -9,7 +9,7 @@
 <body><div class="shell">
 <header><div class="brand">英検ランダムトレーナー<small>非公式・オリジナル練習問題</small></div><button id="resetStats" class="ghost">記録リセット</button></header>
 <main id="home">
-<section class="card hero"><h1>英語力を、<br>1問ずつ上へ。</h1><p>5級から1級まで難易度順に練習。4種類の問題形式と多彩な文章パターンからランダム出題し、実力チェックでは正解し続けるほど上の級へ進みます。</p><div class="badges"><span class="badge">全8,000問</span><span class="badge">各級1,000問</span><span class="badge">4形式 × 各250問</span></div></section>
+<section class="card hero"><h1>英語力を、<br>1問ずつ上へ。</h1><p>5級から1級まで難易度順に練習。4種類の問題形式に、会話・メール・文脈問題など多彩なパターンを混ぜてランダム出題。実力チェックでは正解し続けるほど上の級へ進みます。</p><div class="badges"><span class="badge">全8,000問</span><span class="badge">各級1,000問</span><span class="badge">4形式 × 各250問</span></div></section>
 <div class="title">1. レベルを選択（5級 → 1級）</div><div class="grade-grid" id="gradeGrid"></div>
 <div class="title">2. 通常練習</div><section class="card"><div class="form-grid"><div class="field"><label>問題数</label><select id="count"><option>10</option><option>20</option><option>30</option><option>50</option><option>100</option><option>250</option><option>500</option><option>1000</option><option value="9999">この条件の全問題</option></select></div><div class="field"><label>問題形式</label><select id="type"><option value="all">4形式すべて</option><option value="meaning">言葉の意味</option><option value="cloze">穴埋め問題</option><option value="qa_jp">英文の質問 → 日本語で回答</option><option value="qa_en">英文の質問 → 英語で回答</option></select></div></div><button id="start" class="primary start" disabled>レベルを選んでスタート</button><button id="skill" class="primary skill">🚀 実力チェックモード</button><div class="mode-note">実力チェック：5級から開始し、各級4問中3問以上正解で次の級へ。最大32問で1級まで挑戦します。</div><div class="stats"><div class="stat"><b id="answered">0</b><span>累計回答</span></div><div class="stat"><b id="accuracy">—</b><span>正答率</span></div><div class="stat"><b id="weak">0</b><span>復習候補</span></div></div></section></main>
 <main id="quiz" class="hidden"><div id="skillBanner" class="skill-banner hidden"></div><div class="quiz-top"><button id="quit" class="secondary">← 終了</button><div class="progress-wrap"><div id="progress" class="progress"></div></div></div><div class="meta"><span id="meta"></span><span id="liveScore"></span></div><section class="card"><span id="qtype" class="qtype"></span><div id="passage" class="passage hidden"></div><div id="question" class="question"></div><div id="options" class="options"></div><div id="explain" class="explain hidden"></div><div id="nextRow" class="next-row hidden"><button id="next" class="primary">次の問題 →</button></div></section><div class="footer">キーボードの 1〜4 でも回答できます。回答後は Enter で次へ進めます。</div></main>
@@ -155,6 +155,218 @@ function makeReading(g,nidx){
  };
 }
 
+
+const CLZ={
+"5":{
+ dialogue:[
+  ["A: Do you like {x}?\nB: Yes, I ___.",["music","soccer","books","cats","English"],["do","does","am","can"],0,"Do you ...? への肯定は Yes, I do."],
+  ["A: Where is my {x}?\nB: It is ___ the desk.",["book","pencil","bag","phone","notebook"],["on","at","from","to"],0,"机の上は on the desk。"],
+  ["A: Can {x} swim?\nB: Yes, ___ can.",["Ken","Tom","Mika","Aya","Ben"],["he","him","his","her"],0,"男性名を受ける主語代名詞は he。"],
+  ["A: What time is it?\nB: ___ seven o'clock.",["now","today","here","there","already"],["It's","Its","It","Is"],0,"時刻は It's ... で答えます。"],
+  ["A: Thank you very much.\nB: ___.",["today","again","Ken","now","here"],["You're welcome","Good morning","I'm thirteen","Excuse me"],0,"お礼への応答は You're welcome."]
+ ],
+ email:[
+  ["Hi {x},\nI have a new bike. Let's ___ to the park tomorrow.\nKen",["Mika","Tom","Aya","Ben","Emi"],["go","goes","went","going"],0,"Let's の後は動詞の原形。"],
+  ["Dear {x},\nMy birthday party is ___ Sunday. Please come!\nYuki",["Ken","Sara","Mike","Anna","Leo"],["on","in","at","by"],0,"曜日の前は on。"],
+  ["Hi {x},\nI ___ two tickets for the soccer game. Do you want one?\nTom",["Aya","Mika","Ken","Ben","Emi"],["have","has","having","had"],0,"主語 I の現在形は have。"],
+  ["Dear {x},\nPlease ___ your English book tomorrow.\nMs. Green",["Class","Ken","Mika","Tom","Aya"],["bring","brings","brought","bringing"],0,"Please の後は動詞の原形。"],
+  ["Hi {x},\nI am at the station now. Please ___ for me there.\nEmi",["Ken","Tom","Mika","Aya","Ben"],["wait","waits","waiting","waited"],0,"Please の後は動詞の原形。"]
+ ],
+ context:[
+  ["{x} is my brother. ___ is twelve years old.",["Ken","Tom","Ben","Leo","Hiro"],["He","She","It","They"],0,"男性1人を受ける代名詞は He。"],
+  ["I have a dog. ___ name is Pochi.",["Today","At home","In Japan","Every day","Now"],["Its","It's","It","His"],0,"「その犬の名前」は Its name。"],
+  ["We are hungry. Let's ___ lunch now.",["At school","Today","Together","Here","Outside"],["eat","eats","ate","eating"],0,"Let's の後は動詞の原形。"],
+  ["This is my new camera. I ___ it yesterday.",["At home","In Tokyo","With Ken","For school","On Sunday"],["buy","bought","buys","buying"],1,"yesterday があるので過去形 bought。"],
+  ["My mother is in the kitchen. She ___ dinner now.",["Today","At home","For us","With me","Every day"],["cooks","is cooking","cooked","cook"],1,"now があるので現在進行形。"]
+ ]
+},
+"4":{
+ dialogue:[
+  ["A: Have you ever been to {x}?\nB: Yes, I ___ there last year.",["Kyoto","Osaka","Nara","Tokyo","Kobe"],["went","go","have go","going"],0,"last year があるので過去形 went。"],
+  ["A: May I use your {x}?\nB: Sure. Here you are.",["pen","dictionary","umbrella","camera","bike"],["May","Do","Am","Did"],0,"許可を求める May I ...?"],
+  ["A: How long does it take to get there?\nB: ___ twenty minutes.",["By bus","From here","Usually","Today","Maybe"],["About","At","On","For"],0,"所要時間は About twenty minutes. が自然。"],
+  ["A: Why were you late?\nB: Because I ___ the bus.",["this morning","today","again","yesterday","once"],["missed","miss","missing","have miss"],0,"過去の理由なので missed。"],
+  ["A: Would you like some tea?\nB: Yes, ___.",["today","please","now","again","here"],["please","I do","I like","I am"],0,"申し出への自然な応答は Yes, please."]
+ ],
+ email:[
+  ["Dear {x},\nThank you for inviting me. I ___ come to your party on Saturday.\nLisa",["Ken","Mika","Tom","Aya","Ben"],["can","am","do","have"],0,"can + 動詞原形で「行けます」。"],
+  ["Hi {x},\nI left my notebook in your room. Could you ___ it tomorrow?\nSam",["Mika","Tom","Aya","Ben","Emi"],["bring","brought","brings","bringing"],0,"Could you + 動詞原形。"],
+  ["Dear {x},\nOur club meeting starts ___ 4:00 p.m. today.\nMr. Brown",["Members","Students","Ken","Mika","Tom"],["at","on","in","by"],0,"時刻の前は at。"],
+  ["Hi {x},\nI was sick yesterday, so I ___ go to school.\nAnna",["Ken","Mika","Tom","Aya","Ben"],["couldn't","don't","won't","haven't"],0,"過去にできなかったので couldn't。"],
+  ["Dear {x},\nPlease tell me ___ you can join us on Sunday.\nMike",["Ken","Mika","Tom","Aya","Ben"],["if","what","where","who"],0,"「〜かどうか」は if。"]
+ ],
+ context:[
+  ["{x} was tired after practice. So he ___ to bed early.",["Ken","Tom","Ben","Leo","Hiro"],["went","goes","go","going"],0,"過去の出来事なので went。"],
+  ["It started to rain. We ___ our umbrellas.",["Suddenly","At noon","Outside","Today","Then"],["opened","open","opening","opens"],0,"過去の流れなので opened。"],
+  ["I have lived here ___ three years. I know the town well.",["Now","Already","Usually","Recently","Always"],["for","since","from","during"],0,"期間には for。"],
+  ["The cake was delicious. My sister ___ it yesterday.",["At home","For us","In the kitchen","After dinner","Today"],["made","makes","make","making"],0,"yesterday があるので made。"],
+  ["Tom is taller ___ Ken. They are in the same class.",["At school","Now","Today","Usually","Often"],["than","then","that","as"],0,"比較級 + than。"]
+ ]
+},
+"3":{
+ dialogue:[
+  ["A: What do you think of this plan?\nB: I think it ___ a good idea.",["for school","for us","today","in general","this time"],["is","be","being","was being"],0,"I think it is ... が自然。"],
+  ["A: Have you finished your report?\nB: No, I haven't finished it ___.",["today","this week","already","still","now"],["yet","ever","since","before"],0,"否定の現在完了では yet。"],
+  ["A: Could you tell me where the station is?\nB: Sure. Go straight and ___ left.",["there","then","next","finally","outside"],["turn","turns","turned","turning"],0,"命令文なので turn。"],
+  ["A: Why did you join the club?\nB: I wanted ___ new friends.",["at school","there","this year","in town","quickly"],["to make","making","made","make to"],0,"want to + 動詞原形。"],
+  ["A: Do you know the girl ___ is talking to Ken?\nB: Yes, she's my cousin.",["there","outside","today","now","over there"],["who","which","where","when"],0,"人を説明する関係代名詞 who。"]
+ ],
+ email:[
+  ["Dear {x},\nI am looking forward to ___ you next week.\nAnna",["Ken","Mika","Tom","Aya","Ben"],["seeing","see","saw","to see"],0,"look forward to + 動名詞。"],
+  ["Hi {x},\nIf it ___ tomorrow, the game will be canceled.\nCoach",["Ken","Team","Everyone","Mika","Tom"],["rains","will rain","rained","rain"],0,"条件節では未来でも現在形。"],
+  ["Dear {x},\nThe book ___ I borrowed from you was very interesting.\nSam",["Ken","Mika","Tom","Aya","Ben"],["which","who","where","when"],0,"物を説明する関係代名詞 which。"],
+  ["Hi {x},\nI wish I ___ more time to help you.\nEmi",["Ken","Mika","Tom","Aya","Ben"],["had","have","will have","having"],0,"現在の反実仮想は wish + 過去形。"],
+  ["Dear {x},\nPlease let me know what time I should ___.\nLeo",["Ken","Mika","Tom","Aya","Ben"],["come","came","coming","comes"],0,"should の後は動詞原形。"]
+ ],
+ context:[
+  ["{x} had already left when I arrived. I couldn't talk to him.",["Ken","Tom","Ben","Leo","Hiro"],["had left","left","has left","leaves"],0,"到着より前の出来事なので過去完了。"],
+  ["The problem was difficult, but we finally ___ it.",["Together","At school","Yesterday","After class","In class"],["solved","solve","solving","have solve"],0,"過去の文脈なので solved。"],
+  ["She practices every day because she wants to ___ her English.",["At home","After school","With friends","Online","In class"],["improve","improves","improved","improving"],0,"want to + 動詞原形。"],
+  ["I don't know what ___ next. Could you give me some advice?",["Now","Today","After this","At school","Here"],["to do","do","doing","did"],0,"疑問詞 + to不定詞。"],
+  ["The news made everyone ___. Nobody expected it.",["At school","Yesterday","There","At home","Today"],["surprised","surprise","surprising","to surprise"],0,"make + 人 + 形容詞。"]
+ ]
+},
+"p2":{
+ dialogue:[
+  ["A: Why did you choose this volunteer program?\nB: I wanted to ___ the local community.",["this year","during summer","with friends","after school","on weekends"],["help","helped","helping","to helping"],0,"want to + 動詞原形。"],
+  ["A: What can we do to save energy?\nB: We can ___ lights when we don't need them.",["at home","at school","every day","at night","in summer"],["turn off","turning off","turned off","turns off"],0,"can の後は動詞原形。"],
+  ["A: Do you know why the event was canceled?\nB: Yes. It was canceled ___ the storm.",["yesterday","suddenly","this morning","again","outside"],["because of","because","although","despite of"],0,"名詞句の前は because of。"],
+  ["A: Is this system useful?\nB: Yes. It allows users ___ tickets online.",["at home","quickly","easily","now","today"],["to buy","buy","buying","bought"],0,"allow + 人 + to do。"],
+  ["A: How did he solve the problem?\nB: He succeeded in ___ a new method.",["finally","yesterday","carefully","alone","there"],["using","use","used","to use"],0,"succeed in + 動名詞。"]
+ ],
+ email:[
+  ["Dear {x},\nOur event was organized in order to ___ money for charity.\nStaff",["Members","Volunteers","Students","Ken","Mika"],["raise","raised","raising","to raising"],0,"in order to + 動詞原形。"],
+  ["Hi {x},\nThe number of participants ___ increased this year.\nTom",["Ken","Mika","Team","Everyone","Staff"],["has","have","are","were"],0,"The number of ... は単数扱い。"],
+  ["Dear {x},\nIt is important for everyone ___ the rules carefully.\nManager",["Members","Students","Staff","Visitors","Guests"],["to read","read","reading","reads"],0,"It is important for + 人 + to do。"],
+  ["Hi {x},\nThe bridge, ___ was built in 1950, is still used today.\nKen",["Mika","Tom","Aya","Ben","Emi"],["which","who","where","what"],0,"物の非制限用法は which。"],
+  ["Dear {x},\nNo matter ___ busy you are, please reply by Friday.\nOffice",["Ken","Mika","Tom","Aya","Ben"],["how","what","which","where"],0,"no matter how + 形容詞。"]
+ ],
+ context:[
+  ["The city wants to reduce pollution. It is encouraging people ___ public transportation.",["This year","Recently","Now","Today","In summer"],["to use","use","using","used"],0,"encourage + 人 + to do。"],
+  ["The project lacked enough money. As a result, it ___ canceled.",["Finally","Last month","Suddenly","Yesterday","Later"],["was","is","has","be"],0,"過去受動態 was canceled。"],
+  ["The website is convenient. It makes it easier for users ___ information.",["Online","Quickly","At home","Every day","Now"],["to find","find","finding","found"],0,"make it easier for + 人 + to do。"],
+  ["She exercises every day. No matter how tired she ___, she keeps going.",["After work","At night","Usually","Sometimes","Often"],["is","was","be","being"],0,"現在の習慣なので is。"],
+  ["The teacher suggested that we ___ the article again. We found more details the second time.",["Carefully","At home","Later","Together","Again"],["read","reads","to read","reading"],0,"suggest that 節では動詞原形。"]
+ ]
+},
+"p2plus":{
+ dialogue:[
+  ["A: Why is food waste a concern?\nB: Because it ___ resources used to produce food.",["in many countries","today","globally","every day","in cities"],["wastes","waste","wasted","wasting"],0,"主語 it の現在形なので wastes。"],
+  ["A: What does the report recommend?\nB: It recommends ___ public transportation.",["in cities","nationwide","soon","gradually","first"],["improving","improve","improved","to improving"],0,"recommend + 動名詞。"],
+  ["A: Is the policy useful?\nB: It may have a significant impact ___ small businesses.",["locally","soon","this year","at first","overall"],["on","at","for","with"],0,"have an impact on。"],
+  ["A: Why are consumers changing?\nB: They are becoming more aware ___ environmental issues.",["recently","globally","today","online","at school"],["of","for","to","with"],0,"be aware of。"],
+  ["A: Which solution is better?\nB: The second seems ___ practical.",["overall","to me","today","for now","at first"],["more","most","very much","many"],0,"2つを比較するので more practical。"]
+ ],
+ email:[
+  ["Dear {x},\nOur program aims to ___ access to education.\nProject Team",["Members","Partners","Students","Staff","Volunteers"],["expand","expands","expanded","expansion"],0,"aim to + 動詞原形。"],
+  ["Hi {x},\nThere is growing demand ___ recycled products.\nKen",["Mika","Tom","Aya","Ben","Emi"],["for","to","by","of"],0,"demand for。"],
+  ["Dear {x},\nWe are considering ___ financial support next year.\nCommittee",["Members","Staff","Partners","Residents","Applicants"],["providing","provide","provided","to providing"],0,"consider + 動名詞。"],
+  ["Hi {x},\nThe issue is more complex ___ it first appears.\nAnna",["Ken","Mika","Tom","Aya","Ben"],["than","then","that","as if"],0,"比較級 + than。"],
+  ["Dear {x},\nThe new system is expected to ___ both workers and employers.\nOffice",["Staff","Members","Partners","Residents","Applicants"],["benefit","beneficial","benefits","benefited"],0,"be expected to + 動詞原形。"]
+ ],
+ context:[
+  ["The city introduced a bicycle-sharing system. It was designed to ___ traffic congestion.",["Recently","This year","Downtown","In summer","Gradually"],["reduce","reduces","reduced","reduction"],0,"to の後は動詞原形。"],
+  ["Public awareness has increased. As a result, more people are willing to ___ in local projects.",["Today","Now","Recently","Online","Together"],["participate","participates","participated","participating"],0,"be willing to + 動詞原形。"],
+  ["The proposal is expensive at first. However, it may be ___ in the long term.",["Overall","Eventually","For cities","For residents","In practice"],["beneficial","benefit","benefited","benefiting"],0,"be動詞の補語には形容詞。"],
+  ["Many experts support early action. They argue that problems are easier to solve ___ they become severe.",["In general","Usually","Often","Today","At first"],["before","unless","despite","during"],0,"「深刻になる前に」なので before。"],
+  ["The government wants to promote sustainable transport. One approach is to ___ public transit.",["Nationwide","Gradually","First","Soon","In cities"],["improve","improves","improved","improving"],0,"to の後は動詞原形。"]
+ ]
+},
+"2":{
+ dialogue:[
+  ["A: Why is reliable data important?\nB: It helps people ___ informed decisions.",["in research","in business","in society","today","quickly"],["make","making","made","to making"],0,"help + 人 + 動詞原形。"],
+  ["A: What does the evidence suggest?\nB: It is consistent ___ earlier findings.",["overall","so far","in general","today","recently"],["with","to","for","on"],0,"be consistent with。"],
+  ["A: Why was the policy introduced?\nB: It was intended to ___ inequality.",["nationally","gradually","over time","in cities","among groups"],["reduce","reducing","reduced","reduction"],0,"intend to + 動詞原形。"],
+  ["A: What happened after the experiment?\nB: The team ___ its original hypothesis.",["finally","later","then","carefully","eventually"],["revised","revise","revising","has revise"],0,"過去の流れなので revised。"],
+  ["A: Could the species survive?\nB: Only if its habitat is ___.",["carefully","soon","properly","widely","fully"],["protected","protect","protecting","protection"],0,"受動態 is protected。"]
+ ],
+ email:[
+  ["Dear {x},\nIt is essential that every applicant ___ the form by Friday.\nOffice",["Applicants","Students","Members","Staff","Candidates"],["submit","submits","submitted","to submit"],0,"essential that 節では動詞原形。"],
+  ["Hi {x},\nThe company decided to ___ a new strategy after sales declined.\nKen",["Mika","Tom","Aya","Ben","Emi"],["adopt","adopted","adopting","adoption"],0,"decide to + 動詞原形。"],
+  ["Dear {x},\nThe report discusses factors ___ to the rise in prices.\nEditor",["Readers","Students","Members","Staff","Researchers"],["contributing","contribute","contributed","to contribute them"],0,"factors contributing to ...。"],
+  ["Hi {x},\nMany species are at risk of ___ their natural habitats.\nAnna",["Ken","Mika","Tom","Aya","Ben"],["losing","lose","lost","to lose"],0,"risk of + 動名詞。"],
+  ["Dear {x},\nPlease explain how the figures ___ calculated.\nProfessor",["Students","Team","Researchers","Staff","Members"],["were","was","are being by","did"],0,"figures は複数で過去受動態 were calculated。"]
+ ],
+ context:[
+  ["The price was high. Had it been lower, more customers ___ the product.",["At the time","Last year","During the sale","Then","In stores"],["would have bought","will buy","bought","have bought"],0,"過去の反実仮想。"],
+  ["The researchers collected more evidence. Their conclusion became ___ as a result.",["Over time","Gradually","Eventually","Afterward","Finally"],["stronger","strong","strongest","strongly"],0,"比較の文脈なので stronger。"],
+  ["The policy was introduced to preserve natural areas. It also aims to ___ tourism more carefully.",["In the region","Over time","Locally","Gradually","Responsibly"],["manage","manages","managed","managing"],0,"aim to + 動詞原形。"],
+  ["The experiment had ended before the team noticed the error. Not until then ___ they understand the problem.",["Finally","Later","At last","Only then","Afterward"],["did","had","were","have"],0,"Not until then で倒置。"],
+  ["The proposal was controversial. Nevertheless, several experts ___ it.",["Publicly","At first","Eventually","Strongly","Openly"],["supported","support","supporting","have support"],0,"過去の文脈なので supported。"]
+ ]
+},
+"p1":{
+ dialogue:[
+  ["A: Why is the conclusion uncertain?\nB: Because the evidence is still ___.",["at this stage","so far","overall","for now","in part"],["tentative","abundant","decisive","transparent"],0,"tentative = 暫定的。"],
+  ["A: What effect could the reform have?\nB: It may ___ the burden on small businesses.",["in practice","gradually","eventually","overall","initially"],["alleviate","aggravate","compile","evade"],0,"alleviate = 軽減する。"],
+  ["A: Why did critics object?\nB: They believed the policy might ___ existing inequalities.",["unintentionally","in some cases","over time","indirectly","eventually"],["reinforce","facilitate","mitigate","allocate"],0,"reinforce = 強化する。"],
+  ["A: Is the plan realistic?\nB: Yes. It appears economically ___.",["overall","in principle","for now","at least","on paper"],["feasible","arbitrary","negligible","persistent"],0,"feasible = 実行可能な。"],
+  ["A: Why did the team change its view?\nB: New evidence began to ___ the earlier theory.",["gradually","seriously","directly","clearly","increasingly"],["undermine","undergo","undertake","allocate"],0,"undermine = 弱体化させる。"]
+ ],
+ email:[
+  ["Dear {x},\nOnly after several failures ___ the team identify the flaw.\nProfessor",["Researchers","Students","Colleagues","Staff","Reviewers"],["did","had","was","has"],0,"Only after ... が文頭に来ると主節倒置。"],
+  ["Hi {x},\nThe measure was introduced in response ___ public pressure.\nKen",["Mika","Tom","Aya","Ben","Emi"],["to","for","at","by"],0,"in response to。"],
+  ["Dear {x},\nIt remains unclear whether the benefits ___ the risks.\nEditor",["Readers","Researchers","Reviewers","Staff","Students"],["outweigh","outweighs","is outweighing","has outweighed them"],0,"benefits は複数なので outweigh。"],
+  ["Hi {x},\nThe findings should be interpreted ___ caution.\nAnna",["Ken","Mika","Tom","Aya","Ben"],["with","by","for","at"],0,"with caution。"],
+  ["Dear {x},\nMuch of the criticism stems ___ a misunderstanding of the data.\nCommittee",["Members","Researchers","Readers","Staff","Students"],["from","at","with","into"],0,"stem from。"]
+ ],
+ context:[
+  ["The initial results looked promising. However, the evidence remained too ___ to justify a major policy change.",["At first","Overall","For now","So far","In practice"],["tentative","decisive","transparent","abundant"],0,"tentative = 確定的でない。"],
+  ["The regulation reduced one problem but created another. This unintended effect may ___ public support.",["Over time","Eventually","Gradually","Indirectly","In practice"],["undermine","facilitate","reinforce","allocate"],0,"undermine = 弱める。"],
+  ["The proposal is expensive but technically possible. In other words, it is financially difficult yet ___.",["In principle","Overall","At least","For now","Technically"],["feasible","arbitrary","negligible","ambiguous"],0,"feasible = 実行可能な。"],
+  ["The new study controlled for several variables. This helped ___ the possibility of alternative explanations.",["More clearly","Statistically","In part","To some extent","Methodologically"],["reduce","reduces","reduced","reducing"],0,"help + 動詞原形。"],
+  ["The theory was once controversial. As new evidence accumulated, it became increasingly ___.",["Over time","Gradually","Eventually","Academically","Widely"],["accepted","accept","accepting","acceptance"],0,"became + 過去分詞形容詞 accepted。"]
+ ]
+},
+"1":{
+ dialogue:[
+  ["A: Why was the statement criticized?\nB: Because it was deliberately ___.",["in several places","throughout","at key points","in tone","overall"],["equivocal","unequivocal","arduous","prolific"],0,"equivocal = 曖昧な。"],
+  ["A: What did the new evidence do?\nB: It helped ___ the defendant.",["eventually","decisively","publicly","legally","finally"],["vindicate","obfuscate","vacillate","exacerbate"],0,"vindicate = 正当性・無実を証明する。"],
+  ["A: Why is the argument weak?\nB: Because the supporting evidence is ___.",["at best","overall","in places","so far","in part"],["tenuous","prolific","sagacious","assiduous"],0,"tenuous = 弱い・希薄な。"],
+  ["A: Why did officials react slowly?\nB: The warning was too ___ to justify immediate action.",["initially","at first","in wording","overall","in tone"],["ambiguous","salient","immutable","prolific"],0,"ambiguous = 曖昧な。"],
+  ["A: How would you describe the methodology?\nB: It was unusually ___.",["for the field","by comparison","overall","in design","for its time"],["rigorous","perfunctory","impetuous","capricious"],0,"rigorous = 厳密な。"]
+ ],
+ email:[
+  ["Dear {x},\nRarely ___ such a rapid shift in public attitudes been documented.\nEditor",["Readers","Colleagues","Researchers","Reviewers","Students"],["has","have","did","was"],0,"Rarely が文頭に来る倒置。"],
+  ["Hi {x},\nThe findings are ___ with the hypothesis, though they do not prove it.\nAnna",["Ken","Mika","Tom","Aya","Ben"],["compatible","capricious","perfunctory","esoteric"],0,"compatible with。"],
+  ["Dear {x},\nThe author cautions against ___ correlation with causation.\nProfessor",["Students","Researchers","Readers","Reviewers","Staff"],["confusing","confuse","to confuse","confused"],0,"against + 動名詞。"],
+  ["Hi {x},\nThe proposal was dismissed as ___ because it ignored practical constraints.\nKen",["Mika","Tom","Aya","Ben","Emi"],["utopian","ubiquitous","laconic","immutable"],0,"utopian = 非現実的に理想主義的な。"],
+  ["Dear {x},\nThe recommendation was accepted, albeit ___.\nCommittee",["Members","Reviewers","Researchers","Staff","Observers"],["reluctantly","ubiquitously","arduous","salience"],0,"albeit reluctantly。"]
+ ],
+ context:[
+  ["The policy produced impressive gains, but they disappeared within months. The benefits were largely ___.",["At first","Initially","For a time","In the short term","Overall"],["ephemeral","immutable","ubiquitous","assiduous"],0,"ephemeral = つかの間の。"],
+  ["The testimony was exceptionally persuasive. So ___ was it that even skeptical jurors changed their minds.",["At trial","In court","Overall","By the end","To many"],["cogent","tenuous","perfunctory","capricious"],0,"cogent = 説得力のある。"],
+  ["The apparent contradiction disappears once short-term and long-term effects are ___.",["Carefully","Explicitly","Properly","Analytically","Conceptually"],["distinguished","distinguish","distinguishing","distinction"],0,"受動態 are distinguished。"],
+  ["The critic argued that the theory relied on assumptions too weak to support its conclusion. In that sense, the argument was ___.",["Fundamentally","Ultimately","Methodologically","Logically","Overall"],["tenuous","salient","prolific","assiduous"],0,"tenuous = 脆弱な。"],
+  ["The committee examined every detail before reaching a decision. Its approach was notably ___.",["Throughout","By design","In practice","Overall","From the start"],["circumspect","impetuous","capricious","perfunctory"],0,"circumspect = 慎重な。"]
+ ]
+}
+};
+
+function makeCloze(g,nidx){
+ const bank=CLZ[g];
+ const subtype=nidx%4;
+ if(subtype===0){
+   // Existing single-sentence bank remains part of the mix.
+   const rows=C[g], r=rows[Math.floor(nidx/4)%rows.length];
+   const v=r[1][Math.floor(nidx/rows.length)%r[1].length];
+   let stem=r[0].replace("{x}",v);
+   let opts=[...r[2]], correct=opts[r[3]];
+   let shift=(nidx+g.length)%opts.length;
+   opts=opts.slice(shift).concat(opts.slice(0,shift));
+   return {prompt:stem,options:opts,answer:opts.indexOf(correct),explanation:r[4]};
+ }
+ const key=subtype===1?"dialogue":subtype===2?"email":"context";
+ const rows=bank[key];
+ const r=rows[Math.floor(nidx/4)%rows.length];
+ const v=r[1][Math.floor(nidx/(rows.length*2))%r[1].length];
+ let stem=r[0].replace("{x}",v);
+ let opts=[...r[2]], correct=opts[r[3]];
+ let shift=(nidx*3+key.length)%opts.length;
+ opts=opts.slice(shift).concat(opts.slice(0,shift));
+ return {prompt:stem,options:opts,answer:opts.indexOf(correct),explanation:r[4]};
+}
+
 const TL={meaning:"言葉の意味",cloze:"穴埋め問題",qa_jp:"英文の質問 → 日本語で回答",qa_en:"英文の質問 → 英語で回答"};
 function rotateOpts(arr,correct,seed){let ds=[];for(let k=1;ds.length<3;k++){let v=arr[(seed+k*4)%arr.length];if(v!==correct&&!ds.includes(v))ds.push(v)}let out=ds.concat([correct]);let shift=seed%4;out=out.slice(shift).concat(out.slice(0,shift));return [out,out.indexOf(correct)]}
 function timePhrase(t){
@@ -216,19 +428,13 @@ function build(){
      });
    }
 
-   // 250 cloze questions = existing 50 base sentences × 5 display variants.
-   for(let rep=0;rep<5;rep++){
-     C[g].forEach((r,pi)=>r[1].forEach((v,vi)=>{
-       let stem=r[0].replace("{x}",v);
-       let opts=[...r[2]], correctOpt=opts[r[3]];
-       let shift=(rep+pi+vi)%opts.length;
-       opts=opts.slice(shift).concat(opts.slice(0,shift));
-       q.push({
-         id:"q"+id++,grade:g,type:"cloze",
-         prompt:clozeLead[rep]+stem,
-         options:opts,answer:opts.indexOf(correctOpt),explanation:r[4]
-       });
-     }));
+   // 250 cloze questions mixing single sentences, dialogues, emails, and multi-sentence context.
+   for(let nidx=0;nidx<250;nidx++){
+     const c=makeCloze(g,nidx);
+     q.push({
+       id:"q"+id++,grade:g,type:"cloze",
+       prompt:c.prompt,options:c.options,answer:c.answer,explanation:c.explanation
+     });
    }
 
    // 250 English passage -> Japanese question/Japanese answers.

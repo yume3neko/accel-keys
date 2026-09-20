@@ -1,7 +1,11 @@
 const json=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store'}});
 export const validPath=p=>typeof p==='string'&&p.length>0&&p.length<512&&!/[\\\x00-\x1f]/.test(p)&&p.split('/').every(x=>x&&x!=='.'&&x!=='..');
 const idOK=id=>/^[a-f0-9-]{36}$/.test(id||'');
-const allowed=p=>/\.(mc|tja|ogg|mp3|wav|m4a|flac|mp4|webm|m4v)$/i.test(p);
+const allowed=p=>/\.(mc|tja|ogg|mp3|wav|m4a|flac|mp4|webm|m4v|png|jpe?g|webp|gif)$/i.test(p);
+const mime=p=>{
+ const ext=String(p||'').split('.').pop().toLowerCase();
+ return ({png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',mp4:'video/mp4',webm:'video/webm',m4v:'video/x-m4v',mp3:'audio/mpeg',ogg:'audio/ogg',wav:'audio/wav',m4a:'audio/mp4',flac:'audio/flac',tja:'text/plain; charset=utf-8',mc:'application/json'})[ext]||'application/octet-stream';
+};
 const readJSON=async(bucket,key)=>{const f=await bucket.get(key);return f?await f.json():null};
 const removePrefix=async(bucket,prefix)=>{let cursor;do{const page=await bucket.list({prefix,cursor});if(page.objects.length)await bucket.delete(page.objects.map(o=>o.key));cursor=page.truncated?page.cursor:undefined}while(cursor)};
 const normTitle=s=>String(s||'').normalize('NFC').trim();
@@ -56,7 +60,7 @@ export async function onRequest({request,env}){
   if(request.method==='PUT'){
    const path=url.searchParams.get('path');if(!validPath(path)||!allowed(path))return json({error:'ファイル名・拡張子が不正です。'},400);
    const size=Number(request.headers.get('content-length'));if(!Number.isSafeInteger(size)||size<=0||size>90*1024*1024)return json({error:'1ファイルは90MiB以下にしてください。'},413);
-   await bucket.put(prefix+path,request.body,{httpMetadata:{contentType:'application/octet-stream'}});return json({ok:true});
+   await bucket.put(prefix+path,request.body,{httpMetadata:{contentType:mime(path)}});return json({ok:true});
   }
   if(request.method==='POST'){
    const raw=await request.text();if(raw.length>100000)return json({error:'曲一覧が大きすぎます。'},413);
@@ -68,6 +72,10 @@ export async function onRequest({request,env}){
     for(const k of ['soflan','scrollOnNotes','scrollStop','reverseScroll','fadeOnNotes','branch','dummy','damage','fadeout','mv'])entry.features[k]=s.features?.[k]===true;
     needed.add(s.chartPath);needed.add(s.audioPath);
     if(s.videoPath){if(!validPath(s.videoPath)||!/\.(mp4|webm|m4v)$/i.test(s.videoPath))throw Error('動画の指定が不正です。');entry.video=asset(s.videoPath);entry.features.mv=true;needed.add(s.videoPath)}
+    if(s.spinnerPath){
+     if(!validPath(s.spinnerPath)||!/^spinner\.(png|jpe?g|webp|gif)$/i.test(s.spinnerPath.split('/').pop()))throw Error('spinner画像の指定が不正です。');
+     entry.spinner=asset(s.spinnerPath);needed.add(s.spinnerPath);
+    }
     output.push(entry);
    }
    for(const p of needed)if(!await bucket.head(prefix+p))throw Error('未保存のファイル：'+p);

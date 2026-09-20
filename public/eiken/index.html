@@ -9,7 +9,7 @@
 <body><div class="shell">
 <header><div class="brand">英検ランダムトレーナー<small>非公式・オリジナル練習問題</small></div><button id="resetStats" class="ghost">記録リセット</button></header>
 <main id="home">
-<section class="card hero"><h1>英語力を、<br>1問ずつ上へ。</h1><p>5級から1級まで難易度順に練習。4種類の問題形式からランダム出題し、実力チェックでは正解し続けるほど上の級へ進みます。</p><div class="badges"><span class="badge">全8,000問</span><span class="badge">各級1,000問</span><span class="badge">4形式 × 各250問</span></div></section>
+<section class="card hero"><h1>英語力を、<br>1問ずつ上へ。</h1><p>5級から1級まで難易度順に練習。4種類の問題形式と多彩な文章パターンからランダム出題し、実力チェックでは正解し続けるほど上の級へ進みます。</p><div class="badges"><span class="badge">全8,000問</span><span class="badge">各級1,000問</span><span class="badge">4形式 × 各250問</span></div></section>
 <div class="title">1. レベルを選択（5級 → 1級）</div><div class="grade-grid" id="gradeGrid"></div>
 <div class="title">2. 通常練習</div><section class="card"><div class="form-grid"><div class="field"><label>問題数</label><select id="count"><option>10</option><option>20</option><option>30</option><option>50</option><option>100</option><option>250</option><option>500</option><option>1000</option><option value="9999">この条件の全問題</option></select></div><div class="field"><label>問題形式</label><select id="type"><option value="all">4形式すべて</option><option value="meaning">言葉の意味</option><option value="cloze">穴埋め問題</option><option value="qa_jp">英文の質問 → 日本語で回答</option><option value="qa_en">英文の質問 → 英語で回答</option></select></div></div><button id="start" class="primary start" disabled>レベルを選んでスタート</button><button id="skill" class="primary skill">🚀 実力チェックモード</button><div class="mode-note">実力チェック：5級から開始し、各級4問中3問以上正解で次の級へ。最大32問で1級まで挑戦します。</div><div class="stats"><div class="stat"><b id="answered">0</b><span>累計回答</span></div><div class="stat"><b id="accuracy">—</b><span>正答率</span></div><div class="stat"><b id="weak">0</b><span>復習候補</span></div></div></section></main>
 <main id="quiz" class="hidden"><div id="skillBanner" class="skill-banner hidden"></div><div class="quiz-top"><button id="quit" class="secondary">← 終了</button><div class="progress-wrap"><div id="progress" class="progress"></div></div></div><div class="meta"><span id="meta"></span><span id="liveScore"></span></div><section class="card"><span id="qtype" class="qtype"></span><div id="passage" class="passage hidden"></div><div id="question" class="question"></div><div id="options" class="options"></div><div id="explain" class="explain hidden"></div><div id="nextRow" class="next-row hidden"><button id="next" class="primary">次の問題 →</button></div></section><div class="footer">キーボードの 1〜4 でも回答できます。回答後は Enter で次へ進めます。</div></main>
@@ -30,6 +30,131 @@ const JP={};
 ["月曜日","火曜日","水曜日","木曜日","金曜日","土曜日","日曜日","今朝","先週","来月"].forEach((v,i)=>JP[T[i]]=v);
 ["英語を勉強する","友達に会う","本を買う","クラブに参加する","地域の子どもたちを手伝う","ワークショップに参加する","調査データを集める","レポートを準備する","展示会を訪れる","清掃活動に参加する"].forEach((v,i)=>JP[A[i]]=v);
 ["テストの準備をするため","新しいことを学ぶため","地域社会を助けるため","時間を節約するため","ごみを減らすため","プロジェクトを改善するため","問題をよりよく理解するため","地域住民と会うため","実践的な経験を得るため","さまざまな考えを比較するため"].forEach((v,i)=>JP[R[i]]=v);
+
+const ITEM=["a notebook","a train ticket","a sandwich","an umbrella","a museum ticket","a dictionary","a bottle of water","a bus pass","a gift","a concert ticket"];
+const PRICE=["500 yen","800 yen","1,200 yen","1,500 yen","2,000 yen","2,500 yen","3,000 yen","3,500 yen","4,000 yen","4,500 yen"];
+const MODE=["by bus","by train","by bicycle","on foot","by subway","by car","by taxi","by ferry","by school bus","by local train"];
+const WEATHER=["sunny","rainy","cloudy","windy","snowy","hot","cold","warm","cool","stormy"];
+const CLOCK=["at 8:00","at 9:00","at 10:30","at 11:00","at 1:00 p.m.","at 2:30 p.m.","at 3:00 p.m.","at 4:30 p.m.","at 6:00 p.m.","at 7:30 p.m."];
+const FREQ=["every day","every morning","every evening","three times a week","twice a week","once a week","on weekends","after school","before breakfast","after dinner"];
+const EVENT=["a music festival","a science fair","a book sale","a sports event","a volunteer meeting","an art exhibition","a school festival","a cooking class","a local concert","a community workshop"];
+const JPX={};
+[
+ [ITEM,["ノート","電車の切符","サンドイッチ","傘","博物館のチケット","辞書","水のボトル","バス定期券","贈り物","コンサートのチケット"]],
+ [PRICE,["500円","800円","1,200円","1,500円","2,000円","2,500円","3,000円","3,500円","4,000円","4,500円"]],
+ [MODE,["バスで","電車で","自転車で","徒歩で","地下鉄で","車で","タクシーで","フェリーで","スクールバスで","各駅停車で"]],
+ [WEATHER,["晴れ","雨","くもり","風が強い","雪","暑い","寒い","暖かい","涼しい","嵐"]],
+ [CLOCK,["8時","9時","10時30分","11時","13時","14時30分","15時","16時30分","18時","19時30分"]],
+ [FREQ,["毎日","毎朝","毎晩","週3回","週2回","週1回","週末に","放課後","朝食前","夕食後"]],
+ [EVENT,["音楽祭","科学フェア","古本セール","スポーツイベント","ボランティア会議","美術展","学校祭","料理教室","地域コンサート","地域ワークショップ"]]
+].forEach(([a,b])=>a.forEach((x,i)=>JPX[x]=b[i]));
+Object.assign(JPX,JP);
+
+function addComplexity(g,base,extra,advanced){
+ if(g==="5") return base;
+ if(g==="4") return base+" "+extra;
+ if(g==="3"||g==="p2") return base+" "+extra+" "+advanced;
+ return base+" "+extra+" "+advanced+" The information was included so that readers could make a practical decision based on the details provided.";
+}
+function makeReading(g,nidx){
+ const b=Math.floor(nidx/10),r=nidx%10,sc=nidx%10;
+ const n=N[(r+b)%10],n2=N[(r+b+3)%10];
+ const p=P[(r*3+b*5+1)%10],p2=P[(r*7+b*2+4)%10];
+ const t=T[(r*5+b*3+2)%10],a=A[(r*7+b*4+3)%10],reason=R[(r*9+b*2+1)%10];
+ const item=ITEM[(r*3+b*7+2)%10],item2=ITEM[(r*7+b*3+5)%10];
+ const price=PRICE[(r*5+b*2+1)%10],price2=PRICE[(r*7+b*4+3)%10];
+ const mode=MODE[(r*9+b+2)%10],weather=WEATHER[(r*7+b*3)%10];
+ const clock=CLOCK[(r*3+b*5+4)%10],freq=FREQ[(r*5+b*7+1)%10],event=EVENT[(r*7+b*5+2)%10];
+
+ let passage,qjp,qen,pool,correct;
+ switch(sc){
+   case 0:
+     passage=addComplexity(g,
+       n+" will "+a+" at "+p+" "+timePhrase(t)+".",
+       "The plan was made "+reason+".",
+       n+" checked the schedule in advance and decided that this was the most convenient option."
+     );
+     qjp=n+"は何をする予定ですか？"; qen="What does "+n+" plan to do?"; pool=A; correct=a; break;
+   case 1:
+     passage=addComplexity(g,
+       n+" bought "+item+" for "+price+".",
+       n+" also looked at "+item2+", but did not buy it.",
+       "The purchase was made after comparing several choices in the store."
+     );
+     qjp=n+"はいくら支払いましたか？"; qen="How much did "+n+" pay?"; pool=PRICE; correct=price; break;
+   case 2:
+     passage=addComplexity(g,
+       n+" usually travels "+mode+".",
+       "Today, "+n+" needs to arrive at "+p+" "+clock+".",
+       "Because the schedule is tight, "+n+" decided not to change the usual route."
+     );
+     qjp=n+"は普段どのように移動しますか？"; qen="How does "+n+" usually travel?"; pool=MODE; correct=mode; break;
+   case 3:
+     passage=addComplexity(g,
+       "The weather will be "+weather+" "+timePhrase(t)+".",
+       n+" therefore decided to "+a+".",
+       "The weather forecast was the main reason for changing the original plan."
+     );
+     qjp="天気はどうなる予報ですか？"; qen="What is the weather forecast?"; pool=WEATHER; correct=weather; break;
+   case 4:
+     passage=addComplexity(g,
+       n+"'s club starts "+clock+".",
+       "Before that, "+n+" will meet "+n2+" at "+p+".",
+       "They plan to finish their conversation before the club activity begins."
+     );
+     qjp=n+"のクラブは何時に始まりますか？"; qen="What time does "+n+"'s club start?"; pool=CLOCK; correct=clock; break;
+   case 5:
+     passage=addComplexity(g,
+       n+" invited "+n2+" to "+event+" "+timePhrase(t)+".",
+       "The event will be held at "+p+".",
+       "The invitation explained that visitors should arrive a little early."
+     );
+     qjp="イベントはどこで行われますか？"; qen="Where will the event be held?"; pool=P; correct=p; break;
+   case 6:
+     passage=addComplexity(g,
+       n+" borrowed "+item+" from "+p+".",
+       "It must be returned "+timePhrase(t)+".",
+       n+" wrote the return date in a notebook to avoid forgetting it."
+     );
+     qjp=n+"は何を借りましたか？"; qen="What did "+n+" borrow?"; pool=ITEM; correct=item; break;
+   case 7:
+     passage=addComplexity(g,
+       event+" will begin "+clock+" at "+p+".",
+       "A ticket costs "+price+".",
+       "The organizer recommends buying tickets early because the number of seats is limited."
+     );
+     qjp="チケットはいくらですか？"; qen="How much is a ticket?"; pool=PRICE; correct=price; break;
+   case 8:
+     passage=addComplexity(g,
+       n+" "+(g==="5"?"studies English":"practices English")+" "+freq+".",
+       "The habit started because "+reason+".",
+       n+" says that keeping a regular routine makes progress easier to notice."
+     );
+     qjp=n+"はどのくらいの頻度で英語を練習しますか？"; qen="How often does "+n+" practice English?"; pool=FREQ; correct=freq; break;
+   default:
+     passage=addComplexity(g,
+       n+" compared two choices. "+item+" costs "+price+", while "+item2+" costs "+price2+".",
+       n+" wants to spend less money.",
+       "The final choice will depend mainly on price rather than appearance."
+     );
+     const nums=[parseInt(price.replace(/[^0-9]/g,"")),parseInt(price2.replace(/[^0-9]/g,""))];
+     correct=nums[0]<=nums[1]?item:item2;
+     qjp=n+"がお金を節約したい場合、どちらを選ぶのが安いですか？";
+     qen="Which choice is cheaper for "+n+"?";
+     pool=ITEM;
+ }
+ const opts=rotateOpts(pool,correct,nidx+13);
+ return {
+   passage,
+   qjp,qen,
+   optionsEn:opts[0],
+   optionsJp:opts[0].map(x=>JPX[x]||JP[x]||x),
+   answer:opts[1],
+   correctEn:correct,
+   correctJp:JPX[correct]||JP[correct]||correct
+ };
+}
+
 const TL={meaning:"言葉の意味",cloze:"穴埋め問題",qa_jp:"英文の質問 → 日本語で回答",qa_en:"英文の質問 → 英語で回答"};
 function rotateOpts(arr,correct,seed){let ds=[];for(let k=1;ds.length<3;k++){let v=arr[(seed+k*4)%arr.length];if(v!==correct&&!ds.includes(v))ds.push(v)}let out=ds.concat([correct]);let shift=seed%4;out=out.slice(shift).concat(out.slice(0,shift));return [out,out.indexOf(correct)]}
 function timePhrase(t){
@@ -108,50 +233,23 @@ function build(){
 
    // 250 English passage -> Japanese question/Japanese answers.
    for(let nidx=0;nidx<250;nidx++){
-     let block=Math.floor(nidx/10),rr=nidx%10,n=N[(rr+block)%10],
-         a=A[(rr*3+block*7+1)%10],
-         p=P[(rr*7+block*3+2)%10],
-         t=T[(rr*9+block*5+3)%10],
-         r=R[(rr*5+block*9+4)%10],
-         kind=nidx%4,pas=passage(g,n,a,p,t,r),
-         pools=[P,T,A,R],
-         correctAns=[p,t,a,r][kind],
-         ask=[
-           n+"はどこへ行く予定ですか？",
-           n+"はいつこれをする予定ですか？",
-           n+"は何をする予定ですか？",
-           n+"はなぜこの計画を選びましたか？"
-         ][kind],
-         eng=rotateOpts(pools[kind],correctAns,nidx+2),
-         jpOpts=eng[0].map(x=>JP[x]);
+     const item=makeReading(g,nidx);
      q.push({
-       id:"q"+id++,grade:g,type:"qa_jp",passage:pas,prompt:ask,
-       options:jpOpts,answer:eng[1],
-       explanation:"本文の内容に合う答えは「"+JP[correctAns]+"」です。"
+       id:"q"+id++,grade:g,type:"qa_jp",
+       passage:item.passage,prompt:item.qjp,
+       options:item.optionsJp,answer:item.answer,
+       explanation:"本文の内容に合う答えは「"+item.correctJp+"」です。"
      });
    }
 
    // 250 English passage -> English question/English answers.
    for(let nidx=0;nidx<250;nidx++){
-     let block=Math.floor(nidx/10),rr=nidx%10,n=N[(rr+4+block)%10],
-         a=A[(rr*7+block*5+3)%10],
-         p=P[(rr*3+block*7+1)%10],
-         t=T[(rr*5+block*3+6)%10],
-         r=R[(rr*9+block*2+2)%10],
-         kind=(nidx+2)%4,pas=passage(g,n,a,p,t,r),
-         pools=[P,T,A,R],
-         correctAns=[p,t,a,r][kind],
-         ask=[
-           "Where will "+n+" go?",
-           "When will "+n+" do this?",
-           "What does "+n+" plan to do?",
-           "Why did "+n+" choose this plan?"
-         ][kind],
-         eng=rotateOpts(pools[kind],correctAns,nidx+5);
+     const item=makeReading(g,nidx+250);
      q.push({
-       id:"q"+id++,grade:g,type:"qa_en",passage:pas,prompt:ask,
-       options:eng[0],answer:eng[1],
-       explanation:"The passage gives the answer as “"+correctAns+".”"
+       id:"q"+id++,grade:g,type:"qa_en",
+       passage:item.passage,prompt:item.qen,
+       options:item.optionsEn,answer:item.answer,
+       explanation:"The passage gives the answer as “"+item.correctEn+".”"
      });
    }
  });

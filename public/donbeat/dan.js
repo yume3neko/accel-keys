@@ -118,8 +118,9 @@ function danConditionView(c,i,value,pending=false){const red=c.red[i],gold=c.gol
  const box=danNode('div',undefined,'exam-gauge'+(pending?' pending':''));
  const label=danNode('div',undefined,'exam-caption');label.append(danNode('b',(c.scope==='song'?(i+1)+'曲目 ':'全体 ')+danMetrics[c.type].label),danNode('span',pending?'未演奏':down?kind+'まで あと '+stage.remaining:String(value)));box.append(label);
  const track=danNode('div',undefined,'exam-track'+(second?' second-stage':'')),fill=danNode('i');
- const danger=down&&!pending&&stage.remaining<5;
- fill.className=(pending?'':danPass(value,gold,c,i)?'rainbow':danPass(value,red,c,i)?'yellow':'red')+(danger?' danger':'');fill.style.width=ratio*100+'%';track.append(fill);
+ const goldPass=danPass(value,gold,c,i),redPass=danPass(value,red,c,i);
+ const danger=down&&!pending&&!goldPass&&redPass&&stage.remaining<5;
+ fill.className=(pending?'':goldPass?'rainbow':redPass?'yellow':'red')+(danger?' danger':'');fill.style.width=ratio*100+'%';track.append(fill);
  const mark=danNode('em',undefined,kind==='赤'?'border-red':'border-gold');mark.style.left=down?'0%':'100%';mark.title=kind+' '+target+danLabel(c,i);track.append(mark);
  track.setAttribute('role','meter');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax',String(Math.max(1,capacity)));track.setAttribute('aria-valuenow',String(amount));track.setAttribute('aria-label',danMetrics[c.type].label+' '+kind+(down?'合格までの残り':'合格への進捗'));
  if(danger)track.className+=' danger';box.append(track,danNode('small',(second?'② ':'① ')+kind+' '+target+danLabel(c,i)+' ／ 赤 '+red+'・金 '+gold));return box;}

@@ -28,7 +28,7 @@ function refreshDanSongs(){
  const card=danNode('section',undefined,'result-song');card.append(danNode('h3',(i+1)+'. '+danPendingTitle(song,i)));
  const difficulty=song.course!==undefined?['かんたん','ふつう','むずかしい','おに','裏おに'][song.course]:entry?.chart.meta.LEVEL&&entry.chart.meta.LEVEL!=='?'?'★ '+entry.chart.meta.LEVEL:'';
  if(difficulty)card.append(danNode('p',difficulty));
- card.append(danNode('p',entry?entry.chart.audioFile?'準備完了':'音源未読込':'譜面未読込','dan-preview-status'));
+ card.append(danNode('p',entry?(entry.demo||playbackAssetsAvailable(entry.chart)?'準備完了':'音源未読込'):'譜面未読込','dan-preview-status'));
  for(const r of c.conditions.filter(r=>r.scope==='song'))card.append(danNode('p',condition(r,i),'dan-preview-condition'));
  list.append(card)});box.append(list);
 }
@@ -64,7 +64,7 @@ function resolveDanConfig(preview=false,onlyIndex=null){
  if(!matches.length)matches=danPool.filter(e=>(e.chart.meta.TITLE||'').normalize('NFC')===song.chart.normalize('NFC'));
  if(song.course!==undefined){const courses={easy:0,normal:1,hard:2,oni:3,edit:4};matches=matches.filter(e=>{if(/\.mc$/i.test(e.chart.sourcePath||''))return false;const course=String(e.chart.meta.COURSE||'Oni').trim().toLowerCase();return (Object.hasOwn(courses,course)?courses[course]:/^[0-4]$/.test(course)?Number(course):-1)===song.course});}
  if(matches.length!==1)throw Error((i+1)+'曲目：'+danPendingTitle(song,i)+(matches.length?' が複数あります。難易度番号や譜面の相対パスで特定してください。':' に一致する譜面・難易度がありません。指定を確認して譜面を追加してください。'));
- if(!preview&&!matches[0].chart.audioFile)throw Error((i+1)+'曲目の音源 '+(matches[0].chart.meta.WAVE||'')+' が未読込です。');return {...matches[0],demo:!!matches[0].chart.builtinDemo};});
+ const target=matches[0].chart,demo=!!target.builtinDemo;if(!preview&&!demo&&!playbackAssetsAvailable(target))throw Error((i+1)+'曲目の音源 '+(target.meta.WAVE||'')+' が見つかりません。');return {...matches[0],demo};});
  return {...c,songs:selected.filter(Boolean),auto:false};
 }
 async function tryStartPendingDan(){if(!pendingDan||!pendingDan.armed||danRun)return;refreshDanSongs();} 
@@ -126,10 +126,50 @@ function danConditionView(c,i,value,pending=false){const red=c.red[i],gold=c.gol
  if(danger)track.className+=' danger';box.append(track,danNode('small',(second?'② ':'① ')+kind+' '+target+danLabel(c,i)+' ／ 赤 '+red+'・金 '+gold));return box;}
 function updateDanHUD(){updateSoulDisplay();const hud=$('danHud');if(!danRun){hud.hidden=true;return}hud.hidden=false;hud.replaceChildren();hud.append(danNode('b',danRun.config.name+'　'+(danRun.index+1)+'/'+danRun.config.songs.length+'曲　'+(danRun.failed?'不合格確定・この曲まで':''),'dan-heading'));
  const grid=danNode('div',undefined,'exam-grid');for(const c of danRun.config.conditions){const group=danNode('div',undefined,'exam-group');const indices=c.scope==='song'?[danRun.index]:[0];for(const i of indices){const stats=c.scope==='total'?danStats():danRun.results[i]||danSongStats();group.append(danConditionView(c,i,stats?.[c.type]||0,!stats))}grid.append(group)}hud.append(grid);}
-async function launchDan(automatic=false){if(loading||importing||danRun)return;let config;try{config=resolveDanConfig();config.auto=automatic===true}catch(e){$('danError').textContent=e.message;return}loading=true;if(!$('danDialog').open)$('danDialog').showModal();$('danPlayAuto').disabled=true;$('danPlay').disabled=true;$('danClose').disabled=true;try{await audio().resume();const buffers=[],cache=new Map();for(let i=0;i<config.songs.length;i++){const e=config.songs[i],c=e.chart;$('danError').textContent=(i+1)+'/'+config.songs.length+'曲目の音源を準備中…';if(e.demo){buffers.push(null);continue}const file=c.audioFile;if(!file)throw Error((i+1)+'曲目の音源がありません。対応する音源を追加してください。');if(c===chart&&audioBuffer)cache.set(file,audioBuffer);if(!cache.has(file))cache.set(file,c.preloadedAudio||await audio().decodeAudioData(await file.arrayBuffer()));buffers.push(cache.get(file))}
- pendingDan.armed=false;danRun={config,buffers,index:0,results:[],baseline:{score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0},songCombo:0,songMaxCombo:0,original:{chart,charts,audioBuffer,demoMode},finished:false,failed:false};$('danDialog').close();loading=false;await beginDanSong();
- }catch(e){$('danError').textContent='開始できませんでした：'+e.message;if(danRun)exitDan()}finally{loading=false;$('danPlayAuto').disabled=false;$('danPlay').disabled=false;$('danClose').disabled=false}}
-async function beginDanSong(transition=false){clearTimeout(danTimer);if(!danRun||danRun.finished)return;const e=danRun.config.songs[danRun.index];chart=e.chart;demoMode=e.demo;audioBuffer=danRun.buffers[danRun.index];state='ready';danRun.baseline=danRun.index?danStats():{score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0};danRun.songCombo=0;danRun.songMaxCombo=0;$('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=danRun.config.name+' / '+(danRun.index+1)+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';if(transition){const run=danRun;state='dan-break';notes=chart.notes.map(n=>({...n,done:false,hits:0}));pausedTime=Math.min(0,(notes[0]?.time||0)-4);resetDummyPlayback(pausedTime);feedback='';update();draw();$('overlay').replaceChildren(danNode('h2',chart.meta.TITLE||'無題'),danNode('p',(run.index+1)+'曲目'));$('overlay').style.display='flex';await fadeDanScene(true);await waitDanVisible();if(danRun!==run||run.finished)return}await start({dan:true,carry:danRun.index>0,seamless:danRun.index>0})}
+async function launchDan(automatic=false){
+ if(loading||importing||danRun)return;
+ let config;try{config=resolveDanConfig();config.auto=automatic===true}catch(e){$('danError').textContent=e.message;return}
+ loading=true;if(!$('danDialog').open)$('danDialog').showModal();$('danPlayAuto').disabled=true;$('danPlay').disabled=true;$('danClose').disabled=true;
+ try{
+  // Keep the user gesture for audio/fullscreen, but do not fetch or decode any song asset yet.
+  const resumePromise=audio().state==='suspended'?audio().resume():Promise.resolve();
+  for(let i=0;i<config.songs.length;i++){
+   const e=config.songs[i],c=e.chart;$('danError').textContent=(i+1)+'/'+config.songs.length+'曲目のファイルを確認中…';
+   if(!e.demo&&!playbackAssetsAvailable(c))throw Error((i+1)+'曲目の音源 '+(c.meta.WAVE||'')+' が見つかりません。対応する音源を追加してください。');
+  }
+  pendingDan.armed=false;
+  danRun={config,index:0,results:[],baseline:{score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0},songCombo:0,songMaxCombo:0,original:{chart,charts,audioBuffer,demoMode},audioResumePromise:resumePromise,finished:false,failed:false};
+  $('danDialog').close();loading=false;await beginDanSong();
+ }catch(e){
+  $('danError').textContent='開始できませんでした：'+e.message;if(danRun)exitDan()
+ }finally{
+  loading=false;$('danPlayAuto').disabled=false;$('danPlay').disabled=false;$('danClose').disabled=false
+ }
+}
+async function beginDanSong(transition=false){
+ clearTimeout(danTimer);if(!danRun||danRun.finished)return;
+ const run=danRun,e=run.config.songs[run.index];chart=e.chart;demoMode=e.demo;audioBuffer=null;playbackVisualChart=null;syncMV();syncSpinner();state=transition?'dan-break':'ready';
+ run.baseline=run.index?danStats():{score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0};run.songCombo=0;run.songMaxCombo=0;
+ $('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=run.config.name+' / '+(run.index+1)+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';
+ document.body.classList.remove('selecting');document.body.classList.add('playing');$('pause').disabled=true;
+ ['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
+ notes=chart.notes.map(n=>({...n,done:false,hits:0}));pausedTime=Math.min(0,(notes[0]?.time||0)-4);resetDummyPlayback(pausedTime);feedback='';update();draw();
+ $('overlay').replaceChildren();const heading=danNode('h2',chart.meta.TITLE||'無題'),message=danNode('p',transition?'音源・MV・spinnerを読み込んでいます…':'横画面に切り替えています…');$('overlay').append(heading,message);$('overlay').style.display='flex';
+ try{
+  if(!transition){await enterPlayFullscreen();await waitForLandscape();await run.audioResumePromise}
+  if(danRun!==run||run.finished)return;
+  message.textContent='音源・MV・spinnerを読み込んでいます…';$('status').textContent=(run.index+1)+'曲目の演奏素材を読み込み中…';
+  if(!demoMode)await preparePlaybackAssets(chart);else{audioBuffer=null;playbackVisualChart=chart}
+  if(danRun!==run||run.finished)return;
+  if(transition){message.textContent=(run.index+1)+'曲目';await fadeDanScene(true);await waitDanVisible();if(danRun!==run||run.finished)return}
+  await start({dan:true,carry:run.index>0,seamless:true});
+ }catch(err){
+  if(danRun!==run)return;
+  state='dan-break';$('status').textContent='演奏素材を読み込めませんでした';
+  $('overlay').replaceChildren(danNode('h2','演奏素材を読み込めませんでした'),danNode('p',(err.message||String(err))));
+  const exit=danNode('button','段位を終了','primary');exit.onclick=exitDan;$('overlay').append(exit);$('overlay').style.display='flex';
+ }
+}
 function finishDanSong(){if(!danRun||danRun.finished)return;pausedTime=time();stopAudio();cancelAnimationFrame(raf);danRun.results.push(danSongStats());const complete=danRun.index===danRun.config.songs.length-1,result=evaluateDan(danRun.config,danRun.results,danStats(),soul,complete);if(danRun.failed||!result.pass||complete){showDanResult(danRun.failed||!result.pass);return}state='dan-break';$('pause').disabled=true;queueDanNext();}
 
 function showDanResult(forcedFailure=false){clearDanSceneFade();if(!danRun||danRun.finished)return;const interruptedSong=danRun.results.length<=danRun.index;if(interruptedSong)danRun.results.push(danSongStats());danRun.finished=true;pausedTime=time();state='dan-result';stopAudio();cancelAnimationFrame(raf);clearTimeout(danTimer);document.body.classList.remove('playing');$('pause').disabled=true;const complete=danRun.results.length===danRun.config.songs.length&&!forcedFailure,r=evaluateDan(danRun.config,danRun.results,danStats(),soul,complete),passed=complete&&r.pass,title=danRun.config.auto?'オート演奏終了':passed?r.gold?'金合格':'合格':'不合格';const box=$('danResultContent');box.replaceChildren();box.append(danNode('p',danRun.config.name),danNode('h2',title,'dan-result-title'));if(danRun.config.auto)box.append(danNode('p','オート演奏のため合格扱いにはなりません。条件上は '+(passed?r.gold?'金合格相当':'合格相当':'不合格相当')+'です。'));

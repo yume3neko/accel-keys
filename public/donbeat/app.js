@@ -1,7 +1,7 @@
 'use strict';
 let balloonRolls=0,balloonPops=0;
 const autoPadUntil=[0,0,0,0],autoPadSide={1:0,2:0};
-let mvFile=null,mvURL=null,mvPlaying=false,spinnerFile=null,spinnerURL=null;
+let mvFile=null,mvURL=null,mvPlaying=false,spinnerFile=null,spinnerURL=null,playbackVisualChart=null;
 const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d');let charts=[],chart,audioFiles=new Map(),audioBuffer=null,audioContext,source,state='ready',notes=[],startAt=0,pausedTime=0,score=0,combo=0,maxCombo=0,good=0,ok=0,miss=0,rolls=0,soul=0,feedback='',feedbackAt=-10,auto=false,demoMode=true,beatIndex=0,width=1000,height=230,raf=0,loading=false,practiceTarget=null,judgeFrom=-Infinity,pauseResumeUntil=-Infinity,importing=false;
 const demo=`TITLE:練習譜面\nSUBTITLE:伴奏なし・打音のみ\nBPM:120\nOFFSET:0\nCOURSE:Easy\nLEVEL:3\nBALLOON:8\n#START\n0000,\n1000100010001000,\n1000200010002000,\n1010100010102000,\n1020102010201020,\n3000400030004000,\n5000000000000008,\n#GOGOSTART\n1010202010102020,\n1110200011102000,\n1020102010201020,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000200010201000,\n1000000000000000,\n0000,\n#END\nCOURSE:Normal\nLEVEL:4\nBALLOON:8,10,12\n#START\n0000,\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Hard\nLEVEL:6\nBALLOON:12,14,16\n#START\n0000,\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Oni\nLEVEL:8\nBALLOON:16,20,24\n#START\n0000,\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Edit\nLEVEL:10\nBALLOON:24,30,36\n#START\n0000,\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END`;
 const names={Easy:'かんたん',Normal:'ふつう',Hard:'むずかしい',Oni:'おに',Edit:'裏',0:'かんたん',1:'ふつう',2:'むずかしい',3:'おに',4:'裏'};
@@ -11,7 +11,7 @@ function tone(type,when){const ac=audio(),osc=ac.createOscillator(),gain=ac.crea
 function time(){return state==='playing'?audioContext.currentTime-startAt:pausedTime}
 function stopAudio(){clearAutoPads();stopMV();if(source){try{source.stop()}catch{}source=null}}
 function scheduleAudio(t){stopAudio();if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
-function reset(){document.body.classList.add('selecting');dummyPlayback=null;balloonRolls=balloonPops=0;if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true;seek.disabled=true}renderSongSelection();draw()}
+function reset(){document.body.classList.add('selecting');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true;seek.disabled=true}renderSongSelection();draw()}
 function syncRebuiltChart(next){
  let index=charts.indexOf(chart);
  if(index<0){
@@ -32,14 +32,26 @@ function branchPreviewChoices(decided,currentRoute='N'){
 }
 async function start(options={}){
  if(loading||importing||state==='playing'||(danRun&&!options.dan)||(!demoMode&&!danRun&&!playbackAssetsAvailable(chart)))return;
- loading=true;enterPlayFullscreen();
+ loading=true;
+ const normalStart=!options.dan;
+ if(normalStart){
+  document.body.classList.remove('selecting');document.body.classList.add('playing');
+  $('pause').disabled=true;$('overlay').style.display='flex';$('overlay').replaceChildren();
+  const h=document.createElement('h2'),p=document.createElement('p');h.textContent='演奏準備中';p.textContent='横画面に切り替えています…';$('overlay').append(h,p);
+  $('status').textContent='横画面に切り替えています…';
+  ['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
+ }
+ const resumePromise=(!options.seamless&&audio().state==='suspended')?audio().resume():Promise.resolve();
  try{
-  if(!options.seamless||audio().state==='suspended')await audio().resume();
+  if(!options.seamless){await enterPlayFullscreen();await waitForLandscape()}
+  await resumePromise;
+  if(normalStart){const p=$('overlay').querySelector('p');if(p)p.textContent='音源・MV・spinnerを読み込んでいます…';$('status').textContent='音源・MV・spinnerを読み込み中…'}
   if(!demoMode&&!danRun&&!audioBuffer)await preparePlaybackAssets(chart);
-  if(!options.seamless)await waitForLandscape();
  }catch(e){
-  loading=false;$('status').textContent='演奏素材を読み込めませんでした。';
-  $('fileinfo').textContent='演奏を開始できません：'+(e.message||e);renderSongSelection();return
+  loading=false;
+  if(normalStart){unlock();document.body.classList.remove('playing');document.body.classList.add('selecting');playbackVisualChart=null;leavePlayFullscreen();reset();$('status').textContent='演奏準備に失敗しました';$('fileinfo').textContent='演奏を開始できません：'+(e.message||e)}
+  else $('status').textContent='演奏素材を読み込めませんでした。';
+  return
  }
  loading=false;
  cancelAnimationFrame(raf);stopAudio();auto=danRun?danRun.config.auto:Boolean(options.auto);
@@ -191,8 +203,7 @@ async function choose(){
  try{if(chosen.serverEntry)chosen=await prepareServerChart(chosen)}
  catch(e){loading=false;$('fileinfo').textContent='収録曲の読み込みエラー：'+e.message;renderSongSelection();return}
  chart=chosen;demoMode=!!chart.builtinDemo;audioBuffer=null;
- const wave=(chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase(),file=chartAudioFile(chart);
- if(file)chart.audioFile=file;
+ const wave=(chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase(),file=chartAudioSource(chart);
  $('title').textContent=chart.meta.TITLE||'無題';
  $('subtitle').textContent=(chart.meta.SUBTITLE||'').replace(/^(--|\+\+)/,'')||'TJA譜面';
  $('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';
@@ -273,7 +284,7 @@ function attachSpinners(list,files){
 }
 function attachVideos(list,files){for(const c of list){const name=c.meta.VIDEO;if(typeof name!=='string'||!name)continue;const dir=(c.sourcePath||'').split('/').slice(0,-1).join('/');let matches=files.filter(f=>normalizedPath(filePath(f))===normalizedPath(dir+'/'+name));if(!matches.length)matches=files.filter(f=>normalizedPath(f.name)===normalizedPath(name.split('/').pop()));if(matches.length===1)c.videoFile=matches[0];}}
 function stopMV(){const v=$('mv');if(v&&typeof v.pause==='function')v.pause();mvPlaying=false;}
-function syncMV(){const v=$('mv');if(!v||typeof v.play!=='function')return;const file=chart?._mvEnabled===false?null:(chart?.videoFile||null);
+function syncMV(){const v=$('mv');if(!v||typeof v.play!=='function')return;const visualsAllowed=playbackVisualChart===chart||state==='playing'||state==='paused',file=visualsAllowed&&chart?._mvEnabled!==false?(chart?.videoFile||null):null;
  if(file!==mvFile){stopMV();if(mvURL)URL.revokeObjectURL(mvURL);mvFile=file;mvURL=file?URL.createObjectURL(file):null;v.removeAttribute('src');if(mvURL)v.src=mvURL;v.load();v.parentElement.classList.toggle('has-mv',!!file);v.onerror=()=>{v.parentElement.classList.remove('has-mv');};}
  if(!file)return;const t=time();if(state!=='playing'||t<0){stopMV();return}if(v.readyState<1)return;
  const desired=Math.min(t,Number.isFinite(v.duration)?v.duration:t);if(Math.abs(v.currentTime-desired)>.2)v.currentTime=desired;
@@ -291,7 +302,7 @@ function applyChartFade(t){const fade=state==='playing'&&chart?._fadeEnabled!==f
 var hibikiMotion;
 function syncSpinner(){
  const label=$('hibiki');if(!label)return;
- const file=chart?.spinnerFile||null;
+ const visualsAllowed=playbackVisualChart===chart||state==='playing'||state==='paused',file=visualsAllowed?(chart?.spinnerFile||null):null;
  if(file===spinnerFile)return;
  if(spinnerURL)URL.revokeObjectURL(spinnerURL);
  spinnerFile=file;spinnerURL=file?URL.createObjectURL(file):null;
@@ -588,29 +599,55 @@ async function serverFile(url,name){
  const res=await fetch(url);if(!res.ok)throw Error(name+' (HTTP '+res.status+')');
  const blob=await res.blob();return new File([blob],name,{type:blob.type});
 }
-function chartAudioFile(c){
+function chartAudioSource(c){
  const wave=(c?.meta?.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase();
- return c?.audioFile||audioFiles.get(wave)||null;
+ return c?.audioFile||c?._deferredAudioFile||audioFiles.get(wave)||null;
 }
 function playbackAssetsAvailable(c=chart){
- return !!(c?.builtinDemo||c?.generated||chartAudioFile(c)||c?.serverAudio);
+ return !!(c?.builtinDemo||c?.generated||chartAudioSource(c)||c?.serverAudio);
+}
+function waitMediaEvent(target,ready,event='loadeddata',timeout=20000){
+ if(ready())return Promise.resolve();
+ return new Promise((resolve,reject)=>{
+  let timer;
+  const done=()=>{clearTimeout(timer);target.removeEventListener(event,onReady);target.removeEventListener('error',onError)};
+  const onReady=()=>{done();resolve()};
+  const onError=()=>{done();reject(Error('MVを読み込めませんでした。'))};
+  target.addEventListener(event,onReady,{once:true});target.addEventListener('error',onError,{once:true});
+  timer=setTimeout(()=>{done();reject(Error('MVの読み込みがタイムアウトしました。'))},timeout);
+ });
+}
+async function prepareVisualPlaybackAssets(c=chart){
+ playbackVisualChart=c;
+ syncMV();syncSpinner();
+ const jobs=[];
+ if(c?._mvEnabled!==false&&c?.videoFile){const v=$('mv');if(v)jobs.push(waitMediaEvent(v,()=>v.readyState>=2))}
+ if(c?.spinnerFile&&spinnerURL){
+  jobs.push(new Promise((resolve,reject)=>{
+   const img=new Image(),timer=setTimeout(()=>reject(Error('spinner画像の読み込みがタイムアウトしました。')),15000);
+   img.onload=()=>{clearTimeout(timer);resolve()};img.onerror=()=>{clearTimeout(timer);reject(Error('spinner画像を読み込めませんでした。'))};img.src=spinnerURL;
+  }));
+ }
+ await Promise.all(jobs);
 }
 async function preparePlaybackAssets(c=chart){
- if(c?.builtinDemo||c?.generated){audioBuffer=null;return}
+ if(c?.builtinDemo||c?.generated){audioBuffer=null;playbackVisualChart=c;return}
  $('status').textContent='音源・MV・spinnerを読み込み中…';
- $('fileinfo').textContent='演奏用素材を読み込み中…';
- renderSongSelection();
  const jobs=[];
  if(c.serverAudio&&!c.audioFile)jobs.push(serverFile(c.serverAudio,c.meta.WAVE||'music').then(file=>{c.audioFile=file}));
  if(c.serverVideoParts&&!c.videoFile)jobs.push(Promise.all(c.serverVideoParts.map(url=>serverFile(url,'part'))).then(parts=>{c.videoFile=new File(parts,c.meta.VIDEO||'video.mp4',{type:'video/mp4'})}));
  else if(c.serverVideo&&!c.videoFile)jobs.push(serverFile(c.serverVideo,c.meta.VIDEO||'video.mp4').then(file=>{c.videoFile=file}));
  if(c.serverSpinner&&!c.spinnerFile){const name=decodeURIComponent(new URL(c.serverSpinner).pathname.split('/').pop())||'spinner.png';jobs.push(serverFile(c.serverSpinner,name).then(file=>{c.spinnerFile=file}))}
  await Promise.all(jobs);
- const file=chartAudioFile(c);
+ if(!c.audioFile&&c._deferredAudioFile)c.audioFile=c._deferredAudioFile;
+ if(!c.videoFile&&c._deferredVideoFile)c.videoFile=c._deferredVideoFile;
+ if(!c.spinnerFile&&c._deferredSpinnerFile)c.spinnerFile=c._deferredSpinnerFile;
+ const file=chartAudioSource(c);
  if(!file)throw Error('譜面に対応する音源がありません。');
  c.audioFile=file;
- if(c.preloadedAudio)audioBuffer=c.preloadedAudio;
- else{audioBuffer=await audio().decodeAudioData(await file.arrayBuffer());c.preloadedAudio=audioBuffer}
+ const audioJob=c.preloadedAudio?Promise.resolve(c.preloadedAudio):audio().decodeAudioData(await file.arrayBuffer()).then(buffer=>{c.preloadedAudio=buffer;return buffer});
+ const [buffer]=await Promise.all([audioJob,prepareVisualPlaybackAssets(c)]);
+ audioBuffer=buffer;
 }
 async function prepareServerChart(c){
  const entry=c.serverEntry;
@@ -621,10 +658,13 @@ async function prepareServerChart(c){
    const files=await readChartArchive(file);parsed=[];
    for(const f of files.filter(f=>/\.(mc|tja)$/i.test(f.name))){
     let result;try{const bytes=await f.arrayBuffer();let source;try{source=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{source=new TextDecoder('shift-jis').decode(bytes)}result=/\.mc$/i.test(f.name)?parseMalody(source):parseTJA(source)}catch{continue}
-    for(const chart of result.charts){chart.sourcePath=filePath(f);const dir=chart.sourcePath.split('/').slice(0,-1).join('/');const wave=chart.meta.WAVE||'';chart.audioFile=files.find(x=>normalizedPath(filePath(x))===normalizedPath(dir+'/'+wave));parsed.push(chart)}
+    for(const chart of result.charts){chart.sourcePath=filePath(f);const dir=chart.sourcePath.split('/').slice(0,-1).join('/');const wave=chart.meta.WAVE||'';chart._deferredAudioFile=files.find(x=>normalizedPath(filePath(x))===normalizedPath(dir+'/'+wave));parsed.push(chart)}
    }
-   attachVideos(parsed,files);
-   attachSpinners(parsed,files);
+   attachVideos(parsed,files);attachSpinners(parsed,files);
+   for(const chart of parsed){
+    if(chart.videoFile){chart._deferredVideoFile=chart.videoFile;delete chart.videoFile}
+    if(chart.spinnerFile){chart._deferredSpinnerFile=chart.spinnerFile;delete chart.spinnerFile}
+   }
   }else{
    const response=await fetch(entry.url);if(!response.ok)throw Error('譜面 HTTP '+response.status);
    const bytes=await response.arrayBuffer();let source;try{source=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{source=new TextDecoder('shift-jis').decode(bytes)}

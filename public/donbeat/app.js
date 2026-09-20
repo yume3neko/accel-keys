@@ -93,16 +93,17 @@ function unlock(){['course','files','folder','demo','danOpen','danFiles','danFol
 function update(){$('score').textContent=String(score).padStart(7,'0');$('combo').textContent=combo;$('good').textContent=good;$('ok').textContent=ok;$('miss').textContent=miss;$('roll').textContent=rolls;$('gauge').style.width=soul+'%';$('gaugeText').textContent=Math.floor(soul)+'%';updateDanHUD();updateDanPauseRemaining()}
 function judgmentWindows(){const level=Number(chart?.meta?.LEVEL);return Number.isFinite(level)&&level>0&&level<=5?{good:.041708,ok:.108442,miss:.125125}:{good:.025025,ok:.075075,miss:.108442}}
 function judgeCore(n,error){notifyDanJudgment(error);n.done=true;const total=branchReferenceNoteCount(chart);if(error<=judgmentWindows().good){good++;score+=Math.floor(1000000/Math.max(1,total)/10)*10;soul=Math.min(100,soul+130/soulNoteCount());feedback='良'}else if(error<=judgmentWindows().ok){ok++;score+=Math.floor(1000000/Math.max(1,total)/2/10)*10;soul=Math.min(100,soul+65/soulNoteCount());feedback='可'}else{miss++;combo=0;soul=Math.max(0,soul-260/soulNoteCount());feedback='不可';feedbackAt=time();update();return}combo++;maxCombo=Math.max(combo,maxCombo);feedbackAt=time();update()}
-// Auto balloon ceiling for this game: 60 hits/sec, independent of display refresh rate.
-const AUTO_BALLOON_MAX_HZ=60;
+// Auto rolls use about 30 hits/sec. Balloons may accelerate up to 60 hits/sec
+// when needed so that required hits fit inside the balloon duration.
+const AUTO_ROLL_HZ=30,AUTO_BALLOON_MAX_HZ=60;
 function autoBalloonHits(n,t){
   const duration=n.end-n.time;
   if(!(duration>0)||t<n.time)return 0;
-  const interval=Math.max(1/AUTO_BALLOON_MAX_HZ,Math.min(.065,duration/n.required));
+  const interval=Math.max(1/AUTO_BALLOON_MAX_HZ,Math.min(1/AUTO_ROLL_HZ,duration/n.required));
   const elapsed=Math.min(t-n.time,Math.max(0,duration-1e-9));
   return Math.min(n.required,Math.floor((elapsed+1e-12)/interval)+1);
 }
-function autoRollHits(n,t){if(n.type===7)return autoBalloonHits(n,t);const duration=n.end-n.time;if(duration<=0||t<n.time)return 0;return Math.floor((Math.min(t-n.time,duration-1e-9)+1e-12)/.065)+1}
+function autoRollHits(n,t){if(n.type===7)return autoBalloonHits(n,t);const duration=n.end-n.time;if(duration<=0||t<n.time)return 0;return Math.floor((Math.min(t-n.time,duration-1e-9)+1e-12)/(1/AUTO_ROLL_HZ))+1}
 function addRollHitsCore(r,count=1){
   if(r.done||count<=0)return;
   if(r.type===7)count=Math.min(count,r.required-r.hits);

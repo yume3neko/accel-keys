@@ -157,7 +157,8 @@ function build(){
  });
  return q;
 }
-const Q=build();\nconsole.assert(Q.length===8000,"Question count mismatch:",Q.length);
+const Q=build();
+console.assert(Q.length===8000,"Question count mismatch:",Q.length);
 let grade=null,session=[],i=0,correct=0,answered=false,wrong=[],started=0,mode="normal",stageIndex=0,stageScore=0,stages=[];
 const $=s=>document.querySelector(s),shuffle=a=>{a=[...a];for(let x=a.length-1;x>0;x--){let j=Math.floor(Math.random()*(x+1));[a[x],a[j]]=[a[j],a[x]]}return a},stats=()=>JSON.parse(localStorage.getItem("eiken1600stats")||'{"answered":0,"correct":0,"wrongIds":[]}'),save=s=>localStorage.setItem("eiken1600stats",JSON.stringify(s));
 function renderGrades(){let b=$("#gradeGrid");b.innerHTML="";ORDER.forEach(k=>{let x=document.createElement("button");x.className="grade";x.innerHTML="<strong>"+G[k].label+"</strong><span>"+G[k].level+"<br>1,000問（4形式×250問）</span>";x.onclick=()=>{grade=k;[...b.children].forEach(y=>y.classList.remove("selected"));x.classList.add("selected");$("#start").disabled=false;$("#start").textContent=G[k].label+"をスタート"};b.appendChild(x)})}

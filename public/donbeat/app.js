@@ -499,7 +499,7 @@ function renderSongSelection(){
    select.value=selected.index;
    select.onchange=async()=>{if(loading||importing)return;$('course').value=select.value;const pending=choose();renderSongSelection();await pending};
    label.append(select);panel.append(label,featureBadges([c]));
-   const info=document.createElement('p'),duration=Math.max(0,c.duration||0,c===chart?audioBuffer?.duration||0:0),noteRange=branchNoteCountRange(c),noteText=c.branchEvents?.length&&noteRange.min!==noteRange.max?noteRange.min+'（最小）〜'+noteRange.max+'（最大） ノーツ':noteRange.max+' ノーツ';
+   const info=document.createElement('p'),duration=Math.max(0,c.duration||0,c===chart?audioBuffer?.duration||0:0),noteRange=branchNoteCountRange(c),noteText=c.branchEvents?.length&&noteRange.min!==noteRange.max?noteRange.min+'〜'+noteRange.max+' ノーツ':noteRange.max+' ノーツ';
    info.textContent=c.bpm+' BPM ／ '+Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0')+' ／ '+noteText;panel.append(info);
    if(c.meta.SUBTITLE){const sub=document.createElement('p');sub.textContent=c.meta.SUBTITLE.replace(/^(--|\+\+)/,'');panel.append(sub)}
    const status=document.createElement('p');status.className='muted';status.textContent=loading?'音源を読み込み中…':demoMode?'練習曲':audioBuffer?'演奏できます':'音源を追加してください';panel.append(status);

@@ -9,9 +9,9 @@
 <body><div class="shell">
 <header><div class="brand">英検ランダムトレーナー<small>非公式・オリジナル練習問題</small></div><button id="resetStats" class="ghost">記録リセット</button></header>
 <main id="home">
-<section class="card hero"><h1>英語力を、<br>1問ずつ上へ。</h1><p>5級から1級まで難易度順に練習。4種類の問題形式からランダム出題し、実力チェックでは正解し続けるほど上の級へ進みます。</p><div class="badges"><span class="badge">全1,600問</span><span class="badge">各級200問</span><span class="badge">4形式 × 各50問</span></div></section>
+<section class="card hero"><h1>英語力を、<br>1問ずつ上へ。</h1><p>5級から1級まで難易度順に練習。4種類の問題形式からランダム出題し、実力チェックでは正解し続けるほど上の級へ進みます。</p><div class="badges"><span class="badge">全8,000問</span><span class="badge">各級1,000問</span><span class="badge">4形式 × 各250問</span></div></section>
 <div class="title">1. レベルを選択（5級 → 1級）</div><div class="grade-grid" id="gradeGrid"></div>
-<div class="title">2. 通常練習</div><section class="card"><div class="form-grid"><div class="field"><label>問題数</label><select id="count"><option>10</option><option>20</option><option>30</option><option>50</option><option>100</option><option value="999">この条件の全問題</option></select></div><div class="field"><label>問題形式</label><select id="type"><option value="all">4形式すべて</option><option value="meaning">言葉の意味</option><option value="cloze">穴埋め問題</option><option value="qa_jp">英文の質問 → 日本語で回答</option><option value="qa_en">英文の質問 → 英語で回答</option></select></div></div><button id="start" class="primary start" disabled>レベルを選んでスタート</button><button id="skill" class="primary skill">🚀 実力チェックモード</button><div class="mode-note">実力チェック：5級から開始し、各級4問中3問以上正解で次の級へ。最大32問で1級まで挑戦します。</div><div class="stats"><div class="stat"><b id="answered">0</b><span>累計回答</span></div><div class="stat"><b id="accuracy">—</b><span>正答率</span></div><div class="stat"><b id="weak">0</b><span>復習候補</span></div></div></section></main>
+<div class="title">2. 通常練習</div><section class="card"><div class="form-grid"><div class="field"><label>問題数</label><select id="count"><option>10</option><option>20</option><option>30</option><option>50</option><option>100</option><option>250</option><option>500</option><option>1000</option><option value="9999">この条件の全問題</option></select></div><div class="field"><label>問題形式</label><select id="type"><option value="all">4形式すべて</option><option value="meaning">言葉の意味</option><option value="cloze">穴埋め問題</option><option value="qa_jp">英文の質問 → 日本語で回答</option><option value="qa_en">英文の質問 → 英語で回答</option></select></div></div><button id="start" class="primary start" disabled>レベルを選んでスタート</button><button id="skill" class="primary skill">🚀 実力チェックモード</button><div class="mode-note">実力チェック：5級から開始し、各級4問中3問以上正解で次の級へ。最大32問で1級まで挑戦します。</div><div class="stats"><div class="stat"><b id="answered">0</b><span>累計回答</span></div><div class="stat"><b id="accuracy">—</b><span>正答率</span></div><div class="stat"><b id="weak">0</b><span>復習候補</span></div></div></section></main>
 <main id="quiz" class="hidden"><div id="skillBanner" class="skill-banner hidden"></div><div class="quiz-top"><button id="quit" class="secondary">← 終了</button><div class="progress-wrap"><div id="progress" class="progress"></div></div></div><div class="meta"><span id="meta"></span><span id="liveScore"></span></div><section class="card"><span id="qtype" class="qtype"></span><div id="passage" class="passage hidden"></div><div id="question" class="question"></div><div id="options" class="options"></div><div id="explain" class="explain hidden"></div><div id="nextRow" class="next-row hidden"><button id="next" class="primary">次の問題 →</button></div></section><div class="footer">キーボードの 1〜4 でも回答できます。回答後は Enter で次へ進めます。</div></main>
 <main id="result" class="hidden"><section class="card"><div id="stageGrid" class="stage-grid hidden"></div><p id="resultTitle" class="result-title">結果</p><div class="score"><span id="pct">0</span><small id="pctSuffix">%</small></div><div id="resultMsg" class="result-msg"></div><div class="stats"><div class="stat"><b id="rc">0</b><span>正解</span></div><div class="stat"><b id="rw">0</b><span>不正解</span></div><div class="stat"><b id="rt">0:00</b><span>所要時間</span></div></div><div class="actions"><button id="homeBtn" class="secondary">レベル選択へ</button><button id="retry" class="primary">間違えた問題を復習</button></div><div id="wrongList" class="wrong-list"></div></section></main>
 <div class="footer">英検®対策のための非公式学習アプリです。問題は独自作成で、公益財団法人 日本英語検定協会の過去問題を転載したものではありません。</div>
@@ -32,23 +32,135 @@ const JP={};
 ["テストの準備をするため","新しいことを学ぶため","地域社会を助けるため","時間を節約するため","ごみを減らすため","プロジェクトを改善するため","問題をよりよく理解するため","地域住民と会うため","実践的な経験を得るため","さまざまな考えを比較するため"].forEach((v,i)=>JP[R[i]]=v);
 const TL={meaning:"言葉の意味",cloze:"穴埋め問題",qa_jp:"英文の質問 → 日本語で回答",qa_en:"英文の質問 → 英語で回答"};
 function rotateOpts(arr,correct,seed){let ds=[];for(let k=1;ds.length<3;k++){let v=arr[(seed+k*4)%arr.length];if(v!==correct&&!ds.includes(v))ds.push(v)}let out=ds.concat([correct]);let shift=seed%4;out=out.slice(shift).concat(out.slice(0,shift));return [out,out.indexOf(correct)]}
-function passage(g,n,a,p,t,r){if(g==="5")return n+" will "+a+" at "+p+" on "+t+".";if(g==="4")return n+" is going to "+a+" at "+p+" on "+t+" because "+r+".";if(g==="3")return n+" plans to "+a+" at "+p+" on "+t+". "+n+" chose this plan because "+r+".";if(g==="p2")return n+" plans to "+a+" at "+p+" on "+t+". The main reason is "+r+".";if(g==="p2plus")return n+" has decided to "+a+" at "+p+" on "+t+", mainly "+r+". The decision reflects a growing interest in practical solutions.";if(g==="2")return "After considering several options, "+n+" chose to "+a+" at "+p+" on "+t+". The choice was made primarily "+r+", although it may require extra preparation.";if(g==="p1")return "After weighing the available alternatives, "+n+" opted to "+a+" at "+p+" on "+t+". The decision was motivated chiefly by a desire "+r+", despite some uncertainty about the outcome.";return "Having scrutinized several competing alternatives, "+n+" ultimately elected to "+a+" at "+p+" on "+t+". The decision was driven principally by a desire "+r+", notwithstanding lingering doubts about its long-term efficacy."}
+function timePhrase(t){
+ if(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].includes(t)) return "on "+t;
+ return t;
+}
+function passage(g,n,a,p,t,r){
+ const when=timePhrase(t);
+ if(g==="5")return n+" will "+a+" at "+p+" "+when+".";
+ if(g==="4")return n+" is going to "+a+" at "+p+" "+when+". The reason is "+r+".";
+ if(g==="3")return n+" plans to "+a+" at "+p+" "+when+". The purpose is "+r+".";
+ if(g==="p2")return n+" plans to "+a+" at "+p+" "+when+". The main purpose is "+r+".";
+ if(g==="p2plus")return n+" has decided to "+a+" at "+p+" "+when+", mainly "+r+". The decision reflects a growing interest in practical solutions.";
+ if(g==="2")return "After considering several options, "+n+" chose to "+a+" at "+p+" "+when+". The choice was made primarily "+r+", although it may require extra preparation.";
+ if(g==="p1")return "After weighing the available alternatives, "+n+" opted to "+a+" at "+p+" "+when+". The decision was motivated chiefly by a desire "+r+", despite some uncertainty about the outcome.";
+ return "Having scrutinized several competing alternatives, "+n+" ultimately elected to "+a+" at "+p+" "+when+". The decision was driven principally by a desire "+r+", notwithstanding lingering doubts about its long-term efficacy.";
+}
 function build(){
  let q=[],id=1;
+ const meaningJP=[
+   w=>"“"+w+"” の意味として最も適切なものを選んでください。",
+   w=>"次の英単語 “"+w+"” の意味を選んでください。",
+   w=>"“"+w+"” に最も近い日本語を選んでください。",
+   w=>"英単語 “"+w+"” の意味として正しいものはどれですか？",
+   w=>"“"+w+"” が表す意味を選んでください。"
+ ];
+ const meaningEN=[
+   m=>"「"+m+"」に最も近い英単語を選んでください。",
+   m=>"「"+m+"」を英語で表すとどれですか？",
+   m=>"次の意味「"+m+"」に合う英単語を選んでください。",
+   m=>"「"+m+"」の意味を持つ語はどれですか？",
+   m=>"日本語の「"+m+"」に対応する英単語を選んでください。"
+ ];
+ const clozeLead=[
+   "",
+   "次の英文の空所に入る最も適切な語を選んでください。\n",
+   "英文が自然になるように、空所を補ってください。\n",
+   "文法・語法に合う選択肢を選んでください。\n",
+   "空所に最もよく当てはまるものを選んでください。\n"
+ ];
  ORDER.forEach(g=>{
    const w=G[g].words, meanings=w.map(x=>x[1]), words=w.map(x=>x[0]);
-   w.forEach((x,i)=>{let z=rotateOpts(meanings,x[1],i+3);q.push({id:"q"+id++,grade:g,type:"meaning",prompt:"“"+x[0]+"” の意味として最も適切なものを選んでください。",options:z[0],answer:z[1],explanation:x[0]+" = "+x[1]})});
-   w.forEach((x,i)=>{let z=rotateOpts(words,x[0],i+9);q.push({id:"q"+id++,grade:g,type:"meaning",prompt:"「"+x[1]+"」に最も近い英単語を選んでください。",options:z[0],answer:z[1],explanation:x[1]+" = "+x[0]})});
-   C[g].forEach((r,pi)=>r[1].forEach((v,vi)=>{let stem=r[0].replace("{x}",v);q.push({id:"q"+id++,grade:g,type:"cloze",prompt:stem,options:r[2],answer:r[3],explanation:r[4]})}));
-   for(let i=0;i<50;i++){let k=Math.floor(i/10),rr=i%10,n=N[rr],a=A[(rr*3+k+1)%10],p=P[(rr*7+2*k+2)%10],t=T[(rr*9+3*k+3)%10],r=R[(rr*5+4*k+4)%10],kind=i%4,pas=passage(g,n,a,p,t,r),pools=[P,T,A,R],correct=[p,t,a,r][kind],ask=[ "Where will "+n+" go?","When will "+n+" do this?","What does "+n+" plan to do?","Why did "+n+" choose this plan?" ][kind],eng=rotateOpts(pools[kind],correct,i+2),jpOpts=eng[0].map(x=>JP[x]);q.push({id:"q"+id++,grade:g,type:"qa_jp",passage:pas,prompt:ask,options:jpOpts,answer:eng[1],explanation:"本文の内容に合う答えは「"+JP[correct]+"」です。"})}
-   for(let i=0;i<50;i++){let k=Math.floor(i/10),rr=i%10,n=N[(rr+4)%10],a=A[(rr*7+2*k+3)%10],p=P[(rr*3+3*k+1)%10],t=T[(rr*5+4*k+6)%10],r=R[(rr*9+k+2)%10],kind=(i+2)%4,pas=passage(g,n,a,p,t,r),pools=[P,T,A,R],correct=[p,t,a,r][kind],ask=[ "Where will "+n+" go?","When will "+n+" do this?","What does "+n+" plan to do?","Why did "+n+" choose this plan?" ][kind],eng=rotateOpts(pools[kind],correct,i+5);q.push({id:"q"+id++,grade:g,type:"qa_en",passage:pas,prompt:ask,options:eng[0],answer:eng[1],explanation:"The passage gives the answer as “"+correct+".”"})}
+
+   // 250 meaning questions = 25 words × 2 directions × 5 prompt variants.
+   for(let rep=0;rep<5;rep++){
+     w.forEach((x,wi)=>{
+       let z=rotateOpts(meanings,x[1],wi+rep*17+3);
+       q.push({
+         id:"q"+id++,grade:g,type:"meaning",
+         prompt:meaningJP[rep](x[0]),options:z[0],answer:z[1],
+         explanation:x[0]+" = "+x[1]
+       });
+       let z2=rotateOpts(words,x[0],wi+rep*19+9);
+       q.push({
+         id:"q"+id++,grade:g,type:"meaning",
+         prompt:meaningEN[rep](x[1]),options:z2[0],answer:z2[1],
+         explanation:x[1]+" = "+x[0]
+       });
+     });
+   }
+
+   // 250 cloze questions = existing 50 base sentences × 5 display variants.
+   for(let rep=0;rep<5;rep++){
+     C[g].forEach((r,pi)=>r[1].forEach((v,vi)=>{
+       let stem=r[0].replace("{x}",v);
+       let opts=[...r[2]], correctOpt=opts[r[3]];
+       let shift=(rep+pi+vi)%opts.length;
+       opts=opts.slice(shift).concat(opts.slice(0,shift));
+       q.push({
+         id:"q"+id++,grade:g,type:"cloze",
+         prompt:clozeLead[rep]+stem,
+         options:opts,answer:opts.indexOf(correctOpt),explanation:r[4]
+       });
+     }));
+   }
+
+   // 250 English passage -> Japanese question/Japanese answers.
+   for(let nidx=0;nidx<250;nidx++){
+     let block=Math.floor(nidx/10),rr=nidx%10,n=N[(rr+block)%10],
+         a=A[(rr*3+block*7+1)%10],
+         p=P[(rr*7+block*3+2)%10],
+         t=T[(rr*9+block*5+3)%10],
+         r=R[(rr*5+block*9+4)%10],
+         kind=nidx%4,pas=passage(g,n,a,p,t,r),
+         pools=[P,T,A,R],
+         correctAns=[p,t,a,r][kind],
+         ask=[
+           n+"はどこへ行く予定ですか？",
+           n+"はいつこれをする予定ですか？",
+           n+"は何をする予定ですか？",
+           n+"はなぜこの計画を選びましたか？"
+         ][kind],
+         eng=rotateOpts(pools[kind],correctAns,nidx+2),
+         jpOpts=eng[0].map(x=>JP[x]);
+     q.push({
+       id:"q"+id++,grade:g,type:"qa_jp",passage:pas,prompt:ask,
+       options:jpOpts,answer:eng[1],
+       explanation:"本文の内容に合う答えは「"+JP[correctAns]+"」です。"
+     });
+   }
+
+   // 250 English passage -> English question/English answers.
+   for(let nidx=0;nidx<250;nidx++){
+     let block=Math.floor(nidx/10),rr=nidx%10,n=N[(rr+4+block)%10],
+         a=A[(rr*7+block*5+3)%10],
+         p=P[(rr*3+block*7+1)%10],
+         t=T[(rr*5+block*3+6)%10],
+         r=R[(rr*9+block*2+2)%10],
+         kind=(nidx+2)%4,pas=passage(g,n,a,p,t,r),
+         pools=[P,T,A,R],
+         correctAns=[p,t,a,r][kind],
+         ask=[
+           "Where will "+n+" go?",
+           "When will "+n+" do this?",
+           "What does "+n+" plan to do?",
+           "Why did "+n+" choose this plan?"
+         ][kind],
+         eng=rotateOpts(pools[kind],correctAns,nidx+5);
+     q.push({
+       id:"q"+id++,grade:g,type:"qa_en",passage:pas,prompt:ask,
+       options:eng[0],answer:eng[1],
+       explanation:"The passage gives the answer as “"+correctAns+".”"
+     });
+   }
  });
  return q;
 }
-const Q=build();
+const Q=build();\nconsole.assert(Q.length===8000,"Question count mismatch:",Q.length);
 let grade=null,session=[],i=0,correct=0,answered=false,wrong=[],started=0,mode="normal",stageIndex=0,stageScore=0,stages=[];
 const $=s=>document.querySelector(s),shuffle=a=>{a=[...a];for(let x=a.length-1;x>0;x--){let j=Math.floor(Math.random()*(x+1));[a[x],a[j]]=[a[j],a[x]]}return a},stats=()=>JSON.parse(localStorage.getItem("eiken1600stats")||'{"answered":0,"correct":0,"wrongIds":[]}'),save=s=>localStorage.setItem("eiken1600stats",JSON.stringify(s));
-function renderGrades(){let b=$("#gradeGrid");b.innerHTML="";ORDER.forEach(k=>{let x=document.createElement("button");x.className="grade";x.innerHTML="<strong>"+G[k].label+"</strong><span>"+G[k].level+"<br>200問（4形式×50問）</span>";x.onclick=()=>{grade=k;[...b.children].forEach(y=>y.classList.remove("selected"));x.classList.add("selected");$("#start").disabled=false;$("#start").textContent=G[k].label+"をスタート"};b.appendChild(x)})}
+function renderGrades(){let b=$("#gradeGrid");b.innerHTML="";ORDER.forEach(k=>{let x=document.createElement("button");x.className="grade";x.innerHTML="<strong>"+G[k].label+"</strong><span>"+G[k].level+"<br>1,000問（4形式×250問）</span>";x.onclick=()=>{grade=k;[...b.children].forEach(y=>y.classList.remove("selected"));x.classList.add("selected");$("#start").disabled=false;$("#start").textContent=G[k].label+"をスタート"};b.appendChild(x)})}
 function renderStats(){let s=stats();$("#answered").textContent=s.answered||0;$("#accuracy").textContent=s.answered?Math.round(s.correct/s.answered*100)+"%":"—";$("#weak").textContent=(s.wrongIds||[]).length}
 function begin(pool){session=pool;i=0;correct=0;answered=false;wrong=[];started=Date.now();$("#home").classList.add("hidden");$("#result").classList.add("hidden");$("#quiz").classList.remove("hidden");$("#skillBanner").classList.add("hidden");show()}
 function startNormal(custom){mode="normal";let pool=custom;if(!pool){let t=$("#type").value;pool=Q.filter(q=>q.grade===grade&&(t==="all"||q.type===t));pool=shuffle(pool).slice(0,Math.min(+$("#count").value,pool.length))}begin(pool)}

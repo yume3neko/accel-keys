@@ -573,7 +573,7 @@ function chartFeatures(c){
   for(const line of c._tja.lines){
    if(/^#BRANCHSTART\b/i.test(line))result.branch=true;
    if(/^#DUMMYSTART\b/i.test(line))result.dummy=true;
-   if(!line.startsWith('#')&&/9/.test(line))result.damage=true;
+   if(!line.startsWith('#')&&/[dD]/.test(line))result.damage=true;
    const match=line.match(/^#(BPMCHANGE|ABSCROLL|SCROLL)\s+([+-]?[\d.]+)/i);
    if(match){const command=match[1].toUpperCase(),value=Number(match[2]);if(command==='BPMCHANGE'&&value!==c.bpm||command==='ABSCROLL'&&value!==1||command==='SCROLL'&&value<0)result.soflan=true}
    if(/^#FADE\s*,\s*0\s*,/i.test(line))result.fadeout=true;

@@ -10,7 +10,7 @@
   };
 
   function judgedNotes(c){
-    return (c.notes||[]).filter(n=>(n.type>=1&&n.type<=7)||n.type===9);
+    return (c.notes||[]).filter(n=>(n.type>=1&&n.type<=7)||n.type===9||n.type===10);
   }
 
   function overlapsNotes(notes,start,end){

@@ -189,8 +189,6 @@ function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const 
   ctx.fillStyle='#f28a1c';ctx.fillRect(x+rr*.48,noteY-rr*.36,rr*.42,rr*.72);ctx.strokeRect(x+rr*.48,noteY-rr*.36,rr*.42,rr*.72);
   ctx.fillStyle='#f7f2e5';ctx.beginPath();ctx.arc(x,noteY,rr,0,Math.PI*2);ctx.fill();ctx.stroke();
   ctx.fillStyle='#f28a1c';ctx.beginPath();ctx.arc(x,noteY,rr*.78,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#16110f';for(const dx of [-.3,.3]){ctx.beginPath();ctx.arc(x+rr*dx,noteY-rr*.12,rr*.11,0,Math.PI*2);ctx.fill()}
-  ctx.strokeStyle='#16110f';ctx.lineWidth=Math.max(2,rr*.1);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x-rr*.3,noteY+rr*.22);ctx.quadraticCurveTo(x-rr*.13,noteY+rr*.4,x,noteY+rr*.22);ctx.quadraticCurveTo(x+rr*.13,noteY+rr*.4,x+rr*.3,noteY+rr*.22);ctx.stroke();
   ctx.fillStyle='#fff';ctx.strokeStyle='#17120f';ctx.lineWidth=Math.max(2,rr*.09);ctx.font=`900 ${rr*.62}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.strokeText(String(remain),x+rr*1.75,noteY);ctx.fillText(String(remain),x+rr*1.75,noteY);ctx.restore();return;
  }
  ctx.fillStyle=n.type===10?'#b569eb':(n.type===9||n.type===5||n.type===6)?'#f5c757':n.type===1||n.type===3?'#f66b51':'#55bbd2';

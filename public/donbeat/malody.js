@@ -58,7 +58,7 @@ function parseMalody(text){
   const s=stateAt(b);if(s.showbar)bars.push({time:seconds(b)-offset,bpm:at(b).bpm,scroll:s.hs});
   // A change starts a new measure, even when placed inside the old measure.
   const next=Math.min(b+signature,signatures[signatureIndex]?.position??Infinity);
-  if(!(next>b))throw Error('signの間隔が小さすぎます。');measures.push({time:seconds(b)-offset,end:seconds(next)-offset});b=next;
+  if(!(next>b))throw Error('signの間隔が小さすぎます。');measures.push({time:seconds(b)-offset,end:seconds(next)-offset,numerator:signature,denominator:4});b=next;
  }
  // Visual distance is separate from audio/judgment time. Positive jump advances it.
  const events=[...timing.map(e=>({time:seconds(e.beat)-offset,bpm:e.bpm})),...effects.map(e=>({time:seconds(e.position)-offset,scroll:e.scroll,hs:e.hs,jump:e.jump}))].sort((a,b)=>a.time-b.time);

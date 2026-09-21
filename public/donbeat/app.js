@@ -60,7 +60,7 @@ async function start(options={}){
  const plan=practiceTarget===null?null:practicePlan(chart,practiceTarget,auto);
  pausedTime=plan?plan.lead:Math.min(0,(notes[0]?.time||0)-4);
  // Manual pre-roll is visible but excluded from every judgment and score path.
- if(plan){for(const n of notes){if(n.time>=plan.target)continue;if(auto){if(n.type===9){n.done=true;continue}if(n.type<=4)judge(n,0);else{addRollHits(n,autoRollHits(n,plan.target-1e-9));if(n.end<plan.target)n.done=true}}else{n.ghost=true;if((n.end??n.time)<plan.lead)n.done=true}}}
+ if(plan){for(const n of notes){if(n.time>=plan.target)continue;if(auto){if(n.type===10){n.done=true;continue}if(n.type<=4)judge(n,0);else{addRollHits(n,autoRollHits(n,plan.target-1e-9));if(n.end<plan.target)n.done=true}}else{n.ghost=true;if((n.end??n.time)<plan.lead)n.done=true}}}
  feedback='';feedbackAt=-10;beatIndex=chart.beats.findIndex(b=>b.time>=pausedTime);if(beatIndex<0)beatIndex=chart.beats.length;
  resetDummyPlayback(pausedTime);resetHibiki(pausedTime);startAt=audioContext.currentTime-pausedTime;scheduleAudio(pausedTime);state='playing';document.body.classList.remove('selecting');document.body.classList.add('playing');$('overlay').style.display='none';$('pause').disabled=false;setPauseIcon(false);['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
  update();resize();loop();
@@ -124,16 +124,16 @@ function autoBalloonHits(n,t){
   const elapsed=Math.min(t-n.time,Math.max(0,duration-1e-9));
   return Math.min(n.required,Math.floor((elapsed+1e-12)/interval)+1);
 }
-function autoRollHits(n,t){if(n.type===7)return autoBalloonHits(n,t);const duration=n.end-n.time;if(duration<=0||t<n.time)return 0;return Math.floor((Math.min(t-n.time,duration-1e-9)+1e-12)/(1/AUTO_ROLL_HZ))+1}
+function autoRollHits(n,t){if(n.type===7||n.type===9)return autoBalloonHits(n,t);const duration=n.end-n.time;if(duration<=0||t<n.time)return 0;return Math.floor((Math.min(t-n.time,duration-1e-9)+1e-12)/(1/AUTO_ROLL_HZ))+1}
 function addRollHitsCore(r,count=1){
   if(r.done||count<=0)return;
-  if(r.type===7)count=Math.min(count,r.required-r.hits);
-  r.hits+=count;rolls+=count;if(r.type===7)balloonRolls+=count;score+=count*100;
+  if(r.type===7||r.type===9)count=Math.min(count,r.required-r.hits);
+  r.hits+=count;rolls+=count;if(r.type===7||r.type===9)balloonRolls+=count;score+=count*100;
   feedback='';
-  if(r.type===7&&r.hits>=r.required){r.done=true;score+=5000;balloonPops++;feedback=''}
+  if((r.type===7||r.type===9)&&r.hits>=r.required){r.done=true;score+=5000;balloonPops++;feedback=''}
   feedbackAt=time();update();
 }
-function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(playTime<pauseResumeUntil)return;const t=playTime-Number($('offset').value||0)/1000;if(t<judgeFrom)return;const damage=notes.find(n=>n.type===9&&!n.done&&!n.ghost&&Math.abs(n.time-t)<=judgmentWindows().miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows().miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&(n.type>=5&&n.type<=7)&&t>=n.time&&t<=n.end);if(r&&(r.type!==7||type===1))addRollHits(r)}
+function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(playTime<pauseResumeUntil)return;const t=playTime-Number($('offset').value||0)/1000;if(t<judgeFrom)return;const damage=notes.find(n=>n.type===10&&!n.done&&!n.ghost&&Math.abs(n.time-t)<=judgmentWindows().miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows().miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&((n.type>=5&&n.type<=7)||n.type===9)&&t>=n.time&&t<=n.end);if(r&&(![7,9].includes(r.type)||type===1))addRollHits(r)}
 function songDuration(){return Math.max(.001,chart.duration+(danRun?0:1),danRun?Math.max(0,...chart.notes.map(n=>(n.end??n.time)+judgmentWindows().miss+.001)):0,audioBuffer?.duration||0)}
 function updateProgress(t=time()){
   const songFraction=state==='result'?1:state==='ready'?0:Math.max(0,Math.min(1,t/songDuration()));
@@ -153,14 +153,14 @@ function loop(){
  if(!resumeLead){
   for(const n of notes){
    if(n.done)continue;
-   if(n.type===9){if(t-adjust>n.time+judgmentWindows().miss)n.done=true;continue}
+   if(n.type===10){if(t-adjust>n.time+judgmentWindows().miss)n.done=true;continue}
    if(n.ghost){if(t>(n.end??n.time)+.15)n.done=true;continue}
    if(n.type<=4){
     if(auto&&t>=n.time+adjust){pulseAutoPad(n.type===1||n.type===3?1:2,n.type===3||n.type===4);tone(n.type===1||n.type===3?1:2);judge(n,0)}
     else if(t-adjust>n.time+judgmentWindows().miss)judge(n,1)
    }else if(auto){
     const count=autoRollHits(n,t-adjust)-n.hits;
-    if(count>0){addRollHits(n,count);pulseAutoPad(n.type===7?1:n.hits%2+1);tone(n.type===7?1:n.hits%2+1)}
+    if(count>0){addRollHits(n,count);pulseAutoPad(n.type===7||n.type===9?1:n.hits%2+1);tone(n.type===7||n.type===9?1:n.hits%2+1)}
    }
   }
  }
@@ -174,15 +174,31 @@ function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const 
  if(n.done||(t<pauseResumeUntil&&n.time<pauseResumeUntil)||(n.dummy&&t>(n.end??n.time)+.15))return;
  let x=position(n),nr=n.type===3||n.type===4||n.type===6?r*1.25:r;
  ctx.globalAlpha=(n.ghost?.25:1)*(n.dummy?(n.dummyOpacity??.7):1)*fade.note*alpha;
- if((n.type>=5&&n.type<=7)){
+ const requiredRoll=n.type===7||n.type===9;
+ if(n.type===5||n.type===6){
   let endX=endPosition({...n,time:n.end});if(Math.max(x,endX)<-50||Math.min(x,endX)>width+50||t>n.end)return;
   ctx.strokeStyle='#daa738';ctx.lineWidth=nr*1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(Math.max(target,x),noteY);ctx.lineTo(Math.max(target,endX),noteY);ctx.stroke();x=Math.max(target,x)
+ }else if(requiredRoll){
+  if(t>n.end)return;x=Math.max(target,x);if(x< -90||x>width+120)return;
  }else if(x< -50||x>width+50)return;
- ctx.fillStyle=n.type===9?'#b569eb':(n.type>=5&&n.type<=7)?'#f5c757':n.type===1||n.type===3?'#f66b51':'#55bbd2';
+ if(n.type===7){
+  const rr=nr,remain=Math.max(0,(n.required||0)-(n.hits||0));
+  ctx.save();ctx.lineJoin='round';
+  ctx.fillStyle='#f15a18';ctx.strokeStyle='#17120f';ctx.lineWidth=Math.max(2,rr*.13);
+  ctx.beginPath();ctx.moveTo(x+rr*.55,noteY-rr*.34);ctx.bezierCurveTo(x+rr*1.15,noteY-rr*.28,x+rr*1.9,noteY-rr*.72,x+rr*2.55,noteY-rr*.34);ctx.bezierCurveTo(x+rr*2.9,noteY-rr*.12,x+rr*2.9,noteY+rr*.28,x+rr*2.5,noteY+rr*.4);ctx.bezierCurveTo(x+rr*1.85,noteY+rr*.58,x+rr*1.18,noteY+rr*.28,x+rr*.55,noteY+rr*.3);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.fillStyle='#f28a1c';ctx.fillRect(x+rr*.48,noteY-rr*.36,rr*.42,rr*.72);ctx.strokeRect(x+rr*.48,noteY-rr*.36,rr*.42,rr*.72);
+  ctx.fillStyle='#f7f2e5';ctx.beginPath();ctx.arc(x,noteY,rr,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#f28a1c';ctx.beginPath();ctx.arc(x,noteY,rr*.78,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#16110f';for(const dx of [-.3,.3]){ctx.beginPath();ctx.arc(x+rr*dx,noteY-rr*.12,rr*.11,0,Math.PI*2);ctx.fill()}
+  ctx.strokeStyle='#16110f';ctx.lineWidth=Math.max(2,rr*.1);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x-rr*.3,noteY+rr*.22);ctx.quadraticCurveTo(x-rr*.13,noteY+rr*.4,x,noteY+rr*.22);ctx.quadraticCurveTo(x+rr*.13,noteY+rr*.4,x+rr*.3,noteY+rr*.22);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.strokeStyle='#17120f';ctx.lineWidth=Math.max(2,rr*.09);ctx.font=`900 ${rr*.62}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.strokeText(String(remain),x+rr*1.75,noteY);ctx.fillText(String(remain),x+rr*1.75,noteY);ctx.restore();return;
+ }
+ ctx.fillStyle=n.type===10?'#b569eb':(n.type===9||n.type===5||n.type===6)?'#f5c757':n.type===1||n.type===3?'#f66b51':'#55bbd2';
  ctx.strokeStyle='#f4e8cc';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,noteY,nr,0,Math.PI*2);ctx.fill();ctx.stroke();
  ctx.fillStyle='#17242a';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${nr*.7}px sans-serif`;
- if(n.type===9){ctx.fillStyle='#fff';ctx.fillText('×',x,noteY)}
- if((n.type>=5&&n.type<=7))ctx.fillText(n.type===7?String(Math.max(0,n.required-n.hits)):(t>=n.time?String(n.hits||0):'連'),x,noteY)
+ if(n.type===10){ctx.fillStyle='#fff';ctx.fillText('×',x,noteY)}
+ if(n.type===5||n.type===6)ctx.fillText(t>=n.time?String(n.hits||0):'連',x,noteY);
+ if(n.type===9)ctx.fillText(t>=n.time?String(Math.max(0,(n.required||0)-(n.hits||0))):'連',x,noteY);
 };
 const visibleNotes=renderNotes();
 for(let i=visibleNotes.length-1;i>=0;i--){
@@ -507,10 +523,10 @@ function updateDummyPlayback(t){
   if(n.type<=4){
    const type=n.type===1||n.type===3?1:2;
    pulseAutoPad(type,n.type===3||n.type===4);tone(type);n.done=true;
-  }else if(n.type<=7){
+  }else if((n.type>=5&&n.type<=7)||n.type===9){
    const hits=autoRollHits(n,t),count=hits-(n.hits||0);
-   if(count>0){n.hits=hits;const type=n.type===7?1:n.hits%2+1;pulseAutoPad(type);tone(type)}
-   if(t>=n.end||(n.type===7&&n.hits>=n.required))n.done=true;
+   if(count>0){n.hits=hits;const type=n.type===7||n.type===9?1:n.hits%2+1;pulseAutoPad(type);tone(type)}
+   if(t>=n.end||((n.type===7||n.type===9)&&n.hits>=n.required))n.done=true;
   }else n.done=true;
  }
 }
@@ -568,7 +584,7 @@ function renderSongSelection(){
 }
 
 function chartFeatures(c){
- const result={fadeOnNotes:!!c.features?.fadeOnNotes,scrollOnNotes:!!c.features?.scrollOnNotes,soflan:!!c.features?.soflan,fadeout:!!c.features?.fadeout,branch:!!c.features?.branch||!!c.branchEvents?.length,dummy:!!c.features?.dummy||!!c.dummyNotes?.length,damage:!!c.features?.damage||!!c.notes?.some(n=>n.type===9),mv:!!(c.features?.mv||c.videoFile||c.meta.VIDEO)};
+ const result={fadeOnNotes:!!c.features?.fadeOnNotes,scrollOnNotes:!!c.features?.scrollOnNotes,soflan:!!c.features?.soflan,fadeout:!!c.features?.fadeout,branch:!!c.features?.branch||!!c.branchEvents?.length,dummy:!!c.features?.dummy||!!c.dummyNotes?.length,damage:!!c.features?.damage||!!c.notes?.some(n=>n.type===10),mv:!!(c.features?.mv||c.videoFile||c.meta.VIDEO)};
  if(c._tja){
   for(const line of c._tja.lines){
    if(/^#BRANCHSTART\b/i.test(line))result.branch=true;

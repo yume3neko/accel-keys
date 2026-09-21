@@ -174,28 +174,18 @@ function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const 
  if(n.done||(t<pauseResumeUntil&&n.time<pauseResumeUntil)||(n.dummy&&t>(n.end??n.time)+.15))return;
  let x=position(n),nr=n.type===3||n.type===4||n.type===6?r*1.25:r;
  ctx.globalAlpha=(n.ghost?.25:1)*(n.dummy?(n.dummyOpacity??.7):1)*fade.note*alpha;
- const requiredRoll=n.type===7||n.type===9;
- if(n.type===5||n.type===6){
+ const bandRoll=n.type===5||n.type===6||n.type===7,requiredRoll=n.type===7||n.type===9;
+ if(bandRoll){
   let endX=endPosition({...n,time:n.end});if(Math.max(x,endX)<-50||Math.min(x,endX)>width+50||t>n.end)return;
-  ctx.strokeStyle='#daa738';ctx.lineWidth=nr*1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(Math.max(target,x),noteY);ctx.lineTo(Math.max(target,endX),noteY);ctx.stroke();x=Math.max(target,x)
+  ctx.strokeStyle=n.type===7?'#c75d45':'#daa738';ctx.lineWidth=nr*1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(Math.max(target,x),noteY);ctx.lineTo(Math.max(target,endX),noteY);ctx.stroke();x=Math.max(target,x)
  }else if(requiredRoll){
   if(t>n.end)return;x=Math.max(target,x);if(x< -90||x>width+120)return;
  }else if(x< -50||x>width+50)return;
- if(n.type===7){
-  const rr=nr,remain=Math.max(0,(n.required||0)-(n.hits||0));
-  ctx.save();ctx.lineJoin='round';
-  ctx.fillStyle='#f15a18';ctx.strokeStyle='#17120f';ctx.lineWidth=Math.max(2,rr*.13);
-  ctx.beginPath();ctx.moveTo(x+rr*.55,noteY-rr*.34);ctx.bezierCurveTo(x+rr*1.15,noteY-rr*.28,x+rr*1.9,noteY-rr*.72,x+rr*2.55,noteY-rr*.34);ctx.bezierCurveTo(x+rr*2.9,noteY-rr*.12,x+rr*2.9,noteY+rr*.28,x+rr*2.5,noteY+rr*.4);ctx.bezierCurveTo(x+rr*1.85,noteY+rr*.58,x+rr*1.18,noteY+rr*.28,x+rr*.55,noteY+rr*.3);ctx.closePath();ctx.fill();ctx.stroke();
-  ctx.fillStyle='#f28a1c';ctx.fillRect(x+rr*.48,noteY-rr*.36,rr*.42,rr*.72);ctx.strokeRect(x+rr*.48,noteY-rr*.36,rr*.42,rr*.72);
-  ctx.fillStyle='#f7f2e5';ctx.beginPath();ctx.arc(x,noteY,rr,0,Math.PI*2);ctx.fill();ctx.stroke();
-  ctx.fillStyle='#f28a1c';ctx.beginPath();ctx.arc(x,noteY,rr*.78,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#fff';ctx.strokeStyle='#17120f';ctx.lineWidth=Math.max(2,rr*.09);ctx.font=`900 ${rr*.62}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.strokeText(String(remain),x+rr*1.75,noteY);ctx.fillText(String(remain),x+rr*1.75,noteY);ctx.restore();return;
- }
- ctx.fillStyle=n.type===10?'#b569eb':(n.type===9||n.type===5||n.type===6)?'#f5c757':n.type===1||n.type===3?'#f66b51':'#55bbd2';
+ ctx.fillStyle=n.type===10?'#b569eb':n.type===7?'#df765b':(n.type===9||n.type===5||n.type===6)?'#f5c757':n.type===1||n.type===3?'#f66b51':'#55bbd2';
  ctx.strokeStyle='#f4e8cc';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,noteY,nr,0,Math.PI*2);ctx.fill();ctx.stroke();
  ctx.fillStyle='#17242a';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${nr*.7}px sans-serif`;
  if(n.type===10){ctx.fillStyle='#fff';ctx.fillText('×',x,noteY)}
- if(n.type===5||n.type===6)ctx.fillText(t>=n.time?String(n.hits||0):'連',x,noteY);
+ if(n.type===5||n.type===6||n.type===7)ctx.fillText(t>=n.time?String(n.hits||0):'連',x,noteY);
  if(n.type===9)ctx.fillText(t>=n.time?String(Math.max(0,(n.required||0)-(n.hits||0))):'連',x,noteY);
 };
 const visibleNotes=renderNotes();
@@ -717,11 +707,20 @@ function visualBpmState(c,t){
  const e=lo?events[lo-1]:null,bpm=e?.bpm??c.bpm??120,hs=e?.hs??1,scroll=e?.scroll??1;
  return {bpm,hs,scroll,value:bpm*hs*scroll};
 }
+function timeSignatureAt(c,t){
+ const measures=c?.measures||[];
+ if(!measures.length)return '4/4';
+ let lo=0,hi=measures.length;while(lo<hi){const mid=(lo+hi)>>1;if(measures[mid].time<=t)lo=mid+1;else hi=mid}
+ const m=measures[Math.max(0,lo-1)]||measures[0],num=Number(m?.numerator),den=Number(m?.denominator);
+ if(!(num>0&&den>0))return '4/4';
+ const clean=v=>Number.isInteger(v)?String(v):Number(v.toFixed(3)).toString();
+ return clean(num)+'/'+clean(den);
+}
 function updateVisualBpm(t,opacity){
  let label=$('visualBpm');
  if(!label){label=document.createElement('div');label.id='visualBpm';label.style.cssText='position:absolute;right:10px;top:5px;z-index:35;pointer-events:none;font:600 clamp(10px,1.5vw,13px) sans-serif;color:#eee;text-shadow:0 1px 3px #000;background:#10131799;padding:3px 6px;border-radius:4px;max-width:calc(100% - 20px);text-align:right;overflow-wrap:anywhere';canvas.parentElement.append(label)}
- const n=visualBpmState(chart,t),playerSpeed=Number($('speed').value)||1,format=v=>Number(v.toFixed(3)).toLocaleString('ja-JP',{maximumFractionDigits:3});
- const value='見た目 '+format(n.bpm)+' BPM × '+format(n.hs)+' HS'+(n.scroll!==1?' × '+format(n.scroll):'')+(playerSpeed!==1?' × '+format(playerSpeed)+' 設定':'')+' = '+format(n.value*playerSpeed)+' BPM';
+ const n=visualBpmState(chart,t),meter=timeSignatureAt(chart,t),playerSpeed=Number($('speed').value)||1,format=v=>Number(v.toFixed(3)).toLocaleString('ja-JP',{maximumFractionDigits:3});
+ const value=meter+'　見た目 '+format(n.bpm)+' BPM × '+format(n.hs)+' HS'+(n.scroll!==1?' × '+format(n.scroll):'')+(playerSpeed!==1?' × '+format(playerSpeed)+' 設定':'')+' = '+format(n.value*playerSpeed)+' BPM';
  if(label.textContent!==value)label.textContent=value;
  label.style.opacity=opacity;
 }

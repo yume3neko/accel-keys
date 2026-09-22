@@ -11,7 +11,7 @@ function tone(type,when){const ac=audio(),osc=ac.createOscillator(),gain=ac.crea
 function time(){return state==='playing'?audioContext.currentTime-startAt:pausedTime}
 function stopAudio(){clearAutoPads();stopMV();if(source){try{source.stop()}catch{}source=null}}
 function scheduleAudio(t){stopAudio();if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
-function reset(){document.body.classList.add('selecting');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true}seek.disabled=!chart?.measures?.length;renderSongSelection();draw()}
+function reset(){document.body.classList.add('selecting');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;clearScoreGains();if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true}seek.disabled=!chart?.measures?.length;renderSongSelection();draw()}
 function syncRebuiltChart(next){
  let index=charts.indexOf(chart);
  if(index<0){
@@ -56,7 +56,7 @@ async function start(options={}){
  loading=false;
  cancelAnimationFrame(raf);stopAudio();auto=danRun?danRun.config.auto:Boolean(options.auto);
  practiceTarget=Number.isFinite(options.target)?options.target:null;judgeFrom=practiceTarget??-Infinity;pauseResumeUntil=-Infinity;
- if(chart._tja){syncRebuiltChart(rebuildTjaBranches(chart,branchPreviewChoices([],'N')))}branchChoices=[];branchScoreLog=[];branchRollLog=[];branchTransitions=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;}feedback='';feedbackAt=-10;
+ if(chart._tja){syncRebuiltChart(rebuildTjaBranches(chart,branchPreviewChoices([],'N')))}branchChoices=[];branchScoreLog=[];branchRollLog=[];branchTransitions=[];notes=chart.notes.map(n=>({...n,done:false,hits:0,ghost:false}));if(!options.carry){score=combo=maxCombo=good=ok=miss=rolls=soul=0;balloonRolls=balloonPops=0;clearScoreGains();}feedback='';feedbackAt=-10;
  const plan=practiceTarget===null?null:practicePlan(chart,practiceTarget,auto);
  pausedTime=plan?plan.lead:Math.min(0,(notes[0]?.time||0)-4);
  // Manual pre-roll is visible but excluded from every judgment and score path.
@@ -111,9 +111,33 @@ function togglePause(){
  }else if(state==='paused')resumeFromPause();
 }
 function unlock(){['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=false);}
+let scoreGainSequence=0;
+function clearScoreGains(){
+ const layer=document.getElementById('scoreGainLayer');
+ if(layer)layer.replaceChildren();
+}
+function showScoreGain(points){
+ const gain=Math.floor(Number(points)||0);
+ if(gain<=0||state!=='playing')return;
+ const scoreEl=$('score'),host=scoreEl?.parentElement;
+ if(!host)return;
+ host.classList.add('score-total');
+ let layer=document.getElementById('scoreGainLayer');
+ if(!layer){
+  layer=document.createElement('div');layer.id='scoreGainLayer';layer.className='score-gain-layer';layer.setAttribute('aria-hidden','true');host.append(layer);
+ }
+ const item=document.createElement('span');
+ item.className='score-gain';
+ item.textContent='+'+gain.toLocaleString('ja-JP');
+ item.style.setProperty('--gain-x',(((scoreGainSequence++%3)-1)*8)+'px');
+ layer.append(item);
+ const remove=()=>item.remove();
+ item.addEventListener('animationend',remove,{once:true});
+ setTimeout(remove,1000);
+}
 function update(){$('score').textContent=String(score).padStart(7,'0');$('combo').textContent=combo;$('good').textContent=good;$('ok').textContent=ok;$('miss').textContent=miss;$('roll').textContent=rolls;$('gauge').style.width=soul+'%';$('gaugeText').textContent=Math.floor(soul)+'%';updateDanHUD();updateDanPauseRemaining()}
 function judgmentWindows(){const level=Number(chart?.meta?.LEVEL);return Number.isFinite(level)&&level>0&&level<=5?{good:.041708,ok:.108442,miss:.125125}:{good:.025025,ok:.075075,miss:.108442}}
-function judgeCore(n,error){notifyDanJudgment(error);n.done=true;const noteScore=chartNoteScore(chart);if(error<=judgmentWindows().good){good++;score+=noteScore;soul=Math.min(100,soul+130/soulNoteCount());feedback='良'}else if(error<=judgmentWindows().ok){ok++;score+=Math.floor(noteScore/2);soul=Math.min(100,soul+65/soulNoteCount());feedback='可'}else{miss++;combo=0;soul=Math.max(0,soul-260/soulNoteCount());feedback='不可';feedbackAt=time();update();return}combo++;maxCombo=Math.max(combo,maxCombo);feedbackAt=time();update()}
+function judgeCore(n,error){notifyDanJudgment(error);n.done=true;const noteScore=chartNoteScore(chart);if(error<=judgmentWindows().good){good++;score+=noteScore;showScoreGain(noteScore);soul=Math.min(100,soul+130/soulNoteCount());feedback='良'}else if(error<=judgmentWindows().ok){ok++;const gain=Math.floor(noteScore/2);score+=gain;showScoreGain(gain);soul=Math.min(100,soul+65/soulNoteCount());feedback='可'}else{miss++;combo=0;soul=Math.max(0,soul-260/soulNoteCount());feedback='不可';feedbackAt=time();update();return}combo++;maxCombo=Math.max(combo,maxCombo);feedbackAt=time();update()}
 // Auto rolls use about 30 hits/sec. Balloons may accelerate up to 60 hits/sec
 // when needed so that required hits fit inside the balloon duration.
 const AUTO_ROLL_HZ=30,AUTO_BALLOON_MAX_HZ=60;
@@ -128,7 +152,7 @@ function autoRollHits(n,t){if(n.type===7||n.type===9)return autoBalloonHits(n,t)
 function addRollHitsCore(r,count=1){
   if(r.done||count<=0)return;
   if(r.type===7||r.type===9)count=Math.min(count,r.required-r.hits);
-  r.hits+=count;rolls+=count;if(r.type===7||r.type===9)balloonRolls+=count;score+=count*100;
+  r.hits+=count;rolls+=count;if(r.type===7||r.type===9)balloonRolls+=count;const gain=count*100;score+=gain;showScoreGain(gain);
   feedback='';
   if((r.type===7||r.type===9)&&r.hits>=r.required){r.done=true;balloonPops++;feedback=''}
   feedbackAt=time();update();

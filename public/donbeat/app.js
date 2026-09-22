@@ -372,7 +372,7 @@ function updateDanPauseRemaining(){
 function setPauseIcon(paused){const b=$('pause');b.textContent=paused?'▶':'Ⅱ';b.setAttribute('aria-label',paused?'再開':'一時停止');b.title=paused?'再開':'一時停止';updateDanPauseRemaining();}
 function desktopPlayMode(){
  const uaMobile=navigator.userAgentData?.mobile;
- const finePointer=matchMedia?.('(hover:hover) and (pointer:fine)')?.matches;
+ const finePointer=window.matchMedia?.('(hover:hover) and (pointer:fine)')?.matches;
  if(uaMobile===true)return false;
  if(uaMobile===false&&finePointer)return true;
  return finePointer&&!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||'');

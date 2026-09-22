@@ -37,8 +37,8 @@ async function start(options={}){
  if(normalStart){
   document.body.classList.remove('selecting');document.body.classList.add('playing');
   $('pause').disabled=true;$('overlay').style.display='flex';$('overlay').replaceChildren();
-  const h=document.createElement('h2'),p=document.createElement('p');h.textContent='演奏準備中';p.textContent='横画面に切り替えています…';$('overlay').append(h,p);
-  $('status').textContent='横画面に切り替えています…';
+  const h=document.createElement('h2'),p=document.createElement('p');h.textContent='演奏準備中';p.textContent=desktopPlayMode()?'演奏素材を準備しています…':'横画面に切り替えています…';$('overlay').append(h,p);
+  $('status').textContent=desktopPlayMode()?'演奏準備中…':'横画面に切り替えています…';
   ['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
  }
  const resumePromise=(!options.seamless&&audio().state==='suspended')?audio().resume():Promise.resolve();
@@ -370,7 +370,17 @@ function updateDanPauseRemaining(){
  label.hidden=false;label.textContent='再開あと'+remaining+'回';
 }
 function setPauseIcon(paused){const b=$('pause');b.textContent=paused?'▶':'Ⅱ';b.setAttribute('aria-label',paused?'再開':'一時停止');b.title=paused?'再開':'一時停止';updateDanPauseRemaining();}
-async function enterPlayFullscreen(){try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();if(screen.orientation?.lock)await screen.orientation.lock('landscape')}catch{}}
+function desktopPlayMode(){
+ const uaMobile=navigator.userAgentData?.mobile;
+ const finePointer=matchMedia?.('(hover:hover) and (pointer:fine)')?.matches;
+ if(uaMobile===true)return false;
+ if(uaMobile===false&&finePointer)return true;
+ return finePointer&&!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||'');
+}
+async function enterPlayFullscreen(){
+ if(desktopPlayMode())return;
+ try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();if(screen.orientation?.lock)await screen.orientation.lock('landscape')}catch{}
+}
 function leavePlayFullscreen(){try{screen.orientation?.unlock?.()}catch{}if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}
 
 async function requestLandscape(){try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();if(screen.orientation?.lock)await screen.orientation.lock('landscape');else throw Error('unsupported');}catch{$('status').textContent='横向き固定に対応していない場合は、端末の自動回転を有効にして横にしてください。';}}
@@ -501,7 +511,7 @@ function drawBranchDetails(t,opacity){
 }
 
 async function waitForLandscape(){
- if(window.innerWidth>=window.innerHeight)return;
+ if(desktopPlayMode()||window.innerWidth>=window.innerHeight)return;
  const dialog=document.createElement('dialog'),title=document.createElement('h2'),message=document.createElement('p');
  title.textContent='端末を横向きにしてください';dialog.append(title,message);document.body.append(dialog);dialog.showModal();
  await new Promise(resolve=>{

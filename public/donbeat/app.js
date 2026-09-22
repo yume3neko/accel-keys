@@ -585,23 +585,51 @@ document.querySelectorAll('.pads').forEach(region=>{
  region.addEventListener('contextmenu',e=>e.preventDefault());
 });
 
-var expandedSong=null;
+var expandedSong=null,openSongFolder='official',songFolderTouched=false;
+const officialSongNames=new Set(['BATTLE NO.1','六本の薔薇','Nivalis','魔宵月','エンジェルドリーム','銀の黎明','リスドンヴァルナ','らんぶる'].map(normalizeSongTitle));
+function normalizeSongTitle(title){return String(title||'').normalize('NFKC').toLowerCase().replace(/[\s　・_-]/g,'')}
+function songCategory(c){
+ const explicit=c?.category||c?.serverEntry?.category;
+ if(explicit==='official'||explicit==='creative')return explicit;
+ return officialSongNames.has(normalizeSongTitle(c?.meta?.TITLE||c?.serverEntry?.title))?'official':'creative';
+}
 function songGroups(){
- const groups=new Map();
- charts.forEach((c,index)=>{const key=c.meta.TITLE||'無題';if(!groups.has(key))groups.set(key,[]);groups.get(key).push({c,index})});
- return groups;
+ const grouped={official:new Map(),creative:new Map()};
+ charts.forEach((c,index)=>{
+  const folder=grouped[songCategory(c)],title=c.meta.TITLE||'無題';
+  if(!folder.has(title))folder.set(title,[]);
+  folder.get(title).push({c,index});
+ });
+ return grouped;
 }
 function renderSongSelection(){
  const host=$('songSelectionList');if(!host)return;host.replaceChildren();
- for(const [title,entries] of songGroups()){
+ const grouped=songGroups();
+ if(!songFolderTouched)openSongFolder=grouped.official.size?'official':'creative';
+ for(const [category,label] of [['official','本家譜面'],['creative','創作譜面']]){
+  const folder=document.createElement('section');folder.className='song-folder';
+  const toggle=document.createElement('button');toggle.className='song-folder-title';toggle.type='button';
+  const openedFolder=openSongFolder===category;
+  toggle.setAttribute('aria-expanded',String(openedFolder));
+  const folderName=document.createElement('span');folderName.className='song-folder-name';folderName.textContent=label;
+  const count=document.createElement('span');count.className='song-folder-count';count.textContent=grouped[category].size+'曲';
+  const chevron=document.createElement('span');chevron.className='song-folder-chevron';chevron.textContent=openedFolder?'−':'＋';
+  toggle.append(folderName,count,chevron);toggle.onclick=()=>{
+   songFolderTouched=true;openSongFolder=openSongFolder===category?null:category;expandedSong=null;renderSongSelection();
+  };
+  const list=document.createElement('div');list.className='song-folder-list';list.hidden=!openedFolder;
+  folder.append(toggle,list);host.append(folder);
+  if(!openedFolder)continue;
+  if(!grouped[category].size){const empty=document.createElement('p');empty.className='song-folder-empty';empty.textContent='このフォルダにはまだ曲がありません。';list.append(empty)}
+  for(const [title,entries] of grouped[category]){
   const item=document.createElement('article');item.className='song-choice';
   const heading=document.createElement('button');heading.className='song-choice-title';heading.textContent=title;
-  const opened=expandedSong===title;heading.setAttribute('aria-expanded',String(opened));
+  const songKey=category+'::'+title;const opened=expandedSong===songKey;heading.setAttribute('aria-expanded',String(opened));
   const panel=document.createElement('div');panel.className='song-choice-panel';panel.id='song-panel-'+entries[0].index;panel.hidden=!opened;heading.setAttribute('aria-controls',panel.id);
   heading.onclick=async()=>{
-   if(expandedSong===title){expandedSong=null;renderSongSelection();return}
+   if(expandedSong===songKey){expandedSong=null;renderSongSelection();return}
    if(loading||importing||danRun)return;
-   expandedSong=title;
+   expandedSong=songKey;
    const index=entries.some(e=>e.c===chart)?charts.indexOf(chart):entries[0].index;
    $('course').value=index;
    const pending=choose();renderSongSelection();await pending;
@@ -624,7 +652,8 @@ function renderSongSelection(){
    }
    panel.append(actions);
   }
-  const badges=featureBadges(entries.map(e=>e.c));heading.append(badges);item.append(heading,panel);host.append(item);
+  const badges=featureBadges(entries.map(e=>e.c));heading.append(badges);item.append(heading,panel);list.append(item);
+  }
  }
 }
 
@@ -738,8 +767,8 @@ async function prepareServerChart(c){
    }
   }
   if(!parsed.length)throw Error('対応する譜面がありません');
-  for(const chart of parsed){chart.serverEntry=entry;chart.meta.TITLE=chart.meta.TITLE||entry.title;}
-  const index=charts.indexOf(c);charts.splice(index,1,...parsed);c=parsed[0];expandedSong=c.meta.TITLE;fillCourses();$('course').value=index;
+  for(const chart of parsed){chart.serverEntry=entry;chart.category=entry.category;chart.meta.TITLE=chart.meta.TITLE||entry.title;}
+  const index=charts.indexOf(c);charts.splice(index,1,...parsed);c=parsed[0];expandedSong=songCategory(c)+'::'+c.meta.TITLE;fillCourses();$('course').value=index;
  }
  return c;
 }
@@ -751,7 +780,7 @@ async function loadServerCatalog(){
   const added=data.songs.map((e,i)=>{
    if(typeof e.file!=='string'||!e.file||typeof e.title!=='string')throw Error('曲のtitleとfileを指定してください');
    const entry={...e,url:serverURL(e.file,url)};
-   return {features:e.features||{},serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
+   return {features:e.features||{},category:e.category,serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
   });
   charts.push(...added);const selected=charts.indexOf(chart);fillCourses();$('course').value=Math.max(0,selected);renderSongSelection();
  }catch(e){$('fileinfo').textContent='収録曲一覧を読み込めません：'+e.message}

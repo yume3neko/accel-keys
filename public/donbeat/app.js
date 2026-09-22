@@ -592,8 +592,9 @@ document.querySelectorAll('.pads').forEach(region=>{
 function normalizeSongTitle(title){return String(title||'').normalize('NFKC').toLowerCase().replace(/[\s　・_-]/g,'')}
 function songCategory(c){
  const explicit=c?.category||c?.serverEntry?.category;
- if(explicit==='official'||explicit==='creative')return explicit;
- return officialSongNames.has(normalizeSongTitle(c?.meta?.TITLE||c?.serverEntry?.title))?'official':'creative';
+ if((c?.categoryManual===true||c?.serverEntry?.categoryManual===true)&&(explicit==='official'||explicit==='creative'))return explicit;
+ if(officialSongNames.has(normalizeSongTitle(c?.meta?.TITLE))||officialSongNames.has(normalizeSongTitle(c?.serverEntry?.title)))return 'official';
+ return explicit==='official'||explicit==='creative'?explicit:'creative';
 }
 function songGroups(){
  const grouped={official:new Map(),creative:new Map()};
@@ -769,7 +770,7 @@ async function prepareServerChart(c){
    }
   }
   if(!parsed.length)throw Error('対応する譜面がありません');
-  for(const chart of parsed){chart.serverEntry=entry;chart.category=entry.category;chart.meta.TITLE=chart.meta.TITLE||entry.title;}
+  for(const chart of parsed){chart.serverEntry=entry;chart.category=entry.category;chart.categoryManual=entry.categoryManual===true;chart.meta.TITLE=chart.meta.TITLE||entry.title;}
   const index=charts.indexOf(c);charts.splice(index,1,...parsed);c=parsed[0];expandedSong=songCategory(c)+'::'+c.meta.TITLE;fillCourses();$('course').value=index;
  }
  return c;
@@ -782,7 +783,7 @@ async function loadServerCatalog(){
   const added=data.songs.map((e,i)=>{
    if(typeof e.file!=='string'||!e.file||typeof e.title!=='string')throw Error('曲のtitleとfileを指定してください');
    const entry={...e,url:serverURL(e.file,url)};
-   return {features:e.features||{},category:e.category,serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
+   return {features:e.features||{},category:e.category,categoryManual:e.categoryManual===true,serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
   });
   charts.push(...added);const selected=charts.indexOf(chart);fillCourses();$('course').value=Math.max(0,selected);renderSongSelection();
  }catch(e){$('fileinfo').textContent='収録曲一覧を読み込めません：'+e.message}

@@ -9,6 +9,9 @@ const mime=p=>{
 const readJSON=async(bucket,key)=>{const f=await bucket.get(key);return f?await f.json():null};
 const removePrefix=async(bucket,prefix)=>{let cursor;do{const page=await bucket.list({prefix,cursor});if(page.objects.length)await bucket.delete(page.objects.map(o=>o.key));cursor=page.truncated?page.cursor:undefined}while(cursor)};
 const normTitle=s=>String(s||'').normalize('NFC').trim();
+const officialTitles=new Set(['BATTLE NO.1','六本の薔薇','Nivalis','魔宵月','エンジェルドリーム','銀の黎明','リスドンヴァルナ','らんぶる'].map(s=>s.normalize('NFKC').toLowerCase().replace(/[\\s　・_-]/g,'')));
+const songCategory=s=>s?.category==='official'||s?.category==='creative'?s.category:officialTitles.has(String(s?.title||'').normalize('NFKC').toLowerCase().replace(/[\\s　・_-]/g,''))?'official':'creative';
+
 async function publishedSongTitles(bucket){const titles=new Set();let cursor;do{const page=await bucket.list({prefix:'catalog/',cursor});for(const o of page.objects){const data=await readJSON(bucket,o.key);for(const song of data?.songs||[])if(song?.title)titles.add(normTitle(song.title))}cursor=page.truncated?page.cursor:undefined}while(cursor);return titles}
 function danSongNames(content){
  const found=[];
@@ -25,7 +28,7 @@ function danSongNames(content){
 async function validateDanSongs(bucket,content){const available=await publishedSongTitles(bucket),missing=[...new Set(danSongNames(content).filter(name=>!available.has(name)))];if(missing.length)throw Error('未収録曲を含むため段位を登録できません：'+missing.join('、'));}
 async function listAdmin(bucket){
  const songs=[],dans=[],disabledStatic=[];let cursor;
- do{const page=await bucket.list({prefix:'catalog/',cursor});for(const o of page.objects){const data=await readJSON(bucket,o.key);if(!data)continue;const id=o.key.slice('catalog/'.length,-5);(data.songs||[]).forEach((song,index)=>songs.push({id,index,...song}))}cursor=page.truncated?page.cursor:undefined}while(cursor);
+ do{const page=await bucket.list({prefix:'catalog/',cursor});for(const o of page.objects){const data=await readJSON(bucket,o.key);if(!data)continue;const id=o.key.slice('catalog/'.length,-5);(data.songs||[]).forEach((song,index)=>songs.push({id,index,...song,category:songCategory(song)}))}cursor=page.truncated?page.cursor:undefined}while(cursor);
  cursor=undefined;do{const page=await bucket.list({prefix:'dan-catalog/',cursor});for(const o of page.objects){const data=await readJSON(bucket,o.key);if(data)dans.push(data)}cursor=page.truncated?page.cursor:undefined}while(cursor);
  cursor=undefined;do{const page=await bucket.list({prefix:'dan-disabled/',cursor});for(const o of page.objects)disabledStatic.push(o.key.slice('dan-disabled/'.length,-5));cursor=page.truncated?page.cursor:undefined}while(cursor);
  songs.sort((a,b)=>String(a.title).localeCompare(String(b.title),'ja'));dans.sort((a,b)=>String(a.title).localeCompare(String(b.title),'ja'));return {ready:true,songs,dans,disabledStatic};
@@ -36,6 +39,18 @@ export async function onRequest({request,env}){
  const bucket=env.DONBEAT_BUCKET,url=new URL(request.url),id=url.searchParams.get('id'),action=url.searchParams.get('action')||'';
  try{
   if(request.method==='GET')return json(await listAdmin(bucket));
+  if(action==='song'&&request.method==='PATCH'){
+   if(!idOK(id))return json({error:'アップロードIDが不正です。'},400);
+   if(!url.searchParams.has('index'))return json({error:'対象の曲が指定されていません。'},400);
+   const index=Number(url.searchParams.get('index')),key='catalog/'+id+'.json',data=await readJSON(bucket,key);
+   if(!data||!Array.isArray(data.songs)||!Number.isInteger(index)||index<0||index>=data.songs.length)return json({error:'対象の曲が見つかりません。'},404);
+   const raw=await request.text();if(raw.length>1000)return json({error:'分類指定が大きすぎます。'},413);
+   const category=JSON.parse(raw).category;
+   if(category!=='official'&&category!=='creative')return json({error:'譜面の分類が不正です。'},400);
+   data.songs[index].category=category;
+   await bucket.put(key,JSON.stringify(data),{httpMetadata:{contentType:'application/json'}});
+   return json({ok:true,category});
+  }
   if(action==='song'&&request.method==='DELETE'){
    if(!idOK(id))return json({error:'アップロードIDが不正です。'},400);const index=Number(url.searchParams.get('index'));const key='catalog/'+id+'.json',data=await readJSON(bucket,key);if(!data||!Array.isArray(data.songs)||!Number.isInteger(index)||index<0||index>=data.songs.length)return json({error:'対象の曲が見つかりません。'},404);
    const [removed]=data.songs.splice(index,1);if(data.songs.length)await bucket.put(key,JSON.stringify(data),{httpMetadata:{contentType:'application/json'}});else{await bucket.delete(key);await removePrefix(bucket,'files/'+id+'/')};return json({ok:true,removed:removed?.title||''});
@@ -68,7 +83,8 @@ export async function onRequest({request,env}){
    const output=[],needed=new Set();const asset=p=>'/api/donbeat/files/'+id+'/'+p.split('/').map(encodeURIComponent).join('/');
    for(const s of songs){
     if(typeof s.title!=='string'||!s.title.trim()||s.title.length>300||!validPath(s.chartPath)||!/\.(mc|tja)$/i.test(s.chartPath)||!validPath(s.audioPath)||!/\.(ogg|mp3|wav|m4a|flac)$/i.test(s.audioPath))throw Error('譜面・音源の指定が不正です。');
-    const entry={title:s.title,file:asset(s.chartPath),audio:asset(s.audioPath),features:{}};
+    if(s.category!==undefined&&s.category!=='official'&&s.category!=='creative')throw Error('譜面の分類が不正です。');
+    const entry={title:s.title,file:asset(s.chartPath),audio:asset(s.audioPath),category:songCategory(s),features:{}};
     for(const k of ['soflan','scrollOnNotes','scrollStop','reverseScroll','fadeOnNotes','branch','dummy','damage','fadeout','mv'])entry.features[k]=s.features?.[k]===true;
     needed.add(s.chartPath);needed.add(s.audioPath);
     if(s.videoPath){if(!validPath(s.videoPath)||!/\.(mp4|webm|m4v)$/i.test(s.videoPath))throw Error('動画の指定が不正です。');entry.video=asset(s.videoPath);entry.features.mv=true;needed.add(s.videoPath)}

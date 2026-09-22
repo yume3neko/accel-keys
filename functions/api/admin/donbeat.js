@@ -9,8 +9,8 @@ const mime=p=>{
 const readJSON=async(bucket,key)=>{const f=await bucket.get(key);return f?await f.json():null};
 const removePrefix=async(bucket,prefix)=>{let cursor;do{const page=await bucket.list({prefix,cursor});if(page.objects.length)await bucket.delete(page.objects.map(o=>o.key));cursor=page.truncated?page.cursor:undefined}while(cursor)};
 const normTitle=s=>String(s||'').normalize('NFC').trim();
-const officialTitles=new Set(['BATTLE NO.1','六本の薔薇','Nivalis','魔宵月','エンジェルドリーム','銀の黎明','リスドンヴァルナ','らんぶる'].map(s=>s.normalize('NFKC').toLowerCase().replace(/[\\s　・_-]/g,'')));
-const songCategory=s=>s?.category==='official'||s?.category==='creative'?s.category:officialTitles.has(String(s?.title||'').normalize('NFKC').toLowerCase().replace(/[\\s　・_-]/g,''))?'official':'creative';
+const officialTitles=new Set(['BATTLE NO.1','六本の薔薇','Nivalis','魔宵月','エンジェルドリーム','銀の黎明','リスドンヴァルナ','らんぶる'].map(s=>s.normalize('NFKC').toLowerCase().replace(/[\s　・_-]/g,'')));
+const songCategory=s=>s?.category==='official'||s?.category==='creative'?s.category:officialTitles.has(String(s?.title||'').normalize('NFKC').toLowerCase().replace(/[\s　・_-]/g,''))?'official':'creative';
 
 async function publishedSongTitles(bucket){const titles=new Set();let cursor;do{const page=await bucket.list({prefix:'catalog/',cursor});for(const o of page.objects){const data=await readJSON(bucket,o.key);for(const song of data?.songs||[])if(song?.title)titles.add(normTitle(song.title))}cursor=page.truncated?page.cursor:undefined}while(cursor);return titles}
 function danSongNames(content){

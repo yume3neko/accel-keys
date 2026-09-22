@@ -46,7 +46,7 @@ function branchReferenceScoreBasis(chart){
 }
 function chartNoteScore(chart){
  const basis=branchReferenceScoreBasis(chart),rollBase=basis.requiredHits*100;
- return Math.max(1,Math.floor((1000000-rollBase)/basis.notes)+1);
+ return Math.max(10,Math.floor((1000000-rollBase)/basis.notes/10)*10+10);
 }
 function branchReferenceNoteCount(chart){
  if(!chart)return 1;

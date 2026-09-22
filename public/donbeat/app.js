@@ -185,7 +185,8 @@ function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const 
  ctx.strokeStyle='#f4e8cc';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,noteY,nr,0,Math.PI*2);ctx.fill();ctx.stroke();
  ctx.fillStyle='#17242a';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${nr*.7}px sans-serif`;
  if(n.type===10){ctx.fillStyle='#fff';ctx.fillText('×',x,noteY)}
- if(n.type===5||n.type===6||n.type===7)ctx.fillText(t>=n.time?String(n.hits||0):'連',x,noteY);
+ if(n.type===5||n.type===6)ctx.fillText(t>=n.time?String(n.hits||0):'連',x,noteY);
+ if(n.type===7)ctx.fillText(String(Math.max(0,(n.required||0)-(n.hits||0))),x,noteY);
  if(n.type===9)ctx.fillText(t>=n.time?String(Math.max(0,(n.required||0)-(n.hits||0))):'連',x,noteY);
 };
 const visibleNotes=renderNotes();

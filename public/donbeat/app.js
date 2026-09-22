@@ -11,7 +11,7 @@ function tone(type,when){const ac=audio(),osc=ac.createOscillator(),gain=ac.crea
 function time(){return state==='playing'?audioContext.currentTime-startAt:pausedTime}
 function stopAudio(){clearAutoPads();stopMV();if(source){try{source.stop()}catch{}source=null}}
 function scheduleAudio(t){stopAudio();if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
-function reset(){document.body.classList.add('selecting');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;clearScoreGains();if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true}seek.disabled=!chart?.measures?.length;renderSongSelection();draw()}
+function reset(){document.body.classList.add('selecting');document.body.classList.remove('desktop-play');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;clearScoreGains();if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true}seek.disabled=!chart?.measures?.length;renderSongSelection();draw()}
 function syncRebuiltChart(next){
  let index=charts.indexOf(chart);
  if(index<0){
@@ -32,6 +32,7 @@ function branchPreviewChoices(decided,currentRoute='N'){
 }
 async function start(options={}){
  if(loading||importing||state==='playing'||(danRun&&!options.dan)||(!demoMode&&!danRun&&!playbackAssetsAvailable(chart)))return;
+ document.body.classList.toggle('desktop-play',desktopPlayMode());updateDesktopPlayInfo(chart);
  loading=true;
  const normalStart=!options.dan;
  if(normalStart){
@@ -62,7 +63,7 @@ async function start(options={}){
  // Manual pre-roll is visible but excluded from every judgment and score path.
  if(plan){for(const n of notes){if(n.time>=plan.target)continue;if(auto){if(n.type===10){n.done=true;continue}if(n.type<=4)judge(n,0);else{addRollHits(n,autoRollHits(n,plan.target-1e-9));if(n.end<plan.target)n.done=true}}else{n.ghost=true;if((n.end??n.time)<plan.lead)n.done=true}}}
  feedback='';feedbackAt=-10;beatIndex=chart.beats.findIndex(b=>b.time>=pausedTime);if(beatIndex<0)beatIndex=chart.beats.length;
- resetDummyPlayback(pausedTime);resetHibiki(pausedTime);startAt=audioContext.currentTime-pausedTime;scheduleAudio(pausedTime);state='playing';document.body.classList.remove('selecting');document.body.classList.add('playing');$('overlay').style.display='none';$('pause').disabled=false;setPauseIcon(false);['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
+ updateDesktopPlayInfo(chart);resetDummyPlayback(pausedTime);resetHibiki(pausedTime);startAt=audioContext.currentTime-pausedTime;scheduleAudio(pausedTime);state='playing';document.body.classList.remove('selecting');document.body.classList.add('playing');$('overlay').style.display='none';$('pause').disabled=false;setPauseIcon(false);['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
  update();resize();loop();
 }
 function pauseRewindTime(t){
@@ -234,6 +235,7 @@ async function choose(){
  $('title').textContent=chart.meta.TITLE||'無題';
  $('subtitle').textContent=(chart.meta.SUBTITLE||'').replace(/^(--|\+\+)/,'')||'TJA譜面';
  $('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';
+ updateDesktopPlayInfo(chart);
  $('fileinfo').textContent=demoMode?'伴奏なし・打音のみで練習できます':playbackAssetsAvailable(chart)?'譜面を読み込みました。音源・MV・spinnerは演奏開始時に読み込みます。':wave?'音源未選択：'+chart.meta.WAVE+' を追加してください':'音源を追加すると演奏できます';
  loading=false;rememberDanCharts();reset();if(chart.warnings?.length)$('fileinfo').textContent+=' ／ 注意：'+chart.warnings.join('、');
 }
@@ -376,6 +378,28 @@ function desktopPlayMode(){
  if(uaMobile===true)return false;
  if(uaMobile===false&&finePointer)return true;
  return finePointer&&!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||'');
+}
+function updateDesktopPlayInfo(c=chart){
+ const panel=$('desktopPlayInfo');if(!panel||!c)return;
+ const subtitle=(c.meta?.SUBTITLE||'').replace(/^(--|\+\+)/,'')||'';
+ const course=names[c.meta?.COURSE]||c.meta?.COURSE||'おに';
+ let noteText='-';
+ try{
+  const range=branchNoteCountRange(c);
+  noteText=range.min!==range.max?range.min.toLocaleString('ja-JP')+'〜'+range.max.toLocaleString('ja-JP'):range.max.toLocaleString('ja-JP');
+ }catch{
+  const count=(c.notes||[]).filter(n=>n.type<=4).length;
+  noteText=count.toLocaleString('ja-JP');
+ }
+ const values={
+  desktopPlayTitle:c.meta?.TITLE||'無題',
+  desktopPlaySubtitle:subtitle||'—',
+  desktopPlayCourse:course,
+  desktopPlayLevel:'★ '+(c.meta?.LEVEL||'?'),
+  desktopPlayBpm:String(c.bpm??c.meta?.BPM??'—'),
+  desktopPlayNotes:noteText
+ };
+ for(const [id,value] of Object.entries(values)){const el=$(id);if(el&&el.textContent!==value)el.textContent=value}
 }
 async function enterPlayFullscreen(){
  if(desktopPlayMode())return;

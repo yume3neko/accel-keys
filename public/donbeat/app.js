@@ -111,7 +111,6 @@ function togglePause(){
  }else if(state==='paused')resumeFromPause();
 }
 function unlock(){['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=false);}
-let scoreGainSequence=0;
 function clearScoreGains(){
  const layer=document.getElementById('scoreGainLayer');
  if(layer)layer.replaceChildren();
@@ -129,7 +128,6 @@ function showScoreGain(points){
  const item=document.createElement('span');
  item.className='score-gain';
  item.textContent='+'+gain.toLocaleString('ja-JP');
- item.style.setProperty('--gain-x',(((scoreGainSequence++%3)-1)*8)+'px');
  layer.append(item);
  const remove=()=>item.remove();
  item.addEventListener('animationend',remove,{once:true});

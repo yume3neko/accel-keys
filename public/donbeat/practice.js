@@ -8,7 +8,7 @@ function practicePlan(chart,target,automatic){
 }
 let seekTarget=0;
 function openSeek(){
- if(loading||importing||danRun||state==='playing'||state==='paused'||(!demoMode&&!playbackAssetsAvailable(chart)))return;
+ if(danRun||state!=='ready'||!chart?.measures?.length)return;
  const input=$('seekSeconds');input.min=Math.min(0,chart.measures?.[0]?.time||0);input.max=Math.max(Number(input.min),chart.duration-.001);
  seekTarget=Math.max(Number(input.min),Math.min(Number(input.max),seekTarget));input.value=seekTarget.toFixed(2);$('seekError').textContent='';
  $('seekHint').textContent=false?'オート：指定位置までの通常音符を全良として集計して開始します。':'手動：2小節前から助走し、コンボ0で開始。オート：指定位置まで全良として開始します。';
@@ -37,6 +37,6 @@ function renderSeek(){
 }
 function initPractice(){
  $('seekClose').onclick=()=>$('seekDialog').close();$('seekSeconds').oninput=seekInput;$('seekLocate').onclick=locateSeek;$('seekChart').addEventListener('scroll',renderSeek,{passive:true});
- $('seekPlayAuto').onclick=()=>{if(!seekInput())return;$('seekDialog').close();start({target:seekTarget,auto:true})};$('seekPlay').onclick=()=>{if(!seekInput())return;$('seekDialog').close();start({target:seekTarget})};
+ $('seekPlayAuto').onclick=()=>{if(!seekInput())return;if(!demoMode&&!playbackAssetsAvailable(chart)){$('seekError').textContent='音源を追加してください。';return}$('seekDialog').close();start({target:seekTarget,auto:true})};$('seekPlay').onclick=()=>{if(!seekInput())return;if(!demoMode&&!playbackAssetsAvailable(chart)){$('seekError').textContent='音源を追加してください。';return}$('seekDialog').close();start({target:seekTarget})};
  window.addEventListener('resize',()=>{if($('seekDialog').open)renderSeek()});
 }

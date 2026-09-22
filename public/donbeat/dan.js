@@ -76,7 +76,7 @@ function danExceededMaximum(){if(!danRun)return false;const r=evaluateDan(danRun
 // Optimistic remaining values: mark impossible only when even perfect remaining play cannot pass.
 function danPossibleStats(songOnly){
  const current=danSongStats(),possible={...(songOnly?current:danStats())};let remaining=0;
- const t=time()-Number($('offset').value||0)/1000;
+ const t=time()-judgmentOffsetSeconds();
  const groups=[{chart,notes,current:true}];if(!songOnly)for(let i=danRun.index+1;i<danRun.config.songs.length;i++)groups.push({chart:danRun.config.songs[i].chart,notes:danRun.config.songs[i].chart.notes,current:false});
  for(const group of groups){const normalCount=group.chart.notes.filter(n=>n.type<=4).length,noteScore=chartNoteScore(group.chart);
   for(const n of group.notes){if(group.current&&n.done)continue;if(n.type===10){if(!danRun.config.auto)possible.miss++;continue;}if(n.type<=4){remaining++;possible.good++;possible.ok++;possible.miss++;possible.allcombo++;possible.score+=noteScore;continue}
@@ -148,13 +148,13 @@ async function launchDan(automatic=false){
 }
 async function beginDanSong(transition=false){
  clearTimeout(danTimer);if(!danRun||danRun.finished)return;
- const run=danRun,e=run.config.songs[run.index];chart=e.chart;demoMode=e.demo;audioBuffer=null;playbackVisualChart=null;syncMV();syncSpinner();state=transition?'dan-break':'ready';
+ const run=danRun,e=run.config.songs[run.index];chart=e.chart;demoMode=e.demo;activeSongRate=Number($('musicSpeed')?.value)||1;audioBuffer=null;playbackVisualChart=null;syncMV();syncSpinner();state=transition?'dan-break':'ready';
  run.baseline=run.index?danStats():{score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0};run.songCombo=0;run.songMaxCombo=0;
  $('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=run.config.name+' / '+(run.index+1)+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';
  document.body.classList.remove('selecting');document.body.classList.add('playing');$('pause').disabled=true;
  ['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
  notes=chart.notes.map(n=>({...n,done:false,hits:0}));pausedTime=Math.min(0,(notes[0]?.time||0)-4);resetDummyPlayback(pausedTime);feedback='';update();draw();
- $('overlay').replaceChildren();const heading=danNode('h2',chart.meta.TITLE||'無題'),message=danNode('p',transition?'音源・MV・spinnerを読み込んでいます…':'横画面に切り替えています…');$('overlay').append(heading,message);$('overlay').style.display='flex';
+ $('overlay').replaceChildren();const heading=danNode('h2',chart.meta.TITLE||'無題'),message=danNode('p',transition?'音源・MV・spinnerを読み込んでいます…':desktopPlayMode()?'演奏素材を準備しています…':'横画面に切り替えています…');$('overlay').append(heading,message);$('overlay').style.display='flex';
  try{
   if(!transition){await enterPlayFullscreen();await waitForLandscape();await run.audioResumePromise}
   if(danRun!==run||run.finished)return;

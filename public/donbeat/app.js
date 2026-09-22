@@ -2,15 +2,16 @@
 let balloonRolls=0,balloonPops=0;
 const autoPadUntil=[0,0,0,0],autoPadSide={1:0,2:0};
 let mvFile=null,mvURL=null,mvPlaying=false,spinnerFile=null,spinnerURL=null,playbackVisualChart=null;
-const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d');let charts=[],chart,audioFiles=new Map(),audioBuffer=null,audioContext,source,state='ready',notes=[],startAt=0,pausedTime=0,score=0,combo=0,maxCombo=0,good=0,ok=0,miss=0,rolls=0,soul=0,feedback='',feedbackAt=-10,auto=false,demoMode=true,beatIndex=0,width=1000,height=230,raf=0,loading=false,practiceTarget=null,judgeFrom=-Infinity,pauseResumeUntil=-Infinity,importing=false;
+const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d');let charts=[],chart,audioFiles=new Map(),audioBuffer=null,audioContext,source,state='ready',notes=[],startAt=0,pausedTime=0,score=0,combo=0,maxCombo=0,good=0,ok=0,miss=0,rolls=0,soul=0,feedback='',feedbackAt=-10,auto=false,demoMode=true,beatIndex=0,width=1000,height=230,raf=0,loading=false,practiceTarget=null,judgeFrom=-Infinity,pauseResumeUntil=-Infinity,importing=false,activeSongRate=1;
 const demo=`TITLE:練習譜面\nSUBTITLE:伴奏なし・打音のみ\nBPM:120\nOFFSET:0\nCOURSE:Easy\nLEVEL:3\nBALLOON:8\n#START\n0000,\n1000100010001000,\n1000200010002000,\n1010100010102000,\n1020102010201020,\n3000400030004000,\n5000000000000008,\n#GOGOSTART\n1010202010102020,\n1110200011102000,\n1020102010201020,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000200010201000,\n1000000000000000,\n0000,\n#END\nCOURSE:Normal\nLEVEL:4\nBALLOON:8,10,12\n#START\n0000,\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Hard\nLEVEL:6\nBALLOON:12,14,16\n#START\n0000,\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Oni\nLEVEL:8\nBALLOON:16,20,24\n#START\n0000,\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Edit\nLEVEL:10\nBALLOON:24,30,36\n#START\n0000,\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END`;
 const names={Easy:'かんたん',Normal:'ふつう',Hard:'むずかしい',Oni:'おに',Edit:'裏',0:'かんたん',1:'ふつう',2:'むずかしい',3:'おに',4:'裏'};
 let musicGain,effectGain;
 function audio(){if(!audioContext)audioContext=new (window.AudioContext||window.webkitAudioContext)();if(!musicGain){musicGain=audioContext.createGain();effectGain=audioContext.createGain();musicGain.connect(audioContext.destination);effectGain.connect(audioContext.destination);applyVolumes()}return audioContext}
 function tone(type,when){const ac=audio(),osc=ac.createOscillator(),gain=ac.createGain();osc.type=type===1?'sine':'triangle';const t=when??ac.currentTime;osc.frequency.setValueAtTime(type===1?180:900,t);osc.frequency.exponentialRampToValueAtTime(type===1?55:250,t+.085);gain.gain.setValueAtTime(.23,t);gain.gain.exponentialRampToValueAtTime(.001,t+.12);osc.connect(gain).connect(effectGain);osc.start(t);osc.stop(t+.13)}
-function time(){return state==='playing'?audioContext.currentTime-startAt:pausedTime}
+function judgmentOffsetSeconds(){return Number($('offset').value||0)/1000*activeSongRate}
+function time(){return state==='playing'?(audioContext.currentTime-startAt)*activeSongRate:pausedTime}
 function stopAudio(){clearAutoPads();stopMV();if(source){try{source.stop()}catch{}source=null}}
-function scheduleAudio(t){stopAudio();if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
+function scheduleAudio(t){stopAudio();if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.playbackRate.value=activeSongRate;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t/activeSongRate);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
 function reset(){document.body.classList.add('selecting');document.body.classList.remove('desktop-play');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;clearScoreGains();if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true}seek.disabled=!chart?.measures?.length;renderSongSelection();draw()}
 function syncRebuiltChart(next){
  let index=charts.indexOf(chart);
@@ -32,6 +33,7 @@ function branchPreviewChoices(decided,currentRoute='N'){
 }
 async function start(options={}){
  if(loading||importing||state==='playing'||(danRun&&!options.dan)||(!demoMode&&!danRun&&!playbackAssetsAvailable(chart)))return;
+ activeSongRate=Number($('musicSpeed')?.value)||1;
  document.body.classList.toggle('desktop-play',desktopPlayMode());updateDesktopPlayInfo(chart);
  loading=true;
  const normalStart=!options.dan;
@@ -63,7 +65,7 @@ async function start(options={}){
  // Manual pre-roll is visible but excluded from every judgment and score path.
  if(plan){for(const n of notes){if(n.time>=plan.target)continue;if(auto){if(n.type===10){n.done=true;continue}if(n.type<=4)judge(n,0);else{addRollHits(n,autoRollHits(n,plan.target-1e-9));if(n.end<plan.target)n.done=true}}else{n.ghost=true;if((n.end??n.time)<plan.lead)n.done=true}}}
  feedback='';feedbackAt=-10;beatIndex=chart.beats.findIndex(b=>b.time>=pausedTime);if(beatIndex<0)beatIndex=chart.beats.length;
- updateDesktopPlayInfo(chart);resetDummyPlayback(pausedTime);resetHibiki(pausedTime);startAt=audioContext.currentTime-pausedTime;scheduleAudio(pausedTime);state='playing';document.body.classList.remove('selecting');document.body.classList.add('playing');$('overlay').style.display='none';$('pause').disabled=false;setPauseIcon(false);['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
+ updateDesktopPlayInfo(chart);resetDummyPlayback(pausedTime);resetHibiki(pausedTime);startAt=audioContext.currentTime-pausedTime/activeSongRate;scheduleAudio(pausedTime);state='playing';document.body.classList.remove('selecting');document.body.classList.add('playing');$('overlay').style.display='none';$('pause').disabled=false;setPauseIcon(false);['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
  update();resize();loop();
 }
 function pauseRewindTime(t){
@@ -87,7 +89,7 @@ function resumeFromPause(){
  resetDummyPlayback(resumePoint);
  resetHibiki(rewind);
  audio().resume().then(()=>{
-  startAt=audioContext.currentTime-rewind;
+  startAt=audioContext.currentTime-rewind/activeSongRate;
   scheduleAudio(rewind);
   state='playing';
   $('overlay').style.display='none';
@@ -156,7 +158,7 @@ function addRollHitsCore(r,count=1){
   if((r.type===7||r.type===9)&&r.hits>=r.required){r.done=true;balloonPops++;feedback=''}
   feedbackAt=time();update();
 }
-function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(playTime<pauseResumeUntil)return;const t=playTime-Number($('offset').value||0)/1000;if(t<judgeFrom)return;const damage=notes.find(n=>n.type===10&&!n.done&&!n.ghost&&Math.abs(n.time-t)<=judgmentWindows().miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows().miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&((n.type>=5&&n.type<=7)||n.type===9)&&t>=n.time&&t<=n.end);if(r&&(![7,9].includes(r.type)||type===1))addRollHits(r)}
+function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(playTime<pauseResumeUntil)return;const t=playTime-judgmentOffsetSeconds();if(t<judgeFrom)return;const damage=notes.find(n=>n.type===10&&!n.done&&!n.ghost&&Math.abs(n.time-t)<=judgmentWindows().miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows().miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&((n.type>=5&&n.type<=7)||n.type===9)&&t>=n.time&&t<=n.end);if(r&&(![7,9].includes(r.type)||type===1))addRollHits(r)}
 function songDuration(){return Math.max(.001,chart.duration+(danRun?0:1),danRun?Math.max(0,...chart.notes.map(n=>(n.end??n.time)+judgmentWindows().miss+.001)):0,audioBuffer?.duration||0)}
 function updateProgress(t=time()){
   const songFraction=state==='result'?1:state==='ready'?0:Math.max(0,Math.min(1,t/songDuration()));
@@ -171,7 +173,7 @@ function finish(){if(danRun){finishDanSong();return}pausedTime=time();state='res
 
 function loop(){
  updateBranchRoute();
- const t=time(),adjust=Number($('offset').value||0)/1000,resumeLead=t<pauseResumeUntil;
+ const t=time(),adjust=judgmentOffsetSeconds(),resumeLead=t<pauseResumeUntil;
  if(!resumeLead)updateDummyPlayback(t-adjust);
  if(!resumeLead){
   for(const n of notes){
@@ -290,7 +292,7 @@ async function loadFiles(files){
  }catch(e){$('fileinfo').textContent='読み込みエラー：'+e.message;$('danError').textContent=$('fileinfo').textContent;return}finally{importing=false;loading=false;unlock();$('files').value='';$('folder').value=''}
  await tryStartPendingDan();
 }
-$('files').onchange=e=>loadFiles(e.target.files);$('folder').onchange=e=>loadFiles(e.target.files);$('course').onchange=choose;$('demo').onclick=()=>{if(loading||importing||danRun)return;demoMode=true;charts=parseTJA(demo).charts.map(c=>({...c,builtinDemo:true}));fillCourses();choose()};$('pause').onclick=togglePause;document.querySelectorAll('[data-hit]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();if(autoInputLocked())return;b.setPointerCapture(e.pointerId);b.classList.add('active');hit(Number(b.dataset.hit))});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>b.classList.remove('active'))});window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;const key=e.key.toLowerCase();if(e.repeat)return;if(['d','f','j','k'].includes(key)){e.preventDefault();hit(key==='d'||key==='k'?2:1)}else if(key==='escape'||key===' '){e.preventDefault();togglePause()}});document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')togglePause()});window.addEventListener('resize',resize);$('speed').onchange=draw;initPractice();initDan();charts=parseTJA(demo).charts.map(c=>({...c,builtinDemo:true}));fillCourses();choose();new ResizeObserver(resize).observe(canvas);
+$('files').onchange=e=>loadFiles(e.target.files);$('folder').onchange=e=>loadFiles(e.target.files);$('course').onchange=choose;$('demo').onclick=()=>{if(loading||importing||danRun)return;demoMode=true;charts=parseTJA(demo).charts.map(c=>({...c,builtinDemo:true}));fillCourses();choose()};$('pause').onclick=togglePause;document.querySelectorAll('[data-hit]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();if(autoInputLocked())return;b.setPointerCapture(e.pointerId);b.classList.add('active');hit(Number(b.dataset.hit))});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>b.classList.remove('active'))});window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;const key=e.key.toLowerCase();if(e.repeat)return;if(['d','f','j','k'].includes(key)){e.preventDefault();hit(key==='d'||key==='k'?2:1)}else if(key==='escape'||key===' '){e.preventDefault();togglePause()}});document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')togglePause()});window.addEventListener('resize',resize);$('speed').onchange=draw;$('musicSpeed').onchange=draw;initPractice();initDan();charts=parseTJA(demo).charts.map(c=>({...c,builtinDemo:true}));fillCourses();choose();new ResizeObserver(resize).observe(canvas);
 
 async function decodeDanText(file){const bytes=await file.arrayBuffer();try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{return new TextDecoder('shift-jis').decode(bytes)}}
 
@@ -315,7 +317,7 @@ function attachVideos(list,files){for(const c of list){const name=c.meta.VIDEO;i
 function stopMV(){const v=$('mv');if(v&&typeof v.pause==='function')v.pause();mvPlaying=false;}
 function syncMV(){const v=$('mv');if(!v||typeof v.play!=='function')return;const visualsAllowed=playbackVisualChart===chart||state==='playing'||state==='paused',file=visualsAllowed&&chart?._mvEnabled!==false?(chart?.videoFile||null):null;
  if(file!==mvFile){stopMV();if(mvURL)URL.revokeObjectURL(mvURL);mvFile=file;mvURL=file?URL.createObjectURL(file):null;v.removeAttribute('src');if(mvURL)v.src=mvURL;v.load();v.parentElement.classList.toggle('has-mv',!!file);v.onerror=()=>{v.parentElement.classList.remove('has-mv');};}
- if(!file)return;const t=time();if(state!=='playing'||t<0){stopMV();return}if(v.readyState<1)return;
+ if(!file)return;v.playbackRate=activeSongRate;const t=time();if(state!=='playing'||t<0){stopMV();return}if(v.readyState<1)return;
  const desired=Math.min(t,Number.isFinite(v.duration)?v.duration:t);if(Math.abs(v.currentTime-desired)>.2)v.currentTime=desired;
  if(!mvPlaying&&!v.ended){mvPlaying=true;v.muted=true;v.play().catch(()=>{mvPlaying=false})}}
 
@@ -396,7 +398,7 @@ function updateDesktopPlayInfo(c=chart){
   desktopPlaySubtitle:subtitle||'—',
   desktopPlayCourse:course,
   desktopPlayLevel:'★ '+(c.meta?.LEVEL||'?'),
-  desktopPlayBpm:String(c.bpm??c.meta?.BPM??'—'),
+  desktopPlayBpm:String(c.bpm??c.meta?.BPM??'—')+((state==='playing'||state==='paused')&&activeSongRate!==1?' × '+activeSongRate:'') ,
   desktopPlayNotes:noteText
  };
  for(const [id,value] of Object.entries(values)){const el=$(id);if(el&&el.textContent!==value)el.textContent=value}
@@ -424,7 +426,7 @@ function branchTransitionWindow(e){
 }
 function activeBranchTransition(t){
  if(danRun||!chart.branchEvents?.length||!(state==='playing'||state==='paused'))return null;
- const now=t-Number($('offset').value||0)/1000;
+ const now=t-judgmentOffsetSeconds();
  const active=[...branchTransitions].reverse().find(x=>now>=x.start&&now<x.end);
  if(!active)return null;
  const raw=Math.max(0,Math.min(1,(now-active.start)/Math.max(.001,active.end-active.start)));
@@ -498,7 +500,7 @@ function branchDetails(e,decideRandom=false){
 }
 function updateBranchRoute(){
  if(danRun||!chart.branchEvents?.length)return;
- const now=time()-Number($('offset').value||0)/1000;
+ const now=time()-judgmentOffsetSeconds();
  while(branchChoices.length<chart.branchEvents.length){
   const index=branchChoices.length,e=chart.branchEvents[index],judgeAt=branchJudgeTime(e);if(now<judgeAt)break;
   for(const n of notes){if(n.type<=4&&!n.done&&!n.ghost&&n.time<judgeAt){if(auto)judge(n,0);else if(now>n.time+judgmentWindows().miss)judge(n,1)}}
@@ -518,7 +520,7 @@ function drawBranchDetails(t,opacity){
  const bar=$('branchProgress'),active=state==='playing'||state==='paused';
  const e=!danRun&&active?chart.branchEvents?.[branchChoices.length]:null;
  bar.hidden=!e;if(!e)return;
- const now=t-Number($('offset').value||0)/1000,judgeAt=branchJudgeTime(e);
+ const now=t-judgmentOffsetSeconds(),judgeAt=branchJudgeTime(e);
  const previous=branchChoices.length?branchJudgeTime(chart.branchEvents[branchChoices.length-1]):Math.min(0,(chart.notes[0]?.time||0)-4);
  const start=Math.max(previous,...(chart.sections||[]).filter(x=>x<judgeAt));
  const progress=Math.max(0,Math.min(1,(now-start)/Math.max(.001,judgeAt-start)));
@@ -805,8 +807,8 @@ function timeSignatureAt(c,t){
 function updateVisualBpm(t,opacity){
  let label=$('visualBpm');
  if(!label){label=document.createElement('div');label.id='visualBpm';label.style.cssText='position:absolute;right:10px;top:5px;z-index:35;pointer-events:none;font:600 clamp(10px,1.5vw,13px) sans-serif;color:#eee;text-shadow:0 1px 3px #000;background:#10131799;padding:3px 6px;border-radius:4px;max-width:calc(100% - 20px);text-align:right;overflow-wrap:anywhere';canvas.parentElement.append(label)}
- const n=visualBpmState(chart,t),meter=timeSignatureAt(chart,t),playerSpeed=Number($('speed').value)||1,format=v=>Number(v.toFixed(3)).toLocaleString('ja-JP',{maximumFractionDigits:3});
- const value=meter+' 拍子   見た目 '+format(n.bpm)+' BPM × '+format(n.hs)+' HS'+(n.scroll!==1?' × '+format(n.scroll):'')+(playerSpeed!==1?' × '+format(playerSpeed)+' 設定':'')+' = '+format(n.value*playerSpeed)+' BPM';
+ const n=visualBpmState(chart,t),meter=timeSignatureAt(chart,t),playerSpeed=Number($('speed').value)||1,musicRate=(state==='playing'||state==='paused')?activeSongRate:(Number($('musicSpeed').value)||1),format=v=>Number(v.toFixed(3)).toLocaleString('ja-JP',{maximumFractionDigits:3});
+ const value=meter+' 拍子   見た目 '+format(n.bpm)+' BPM × '+format(n.hs)+' HS'+(n.scroll!==1?' × '+format(n.scroll):'')+(playerSpeed!==1?' × '+format(playerSpeed)+' 設定':'')+(musicRate!==1?' × '+format(musicRate)+' 曲速':'')+' = '+format(n.value*playerSpeed*musicRate)+' BPM';
  if(label.textContent!==value)label.textContent=value;
  label.style.opacity=opacity;
 }

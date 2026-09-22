@@ -84,12 +84,12 @@ function danPossibleStats(songOnly){
    if(danRun.config.auto)extra=Math.max(0,autoRollHits(n,n.end)-hits);
    else extra=(n.type===7||n.type===9)?Math.max(0,n.required-hits):Infinity;
    possible.rolls+=extra;possible.allcombo+=extra;possible.score+=extra*100;
-   if((n.type===7||n.type===9)&&hits+extra>=n.required)possible.score+=5000;
+   
   }
  }
  possible.maxCombo=Math.max(possible.maxCombo,(songOnly?danRun.songCombo:combo)+remaining);return possible;
 }
-function danUnplayedMaximum(c){const normal=c.notes.filter(n=>n.type<=4).length,noteScore=chartNoteScore(c),result={good:normal,ok:0,miss:0,maxCombo:normal,rolls:0,score:normal*noteScore};for(const n of c.notes){if(!((n.type>=5&&n.type<=7)||n.type===9))continue;const hits=danRun.config.auto?autoRollHits(n,n.end):(n.type===7||n.type===9)?n.required:Infinity;result.rolls+=hits;result.score+=hits*100;if((n.type===7||n.type===9)&&hits>=n.required)result.score+=5000}result.ok=normal;result.miss=normal+(danRun.config.auto?0:c.notes.filter(n=>n.type===10).length);result.allcombo=normal+result.rolls;return result}
+function danUnplayedMaximum(c){const normal=c.notes.filter(n=>n.type<=4).length,noteScore=chartNoteScore(c),result={good:normal,ok:0,miss:0,maxCombo:normal,rolls:0,score:normal*noteScore};for(const n of c.notes){if(!((n.type>=5&&n.type<=7)||n.type===9))continue;const hits=danRun.config.auto?autoRollHits(n,n.end):(n.type===7||n.type===9)?n.required:Infinity;result.rolls+=hits;result.score+=hits*100;}result.ok=normal;result.miss=normal+(danRun.config.auto?0:c.notes.filter(n=>n.type===10).length);result.allcombo=normal+result.rolls;return result}
 function danCurrentFailed(){
  if(!danRun)return false;if(danRun.failed||danExceededMaximum())return true;
  const whole=danPossibleStats(false),current=danPossibleStats(true);

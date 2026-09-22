@@ -130,7 +130,7 @@ function addRollHitsCore(r,count=1){
   if(r.type===7||r.type===9)count=Math.min(count,r.required-r.hits);
   r.hits+=count;rolls+=count;if(r.type===7||r.type===9)balloonRolls+=count;score+=count*100;
   feedback='';
-  if((r.type===7||r.type===9)&&r.hits>=r.required){r.done=true;score+=5000;balloonPops++;feedback=''}
+  if((r.type===7||r.type===9)&&r.hits>=r.required){r.done=true;balloonPops++;feedback=''}
   feedbackAt=time();update();
 }
 function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(playTime<pauseResumeUntil)return;const t=playTime-Number($('offset').value||0)/1000;if(t<judgeFrom)return;const damage=notes.find(n=>n.type===10&&!n.done&&!n.ghost&&Math.abs(n.time-t)<=judgmentWindows().miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows().miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&((n.type>=5&&n.type<=7)||n.type===9)&&t>=n.time&&t<=n.end);if(r&&(![7,9].includes(r.type)||type===1))addRollHits(r)}

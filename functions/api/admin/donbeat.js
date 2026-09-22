@@ -10,7 +10,12 @@ const readJSON=async(bucket,key)=>{const f=await bucket.get(key);return f?await 
 const removePrefix=async(bucket,prefix)=>{let cursor;do{const page=await bucket.list({prefix,cursor});if(page.objects.length)await bucket.delete(page.objects.map(o=>o.key));cursor=page.truncated?page.cursor:undefined}while(cursor)};
 const normTitle=s=>String(s||'').normalize('NFC').trim();
 const officialTitles=new Set(['BATTLE NO.1','六本の薔薇','六本の薔薇と采の歌','Nivalis','Nivalis*Anima','魔宵月','エンジェルドリーム','銀の黎明','銀の黎明か、黒の晶華か。','銀の黎明か、黒の晶華か','リスドンヴァルナ','リスドンヴァルナの黄昏','らんぶる','らんぶる乱舞'].map(s=>s.normalize('NFKC').toLowerCase().replace(/[\s　・_-]/g,'')));
-const songCategory=s=>s?.category==='official'||s?.category==='creative'?s.category:officialTitles.has(String(s?.title||'').normalize('NFKC').toLowerCase().replace(/[\s　・_-]/g,''))?'official':'creative';
+const songCategory=s=>{
+ const explicit=s?.category==='official'||s?.category==='creative'?s.category:null;
+ if(s?.categoryManual===true&&explicit)return explicit;
+ if(officialTitles.has(String(s?.title||'').normalize('NFKC').toLowerCase().replace(/[\s　・_-]/g,'')))return 'official';
+ return explicit||'creative';
+};
 
 async function publishedSongTitles(bucket){const titles=new Set();let cursor;do{const page=await bucket.list({prefix:'catalog/',cursor});for(const o of page.objects){const data=await readJSON(bucket,o.key);for(const song of data?.songs||[])if(song?.title)titles.add(normTitle(song.title))}cursor=page.truncated?page.cursor:undefined}while(cursor);return titles}
 function danSongNames(content){
@@ -47,7 +52,7 @@ export async function onRequest({request,env}){
    const raw=await request.text();if(raw.length>1000)return json({error:'分類指定が大きすぎます。'},413);
    const category=JSON.parse(raw).category;
    if(category!=='official'&&category!=='creative')return json({error:'譜面の分類が不正です。'},400);
-   data.songs[index].category=category;
+   data.songs[index].category=category;data.songs[index].categoryManual=true;
    await bucket.put(key,JSON.stringify(data),{httpMetadata:{contentType:'application/json'}});
    return json({ok:true,category});
   }
@@ -84,7 +89,7 @@ export async function onRequest({request,env}){
    for(const s of songs){
     if(typeof s.title!=='string'||!s.title.trim()||s.title.length>300||!validPath(s.chartPath)||!/\.(mc|tja)$/i.test(s.chartPath)||!validPath(s.audioPath)||!/\.(ogg|mp3|wav|m4a|flac)$/i.test(s.audioPath))throw Error('譜面・音源の指定が不正です。');
     if(s.category!==undefined&&s.category!=='official'&&s.category!=='creative')throw Error('譜面の分類が不正です。');
-    const entry={title:s.title,file:asset(s.chartPath),audio:asset(s.audioPath),category:songCategory(s),features:{}};
+    const entry={title:s.title,file:asset(s.chartPath),audio:asset(s.audioPath),category:songCategory(s),categoryManual:s.categoryManual===true,features:{}};
     for(const k of ['soflan','scrollOnNotes','scrollStop','reverseScroll','fadeOnNotes','branch','dummy','damage','fadeout','mv'])entry.features[k]=s.features?.[k]===true;
     needed.add(s.chartPath);needed.add(s.audioPath);
     if(s.videoPath){if(!validPath(s.videoPath)||!/\.(mp4|webm|m4v)$/i.test(s.videoPath))throw Error('動画の指定が不正です。');entry.video=asset(s.videoPath);entry.features.mv=true;needed.add(s.videoPath)}

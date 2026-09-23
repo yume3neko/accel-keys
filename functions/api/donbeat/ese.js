@@ -51,10 +51,13 @@ function tjaMetadata(text,file){
   const m=line.match(/^([A-Z][A-Z0-9]*)\s*:\s*(.*)$/i);
   if(m&&!Object.prototype.hasOwnProperty.call(metadata,m[1].toUpperCase()))metadata[m[1].toUpperCase()]=m[2].trim();
  }
- const title=metadata.TITLEJA||metadata.TITLE||filename(file).replace(/\.tja$/i,'');
+ const titleJa=String(metadata.TITLEJA||'').trim();
+ const subtitleJa=String(metadata.SUBTITLEJA||'').trim();
+ const title=titleJa||metadata.TITLE||filename(file).replace(/\.tja$/i,'');
+ const subtitle=subtitleJa||(/[\u3040-\u30ff\u3400-\u9fff]/.test(metadata.SUBTITLE||'')?metadata.SUBTITLE:'');
  const chartInfo=[...text.matchAll(/^\s*COURSE\s*:\s*(.+)$/gmi)].slice(0,15).map(m=>m[1].trim());
  const levels=[...text.matchAll(/^\s*LEVEL\s*:\s*(.+)$/gmi)].slice(0,15).map(m=>m[1].trim());
- return {title,titleJa:metadata.TITLEJA||'',subtitle:metadata.SUBTITLEJA||metadata.SUBTITLE||'',bpm:metadata.BPM||'',wave:metadata.WAVE||'',charts:chartInfo.map((course,i)=>({course,level:levels[i]||'?'}))};
+ return {title,titleJa,subtitle,subtitleJa,japaneseTitleAvailable:!!titleJa||/[\u3040-\u30ff\u3400-\u9fff]/.test(title),bpm:metadata.BPM||'',wave:metadata.WAVE||'',charts:chartInfo.map((course,i)=>({course,level:levels[i]||'?'}))};
 }
 function findAudio(rows,wave){
  const audio=rows.filter(x=>x.type==='file'&&AUDIO.test(x.name));

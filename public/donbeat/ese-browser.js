@@ -16,7 +16,7 @@ function eseApi(type,path){
 }
 function eseDepth(path){return path?path.split('/').length:0}
 function eseGenreName(folder){
- const raw=String(folder||''),number=raw.match(/^(\d{1,2})\b/)?.[1];
+ const raw=String(folder||''),number=raw.match(/^(\d{1,2})(?=\D|$)/)?.[1];
  const code=number?number.padStart(2,'0'):null;
  const map={
   '01':'ポップス','02':'アニメ','03':'ボーカロイド',
@@ -31,8 +31,9 @@ function eseGenreName(folder){
   [/game|ゲーム/,'ゲームミュージック'],[/original|オリジナル/,'オリジナル']
  ].find(([test])=>test.test(original));
  const translated=guess?.[1]||map[code]||(/[\u3040-\u30ff\u3400-\u9fff]/.test(original)?original:code?'その他のジャンル':'その他');
- return (code?code+'　':'')+translated;
+ return translated;
 }
+function eseVisibleGenre(item){return item.type==='dir'&&!['その他のジャンル','その他'].includes(eseGenreName(item.name))}
 function eseInfoFor(item){return eseState.infoCache.get(item.path)}
 async function eseReadInfo(path){
  if(eseState.infoCache.has(path))return eseState.infoCache.get(path);
@@ -89,7 +90,8 @@ async function eseBrowse(path){
   if(!res.ok)throw Error(data.error||'ESEの一覧を取得できませんでした。');
   if(!Array.isArray(data.items))throw Error('ESEのフォルダ一覧の形式が不正です。');
   if(id!==eseState.requestId)return;
-  eseState.cache.set(path,data.items);eseState.items=data.items;
+  const items=eseDepth(path)===0?data.items.filter(eseVisibleGenre):data.items;
+  eseState.cache.set(path,items);eseState.items=items;
  }catch(e){if(id===eseState.requestId)eseState.error=e.message||String(e)}
  finally{
   if(id===eseState.requestId){
@@ -136,8 +138,9 @@ async function eseOpenSong(path){
    try{
     const parsed=await eseFetchChart(filePath);
     for(const c of parsed){
-     c.meta.TITLE=c.meta.TITLEJA||info.title||c.meta.TITLE;
-     if(c.meta.SUBTITLEJA)c.meta.SUBTITLE=c.meta.SUBTITLEJA;
+     c.meta.TITLE=String(c.meta.TITLEJA||info.title||c.meta.TITLE||'').trim();
+     // Do not override Japanese subtitles with the original-language header.
+     c.meta.SUBTITLE=String(c.meta.SUBTITLEJA||info.subtitle||(/[^\x00-\x7f]/.test(c.meta.SUBTITLE||'')?c.meta.SUBTITLE:'')||'').trim();
      c.category='official';
      c._esePath=filePath;c._eseTja=filePath;c._eseFolder=info.path;c.sourcePath=filePath;
     }

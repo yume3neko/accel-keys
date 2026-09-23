@@ -219,3 +219,25 @@ body.selecting .fields>label:first-child{display:none}
 .song-folder-list .song-choice{margin:9px 0}
 .song-folder-empty{padding:15px;color:#aeb5bf;font-size:14px}
 @media(max-width:600px){.song-folder-title{padding:13px;font-size:18px}.song-folder-list{padding:2px 7px 7px}}
+
+/* Lazy ESE Git repository browser inside the official song folder. */
+.ese-browser{margin:12px 0;padding:12px;border:1px solid #72603d;background:#29251f;border-radius:10px}
+.ese-browser-toggle{width:100%;text-align:left;font-size:16px;font-weight:800;background:#3b3224;border-color:#916c3c;color:#ffdd9e}
+.ese-browser-toggle[aria-expanded=true]{border-color:#f8c259}
+.ese-browser-panel{display:flex;flex-direction:column;gap:10px;padding:12px 3px 3px}
+.ese-browser-note{margin:0;font-size:12px;color:#c1b7a5;line-height:1.7}
+.ese-source-link{align-self:flex-start;color:#ffd37e;font-size:12px}
+.ese-browser-nav{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ese-back{padding:6px 12px}
+.ese-current-path{font-size:12px;color:#d3d1ca;overflow-wrap:anywhere}
+.ese-search{width:100%;padding:10px 12px;border-radius:7px;border:1px solid #6b675d;background:#171c20;color:#f4efe4;font:inherit}
+.ese-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:7px;max-height:min(45vh,490px);overflow:auto;padding:4px 2px}
+.ese-entry{padding:10px 12px;text-align:left;min-height:42px;overflow-wrap:anywhere;white-space:normal}
+.ese-dir{border-color:#586879;background:#273340}
+.ese-chart{border-color:#74623b;background:#302b23}
+.ese-error{color:#ff9c8a;font-size:13px}
+.ese-loading{color:#f8c259;font-size:13px}
+.ese-chart-origin{color:#ffd37e!important;font-size:12px}
+.ese-audio-picker{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px;border-radius:7px;border:1px solid #626f78;color:#dce3e6;font-size:13px}
+.ese-audio-picker input{max-width:100%;color:#dce3e6}
+@media(max-width:600px){.ese-results{grid-template-columns:1fr;max-height:45vh}.ese-browser{padding:9px}}

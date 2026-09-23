@@ -615,7 +615,7 @@ function renderSongSelection(){
   const openedFolder=openSongFolder===category;
   toggle.setAttribute('aria-expanded',String(openedFolder));
   const folderName=document.createElement('span');folderName.className='song-folder-name';folderName.textContent=label;
-  const count=document.createElement('span');count.className='song-folder-count';count.textContent=grouped[category].size+'曲';
+  const count=document.createElement('span');count.className='song-folder-count';count.textContent=grouped[category].size+'曲'+(category==='official'?' ＋ ESE':'');
   const chevron=document.createElement('span');chevron.className='song-folder-chevron';chevron.textContent=openedFolder?'−':'＋';
   toggle.append(folderName,count,chevron);toggle.onclick=()=>{
    songFolderTouched=true;openSongFolder=openSongFolder===category?null:category;expandedSong=null;renderSongSelection();
@@ -649,6 +649,7 @@ function renderSongSelection(){
    if(c._esePath){
     const sourceInfo=document.createElement('p');sourceInfo.className='ese-chart-origin';
     sourceInfo.textContent='ESEから取得した譜面';
+    const sourceLink=document.createElement('a');sourceLink.href='https://ese.tjadataba.se/ESE/ESE/src/branch/master/'+c._esePath.split('/').map(encodeURIComponent).join('/');sourceLink.textContent='元のTJAを開く ↗';sourceLink.target='_blank';sourceLink.rel='noopener noreferrer';sourceInfo.append('　',sourceLink);
     panel.append(sourceInfo);
     const audioLabel=document.createElement('label');audioLabel.className='ese-audio-picker';
     audioLabel.textContent=playbackAssetsAvailable(c)?'音源を変更する':'音源を選択して演奏可能にする';

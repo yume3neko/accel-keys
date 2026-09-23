@@ -623,6 +623,7 @@ function renderSongSelection(){
   const list=document.createElement('div');list.className='song-folder-list';list.hidden=!openedFolder;
   folder.append(toggle,list);host.append(folder);
   if(!openedFolder)continue;
+  if(category==='official'&&typeof renderESEBrowser==='function')renderESEBrowser(list);
   if(!grouped[category].size){const empty=document.createElement('p');empty.className='song-folder-empty';empty.textContent='このフォルダにはまだ曲がありません。';list.append(empty)}
   for(const [title,entries] of grouped[category]){
   const item=document.createElement('article');item.className='song-choice';
@@ -645,6 +646,17 @@ function renderSongSelection(){
    select.value=selected.index;
    select.onchange=async()=>{if(loading||importing)return;$('course').value=select.value;const pending=choose();renderSongSelection();await pending};
    label.append(select);panel.append(label,featureBadges([c]));
+   if(c._esePath){
+    const sourceInfo=document.createElement('p');sourceInfo.className='ese-chart-origin';
+    sourceInfo.textContent='ESEから取得した譜面';
+    panel.append(sourceInfo);
+    const audioLabel=document.createElement('label');audioLabel.className='ese-audio-picker';
+    audioLabel.textContent=playbackAssetsAvailable(c)?'音源を変更する':'音源を選択して演奏可能にする';
+    const audioInput=document.createElement('input');audioInput.type='file';audioInput.accept='.ogg,.mp3,.wav,.m4a,.flac,audio/*';
+    audioInput.disabled=loading||importing;
+    audioInput.onchange=()=>attachESEAudio(c,audioInput.files?.[0]);
+    audioLabel.append(audioInput);panel.append(audioLabel);
+   }
    const info=document.createElement('p'),duration=Math.max(0,c.duration||0,c===chart?audioBuffer?.duration||0:0),noteRange=branchNoteCountRange(c),noteText=c.branchEvents?.length&&noteRange.min!==noteRange.max?noteRange.min+'〜'+noteRange.max+' ノーツ':noteRange.max+' ノーツ';
    info.textContent=c.bpm+' BPM ／ '+Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0')+' ／ '+noteText;panel.append(info);
    if(c.meta.SUBTITLE){const sub=document.createElement('p');sub.textContent=c.meta.SUBTITLE.replace(/^(--|\+\+)/,'');panel.append(sub)}

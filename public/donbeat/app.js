@@ -618,13 +618,22 @@ function renderSongSelection(){
   const count=document.createElement('span');count.className='song-folder-count';count.textContent=grouped[category].size+'曲'+(category==='official'?' ＋ ESE':'');
   const chevron=document.createElement('span');chevron.className='song-folder-chevron';chevron.textContent=openedFolder?'−':'＋';
   toggle.append(folderName,count,chevron);toggle.onclick=()=>{
-   songFolderTouched=true;openSongFolder=openSongFolder===category?null:category;expandedSong=null;renderSongSelection();
+   const opening=openSongFolder!==category;
+   songFolderTouched=true;openSongFolder=opening?category:null;expandedSong=null;
+   if(opening&&category==='official'&&typeof eseOpenRoot==='function')eseOpenRoot();
+   else renderSongSelection();
   };
   const list=document.createElement('div');list.className='song-folder-list';list.hidden=!openedFolder;
   folder.append(toggle,list);host.append(folder);
   if(!openedFolder)continue;
   if(category==='official'&&typeof renderESEBrowser==='function')renderESEBrowser(list);
-  if(!grouped[category].size){const empty=document.createElement('p');empty.className='song-folder-empty';empty.textContent='このフォルダにはまだ曲がありません。';list.append(empty)}
+  if(!grouped[category].size&&category==='creative'){const empty=document.createElement('p');empty.className='song-folder-empty';empty.textContent='このフォルダにはまだ曲がありません。';list.append(empty)}
+  let savedList=list;
+  if(category==='official'&&grouped[category].size){
+   const saved=document.createElement('details');saved.className='ese-saved-songs';
+   const heading=document.createElement('summary');heading.textContent='保存済みの本家譜面（'+grouped[category].size+'曲）';
+   saved.append(heading);list.append(saved);savedList=saved;
+  }
   for(const [title,entries] of grouped[category]){
   const item=document.createElement('article');item.className='song-choice';
   const heading=document.createElement('button');heading.className='song-choice-title';heading.textContent=title;
@@ -668,7 +677,7 @@ function renderSongSelection(){
    }
    panel.append(actions);
   }
-  const badges=featureBadges(entries.map(e=>e.c));heading.append(badges);item.append(heading,panel);list.append(item);
+  const badges=featureBadges(entries.map(e=>e.c));heading.append(badges);item.append(heading,panel);savedList.append(item);
   }
  }
 }

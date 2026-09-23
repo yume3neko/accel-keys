@@ -92,7 +92,7 @@ export async function onRequestGet({request}){
   if(type==='info'){
    const chartOnly=CHART.test(path),folder=chartOnly?directoryOf(path):path;
    const rows=await entries(folder);
-   const tjas=rows.filter(x=>x.type==='file'&&CHART.test(x.name))
+   const tjas=rows.filter(x=>x.type==='file'&&CHART.test(x.name)&&(!chartOnly||x.path===path))
     .sort((a,b)=>a.name.localeCompare(b.name,'ja'));
    const selected=chartOnly?tjas.find(x=>x.path===path):tjas[0];
    if(!selected)return json({error:'曲フォルダにTJAが見つかりませんでした。'},404);

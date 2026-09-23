@@ -19,7 +19,7 @@ function syncRebuiltChart(next){
  // Keep the Japanese display title when a branch chart is compiled again.
  if(chart?._esePath&&chart.meta?.TITLE){
   next.meta.TITLE=chart.meta.TITLE;
-  if(chart.meta.SUBTITLEJA)next.meta.SUBTITLE=chart.meta.SUBTITLEJA;
+  next.meta.SUBTITLE=chart.meta.SUBTITLE||'';
  }
  let index=charts.indexOf(chart);
  if(index<0){

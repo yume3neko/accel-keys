@@ -1,111 +1,285 @@
-/* ESE remote browser. TJA is fetched only when a song is selected; audio stays user-supplied. */
-const eseState={open:false,path:'',items:[],query:'',loading:false,error:'',busyPath:'',cache:new Map(),requestId:0};
-function eseControl(tag,cls,textContent){
+/* ESE: open the official folder directly, lazily display TJA Japanese titles and fetch matching audio. */
+const eseState={
+ path:'',items:[],query:'',loading:false,error:'',busyPath:'',
+ cache:new Map(),infoCache:new Map(),requestId:0,pageSize:24,visible:24,
+ activeInfo:null,activeCharts:[],audioError:'',fetchingSong:false
+};
+const ESE_ROOT='https://ese.tjadataba.se/ESE/ESE';
+function eseControl(tag,css,text){
  const el=document.createElement(tag);
- if(cls)el.className=cls;
- if(textContent!=null)el.textContent=textContent;
+ if(css)el.className=css;
+ if(text!==undefined)el.textContent=text;
  return el;
 }
+function eseApi(type,path){
+ return '/api/donbeat/ese?type='+encodeURIComponent(type)+'&path='+encodeURIComponent(path||'');
+}
+function eseDepth(path){return path?path.split('/').length:0}
+function eseGenreName(folder){
+ const raw=String(folder||''),number=raw.match(/^(\d{1,2})\b/)?.[1];
+ const code=number?number.padStart(2,'0'):null;
+ const map={
+  '01':'ポップス','02':'アニメ','03':'ボーカロイド',
+  '04':'キッズ・民謡','05':'バラエティ','06':'クラシック',
+  '07':'ゲームミュージック','09':'ナムコオリジナル'
+ };
+ const original=raw.replace(/^\d+\s*[-_ ]*\s*/,'').toLowerCase();
+ const guess=[
+  [/namco|ナムコ/,'ナムコオリジナル'],[/vocaloid|ボーカロイド|ボカロ/,'ボーカロイド'],
+  [/anime|アニメ/,'アニメ'],[/pop|ポップ/,'ポップス'],[/children|folk|kids|童謡|民謡/,'キッズ・民謡'],
+  [/variety|バラエティ/,'バラエティ'],[/classical|クラシック/,'クラシック'],
+  [/game|ゲーム/,'ゲームミュージック'],[/original|オリジナル/,'オリジナル']
+ ].find(([test])=>test.test(original));
+ const translated=guess?.[1]||map[code]||(/[\u3040-\u30ff\u3400-\u9fff]/.test(original)?original:code?'その他のジャンル':'その他');
+ return (code?code+'　':'')+translated;
+}
+function eseInfoFor(item){return eseState.infoCache.get(item.path)}
+async function eseReadInfo(path){
+ if(eseState.infoCache.has(path))return eseState.infoCache.get(path);
+ const res=await fetch(eseApi('info',path));
+ const data=await res.json();
+ if(!res.ok)throw Error(data.error||'曲情報を取得できませんでした。');
+ eseState.infoCache.set(path,data);
+ return data;
+}
+function esePreviewLabel(item){
+ const cached=eseInfoFor(item);
+ return cached?.title||'曲名を取得中…';
+}
+async function eseLoadVisibleTitles(){
+ if(eseDepth(eseState.path)!==1||eseState.loading)return;
+ const path=eseState.path,visible=eseState.items.slice(0,eseState.visible)
+  .filter(item=>item.type==='dir'||item.type==='file'&&/\.tja$/i.test(item.name));
+ let offset=0;
+ const worker=async()=>{
+  while(path===eseState.path&&offset<visible.length){
+   const item=visible[offset++];
+   if(eseInfoFor(item))continue;
+   try{
+    const info=await eseReadInfo(item.path);
+    if(path!==eseState.path)return;
+    document.querySelectorAll('[data-ese-item]').forEach(button=>{
+     if(button.dataset.eseItem===item.path)button.textContent='♫ '+info.title+' ›';
+    });
+   }catch{
+    if(path!==eseState.path)return;
+    document.querySelectorAll('[data-ese-item]').forEach(button=>{
+     if(button.dataset.eseItem===item.path)button.textContent='⚠ 曲情報を取得できません。タップして再試行';
+    });
+   }
+  }
+ };
+ await Promise.all([worker(),worker(),worker()]);
+}
 async function eseBrowse(path){
- if(eseState.loading)return;
- eseState.path=path;eseState.query='';eseState.error='';
- if(eseState.cache.has(path)){eseState.items=eseState.cache.get(path);renderSongSelection();return}
- eseState.loading=true;eseState.items=[];const id=++eseState.requestId;renderSongSelection();
+ if(eseState.loading||eseState.fetchingSong)return;
+ eseState.path=path;eseState.error='';eseState.query='';
+ eseState.activeInfo=null;eseState.activeCharts=[];eseState.audioError='';
+ eseState.visible=eseState.pageSize;
+ const id=++eseState.requestId;
+ if(eseState.cache.has(path)){
+  eseState.items=eseState.cache.get(path);renderSongSelection();
+  if(eseDepth(path)===1)void eseLoadVisibleTitles();
+  return;
+ }
+ eseState.loading=true;eseState.items=[];renderSongSelection();
  try{
-  const res=await fetch('/api/donbeat/ese?type=list&path='+encodeURIComponent(path));
+  const res=await fetch(eseApi('list',path));
   const data=await res.json();
-  if(!res.ok)throw Error(data.error||'ESEのフォルダを取得できませんでした。');
-  if(!Array.isArray(data.items))throw Error('フォルダ一覧の形式が不正です。');
+  if(!res.ok)throw Error(data.error||'ESEの一覧を取得できませんでした。');
+  if(!Array.isArray(data.items))throw Error('ESEのフォルダ一覧の形式が不正です。');
   if(id!==eseState.requestId)return;
   eseState.cache.set(path,data.items);eseState.items=data.items;
  }catch(e){if(id===eseState.requestId)eseState.error=e.message||String(e)}
- finally{if(id===eseState.requestId){eseState.loading=false;renderSongSelection()}}
+ finally{
+  if(id===eseState.requestId){
+   eseState.loading=false;renderSongSelection();
+   if(eseDepth(path)===1)void eseLoadVisibleTitles();
+  }
+ }
 }
-async function eseImport(item){
- if(eseState.busyPath||loading||importing||danRun)return;
- eseState.busyPath=item.path;eseState.error='';renderSongSelection();
+function eseOpenRoot(){
+ if(typeof openSongFolder==='string'){openSongFolder='official';songFolderTouched=true}
+ if(!eseState.loading&&!eseState.fetchingSong)void eseBrowse('');
+ else renderSongSelection();
+}
+async function eseFetchChart(path){
+ const res=await fetch(eseApi('chart',path));
+ if(!res.ok){let body={};try{body=await res.json()}catch{}throw Error(body.error||'ESEの譜面を読み込めませんでした。')}
+ const bytes=await res.arrayBuffer();
+ let text;
+ try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}
+ catch{text=new TextDecoder('shift-jis').decode(bytes)}
+ const parsed=parseTJA(text);
+ return parsed.charts.filter(c=>String(c.meta?.STYLE||'').toUpperCase()!=='DOUBLE').map(c=>({...c,warnings:[...(parsed.warnings||[])]}));
+}
+async function eseDownloadAudio(path){
+ const res=await fetch(eseApi('audio',path));
+ if(!res.ok){let body={};try{body=await res.json()}catch{}throw Error(body.error||'音源を取得できませんでした。')}
+ const blob=await res.blob();
+ if(!blob.size)throw Error('音源ファイルが空でした。');
+ return new File([blob],path.split('/').pop(),{type:blob.type||'audio/ogg'});
+}
+async function eseOpenSong(path){
+ if(eseState.fetchingSong||eseState.loading||loading||importing||danRun)return;
+ eseState.path=path;eseState.error='';eseState.query='';
+ eseState.activeInfo=eseState.infoCache.get(path)||null;
+ eseState.activeCharts=[];eseState.audioError='';eseState.busyPath=path;
+ eseState.fetchingSong=true;renderSongSelection();
  try{
-  const existing=charts.find(c=>c._esePath===item.path);
-  if(existing){
-   openSongFolder='official';songFolderTouched=true;expandedSong='official::'+(existing.meta.TITLE||'無題');
-   $('course').value=charts.indexOf(existing);await choose();return;
+  const info=await eseReadInfo(path);
+  eseState.activeInfo=info;renderSongSelection();
+  const tjas=info.tjas?.length?info.tjas.map(x=>x.path):[info.primaryTja];
+  const existing=charts.filter(c=>c._eseFolder===info.path&&c._eseTja&&tjas.includes(c._eseTja));
+  let selectedCharts=existing;
+  const chartTask=existing.length?Promise.resolve(existing):Promise.all(tjas.slice(0,12).map(async filePath=>{
+   try{
+    const parsed=await eseFetchChart(filePath);
+    for(const c of parsed){
+     c.meta.TITLE=c.meta.TITLEJA||c.meta.TITLE||info.title;
+     c.category='official';
+     c._esePath=filePath;c._eseTja=filePath;c._eseFolder=info.path;c.sourcePath=filePath;
+    }
+    return parsed;
+   }catch(e){
+    // Other charts can still load if one optional TJA is invalid.
+    if(filePath===info.primaryTja)throw e;
+    return [];
+   }
+  })).then(rows=>{
+   const collected=rows.flat();
+   if(!collected.length)throw Error('通常プレイ用のTJAが見つかりませんでした。');
+   return collected;
+  });
+  const audioTask=info.audio?eseDownloadAudio(info.audio).then(file=>({file})).catch(e=>({error:e.message||String(e)})):Promise.resolve({error:'ESEの曲フォルダに音源がありません。'});
+  const [chartResult,audioResult]=await Promise.allSettled([chartTask,audioTask]);
+  if(chartResult.status==='rejected')throw chartResult.reason;
+  selectedCharts=chartResult.value;
+  const audio=audioResult.status==='fulfilled'?audioResult.value:{error:String(audioResult.reason)};
+  eseState.audioError=audio.error||'';
+  for(const c of selectedCharts){
+   if(audio.file){
+    c.audioFile=audio.file;c.preloadedAudio=null;
+    c.serverAudio=null;
+   }else if(!c.audioFile&&!c.serverAudio){
+    // Keep a same-title previously published audio as a fallback only when ESE is missing.
+    const fallback=charts.find(other=>other.serverEntry?.audio&&normalizeSongTitle(other.meta?.TITLE||other.serverEntry.title)===normalizeSongTitle(c.meta.TITLE));
+    if(fallback){try{c.serverAudio=serverURL(fallback.serverEntry.audio,location.href)}catch{}}
+   }
   }
-  const res=await fetch('/api/donbeat/ese?type=chart&path='+encodeURIComponent(item.path));
-  if(!res.ok){let data={};try{data=await res.json()}catch{}throw Error(data.error||'ESEのTJAを取得できませんでした。')}
-  const bytes=await res.arrayBuffer();
-  let source;try{source=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{source=new TextDecoder('shift-jis').decode(bytes)}
-  const parsed=parseTJA(source);
-  const imported=parsed.charts.filter(c=>String(c.meta?.STYLE||'').toUpperCase()!=='DOUBLE');
-  if(!imported.length)throw Error('通常プレイ用の譜面が見つかりませんでした。');
-  const fallback=item.name.replace(/\.tja$/i,'');
-  for(const c of imported){
-   c.meta.TITLE=c.meta.TITLEJA||c.meta.TITLE||fallback;
-   c.category='official';
-   c._esePath=item.path;c.sourcePath=item.path;
-   c.warnings=[...(parsed.warnings||[])];
-   // Only reuse audio already published by the owner on this site.
-   const shared=charts.find(other=>other.serverEntry?.audio&&normalizeSongTitle(other.meta?.TITLE||other.serverEntry.title)===normalizeSongTitle(c.meta.TITLE));
-   if(shared){try{c.serverAudio=serverURL(shared.serverEntry.audio,location.href)}catch{}}
-   const wave=(c.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase();
-   if(!c.serverAudio&&audioFiles.has(wave))c.audioFile=audioFiles.get(wave);
-  }
-  charts.push(...imported);
-  fillCourses();$('course').value=charts.indexOf(imported[0]);
-  expandedSong='official::'+imported[0].meta.TITLE;
-  openSongFolder='official';songFolderTouched=true;
+  if(!existing.length){charts.push(...selectedCharts);fillCourses()}
+  eseState.activeCharts=selectedCharts;
+  const current=selectedCharts.includes(chart)?chart:selectedCharts[0];
+  $('course').value=charts.indexOf(current);
+  expandedSong='official::'+current.meta.TITLE;
   await choose();
  }catch(e){eseState.error=e.message||String(e)}
- finally{eseState.busyPath='';renderSongSelection()}
+ finally{eseState.busyPath='';eseState.fetchingSong=false;renderSongSelection()}
+}
+async function eseImport(item){
+ if(item.type==='dir'||item.type==='file'&&/\.tja$/i.test(item.name))return eseOpenSong(item.path);
+}
+function eseAudioPicker(c){
+ const label=eseControl('label','ese-audio-picker','音源ファイルを指定');
+ const input=eseControl('input');
+ input.type='file';input.accept='.ogg,.mp3,.wav,.m4a,.flac,.opus,.aac,audio/*';
+ input.onchange=()=>{const f=input.files?.[0];if(!f)return;for(const chart of eseState.activeCharts){chart.audioFile=f;chart.serverAudio=null;chart.preloadedAudio=null}eseState.audioError='';if(c===chart){audioBuffer=null;reset()}else renderSongSelection()};
+ label.append(input);return label;
+}
+function eseSongInfo(panel){
+ const info=eseState.activeInfo;
+ const box=eseControl('section','ese-song-info');
+ const heading=eseControl('h3','ese-song-title',info?.title||'曲情報を読み込んでいます…');
+ box.append(heading);
+ if(info){
+  if(info.subtitle)box.append(eseControl('p','ese-song-subtitle',info.subtitle.replace(/^(--|\+\+)/,'')));
+  const stats=eseControl('p','ese-song-stats',(info.bpm?info.bpm+' BPM　':'')+(info.charts?.length?info.charts.map(x=>x.course+' ★'+x.level).join(' / '):'譜面を確認中'));
+  box.append(stats);
+  if(eseState.fetchingSong)box.append(eseControl('p','ese-loading','譜面と音源を自動ダウンロード中…'));
+  if(eseState.audioError)box.append(eseControl('p','ese-error','音源：'+eseState.audioError));
+  if(eseState.activeCharts.length){
+   const playable=eseState.activeCharts.filter(x=>!!(x.audioFile||x.serverAudio));
+   const label=eseControl('label','ese-difficulty-label','難易度');
+   const select=eseControl('select','ese-difficulty');
+   for(const c of eseState.activeCharts){
+    const option=eseControl('option','',((typeof names!=='undefined'&&names[c.meta.COURSE])||c.meta.COURSE||'難易度不明')+' ★'+(c.meta.LEVEL||'?'));
+    option.value=String(charts.indexOf(c));select.append(option);
+   }
+   select.value=String(charts.indexOf(chart));
+   select.onchange=async()=>{$('course').value=select.value;await choose()};
+   label.append(select);box.append(label);
+   const actions=eseControl('div','ese-song-actions');
+   const play=eseControl('button','primary','▶ 演奏スタート');
+   play.disabled=!playable.length||!playbackAssetsAvailable(chart);
+   play.onclick=()=>start();
+   const auto=eseControl('button','','オートプレイ');
+   auto.disabled=play.disabled;auto.onclick=()=>start({auto:true});
+   actions.append(play,auto);box.append(actions);
+   if(!playable.length)box.append(eseAudioPicker(chart));
+  }
+  const credit=eseControl('a','ese-source-link','元のTJA・音源をESEで確認 ↗');
+  credit.href=ESE_ROOT+'/src/branch/master/'+info.path.split('/').map(encodeURIComponent).join('/');
+  credit.target='_blank';credit.rel='noopener noreferrer';box.append(credit);
+ }
+ panel.append(box);
 }
 function renderESEBrowser(host){
  const wrapper=eseControl('section','ese-browser');
- const toggle=eseControl('button','ese-browser-toggle','ESEから本家譜面を探す');
- toggle.type='button';toggle.setAttribute('aria-expanded',String(eseState.open));
- toggle.onclick=()=>{eseState.open=!eseState.open;if(eseState.open&&!eseState.cache.has(eseState.path)&&!eseState.loading)void eseBrowse(eseState.path);else renderSongSelection()};
- wrapper.append(toggle);host.append(wrapper);
- if(!eseState.open)return;
- const panel=eseControl('div','ese-browser-panel');
- const note=eseControl('p','ese-browser-note','ESEのGitリポジトリから選択したTJAのみ取得します。音源は既存の収録曲のものを使うか、お手持ちのファイルを指定してください。');
- panel.append(note);
- const upstream=eseControl('a','ese-source-link','ESEリポジトリを開く ↗');
- upstream.href='https://ese.tjadataba.se/ESE/ESE';upstream.target='_blank';upstream.rel='noopener noreferrer';panel.append(upstream);
+ const panel=eseControl('div','ese-browser-panel');wrapper.append(panel);host.append(wrapper);
  const nav=eseControl('div','ese-browser-nav');
- if(eseState.path){
-  const back=eseControl('button','ese-back','← 親フォルダ');
-  back.type='button';back.disabled=eseState.loading||!!eseState.busyPath;
-  back.onclick=()=>void eseBrowse(eseState.path.split('/').slice(0,-1).join('/'));
+ const depth=eseDepth(eseState.path),isFile=/\.tja$/i.test(eseState.path);
+ if(depth){
+  const back=eseControl('button','ese-back','← '+(depth>=2?'曲一覧へ':'ジャンル一覧へ'));
+  back.type='button';back.disabled=eseState.loading||eseState.fetchingSong;
+  back.onclick=()=>void eseBrowse(isFile?eseState.path.split('/').slice(0,-1).join('/'):eseState.path.split('/').slice(0,-1).join('/'));
   nav.append(back);
  }
- const current=eseControl('span','ese-current-path',eseState.path||'ESE / すべてのジャンル');
+ const current=eseControl('strong','ese-current-path',depth?depth>=2?eseState.activeInfo?.title||'曲情報を読み込み中…':eseGenreName(eseState.path.split('/')[0]):'ジャンル一覧');
  nav.append(current);panel.append(nav);
+ if(depth<=1){
+  const description=eseControl('p','ese-browser-note',depth?'曲名は各TJAに書かれた日本語タイトルから取得します。':'ジャンルを選ぶと、ESEの曲フォルダを開きます。');
+  panel.append(description);
+ }
  if(eseState.error){const alert=eseControl('p','ese-error',eseState.error);alert.setAttribute('role','alert');panel.append(alert)}
- if(eseState.loading){panel.append(eseControl('p','ese-loading','ESEから一覧を取得中…'));wrapper.append(panel);return}
+ if(depth>=2){eseSongInfo(panel);return}
+ if(eseState.loading){panel.append(eseControl('p','ese-loading','ESEからフォルダ一覧を取得中…'));return}
  const search=eseControl('input','ese-search');
- search.type='search';search.placeholder='このフォルダ内で曲名・フォルダ名を検索';
- search.setAttribute('aria-label','ESEフォルダ内検索');search.value=eseState.query;
- panel.append(search);
+ search.type='search';search.placeholder=depth?'表示中の曲名を検索':'ジャンルを検索';
+ search.setAttribute('aria-label','ESE内検索');
+ search.value=eseState.query;panel.append(search);
  const results=eseControl('div','ese-results');
- const paint=()=>{
+ const draw=()=>{
   results.replaceChildren();
   const term=eseState.query.normalize('NFKC').toLowerCase().trim();
-  const items=eseState.items.filter(x=>String(x.name||'').normalize('NFKC').toLowerCase().includes(term));
-  if(!items.length){results.append(eseControl('p','ese-browser-note',eseState.items.length?'一致する曲がありません。':'このフォルダにはTJAまたはサブフォルダがありません。'));return}
+  const currentList=eseState.items.slice(0,eseState.visible);
+  const items=currentList.filter(item=>{
+   const label=depth===0?eseGenreName(item.name):esePreviewLabel(item);
+   return !term||label.normalize('NFKC').toLowerCase().includes(term)||item.name.normalize('NFKC').toLowerCase().includes(term);
+  });
+  if(!items.length)results.append(eseControl('p','ese-browser-note',eseState.items.length?'一致する項目がありません。':'このフォルダは空です。'));
   for(const item of items){
-   const button=eseControl('button','ese-entry '+(item.type==='dir'?'ese-dir':'ese-chart'),(item.type==='dir'?'📁 ':'♫ ')+item.name+(item.type==='dir'?' ›':''));
-   button.type='button';button.disabled=!!eseState.busyPath;
-   button.onclick=()=>item.type==='dir'?void eseBrowse(item.path):void eseImport(item);
-   if(item.path===eseState.busyPath)button.textContent='譜面を読み込み中…';
+   const isGenre=depth===0;
+   const label=isGenre?eseGenreName(item.name):esePreviewLabel(item);
+   const button=eseControl('button','ese-entry '+(isGenre?'ese-dir':'ese-chart'),(isGenre?'📁 ':'♫ ')+label+' ›');
+   button.type='button';button.dataset.eseItem=item.path;
+   button.title=item.name;button.disabled=eseState.fetchingSong;
+   button.onclick=()=>isGenre?void eseBrowse(item.path):void eseOpenSong(item.path);
    results.append(button);
   }
+  const old=panel.querySelector('.ese-load-more');if(old)old.remove();
+  if(depth===1&&eseState.visible<eseState.items.length){
+   const more=eseControl('button','ese-load-more','さらに曲を表示（'+Math.min(eseState.pageSize,eseState.items.length-eseState.visible)+'曲）');
+   more.onclick=()=>{eseState.visible+=eseState.pageSize;draw();void eseLoadVisibleTitles()};
+   panel.append(more);
+  }
  };
- search.oninput=()=>{eseState.query=search.value;paint()};
- paint();panel.append(results);wrapper.append(panel);
+ search.oninput=()=>{eseState.query=search.value;draw()};
+ draw();panel.append(results);
+ const link=eseControl('a','ese-source-link','ESEリポジトリを開く ↗');
+ link.href=ESE_ROOT;link.target='_blank';link.rel='noopener noreferrer';panel.append(link);
 }
-function attachESEAudio(c,file){
- if(!file||!c?._esePath)return;
- c.audioFile=file;c.serverAudio=null;
- if(c===chart){audioBuffer=null;reset()}
+// Main game script is evaluated before this optional feature.
+if(typeof renderSongSelection==='function'){
+ if(openSongFolder==='official')void eseBrowse('');
  else renderSongSelection();
 }
-// The main script is loaded before this optional feature.
-if(typeof renderSongSelection==='function')renderSongSelection();

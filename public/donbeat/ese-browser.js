@@ -138,9 +138,10 @@ async function eseOpenSong(path){
    try{
     const parsed=await eseFetchChart(filePath);
     for(const c of parsed){
-     c.meta.TITLE=String(c.meta.TITLEJA||info.title||c.meta.TITLE||'').trim();
-     // Do not override Japanese subtitles with the original-language header.
-     c.meta.SUBTITLE=String(c.meta.SUBTITLEJA||info.subtitle||(/[^\x00-\x7f]/.test(c.meta.SUBTITLE||'')?c.meta.SUBTITLE:'')||'').trim();
+     c.meta.TITLE=String(c.meta.TITLEJA||'').trim()||info.title||c.meta.TITLE||'無題';
+     // Prefer ESE's Japanese subtitle and never fall back to an English-only subtitle.
+     c.meta.SUBTITLE=String(c.meta.SUBTITLEJA||'').trim()||info.subtitle||
+      (/[\u3040-\u30ff\u3400-\u9fff]/.test(c.meta.SUBTITLE||'')?c.meta.SUBTITLE:'');
      c.category='official';
      c._esePath=filePath;c._eseTja=filePath;c._eseFolder=info.path;c.sourcePath=filePath;
     }

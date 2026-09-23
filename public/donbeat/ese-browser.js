@@ -136,7 +136,8 @@ async function eseOpenSong(path){
    try{
     const parsed=await eseFetchChart(filePath);
     for(const c of parsed){
-     c.meta.TITLE=c.meta.TITLEJA||c.meta.TITLE||info.title;
+     c.meta.TITLE=c.meta.TITLEJA||info.title||c.meta.TITLE;
+     if(c.meta.SUBTITLEJA)c.meta.SUBTITLE=c.meta.SUBTITLEJA;
      c.category='official';
      c._esePath=filePath;c._eseTja=filePath;c._eseFolder=info.path;c.sourcePath=filePath;
     }
@@ -179,11 +180,19 @@ async function eseOpenSong(path){
 async function eseImport(item){
  if(item.type==='dir'||item.type==='file'&&/\.tja$/i.test(item.name))return eseOpenSong(item.path);
 }
+function attachESEAudio(c,file){
+ if(!file||!c?._esePath)return;
+ const sameFolder=charts.filter(other=>other._eseFolder===c._eseFolder);
+ for(const other of sameFolder){other.audioFile=file;other.serverAudio=null;other.preloadedAudio=null}
+ eseState.audioError='';
+ if(sameFolder.includes(chart)){audioBuffer=null;reset()}
+ else renderSongSelection();
+}
 function eseAudioPicker(c){
  const label=eseControl('label','ese-audio-picker','音源ファイルを指定');
  const input=eseControl('input');
  input.type='file';input.accept='.ogg,.mp3,.wav,.m4a,.flac,.opus,.aac,audio/*';
- input.onchange=()=>{const f=input.files?.[0];if(!f)return;for(const chart of eseState.activeCharts){chart.audioFile=f;chart.serverAudio=null;chart.preloadedAudio=null}eseState.audioError='';if(c===chart){audioBuffer=null;reset()}else renderSongSelection()};
+ input.onchange=()=>attachESEAudio(c,input.files?.[0]);
  label.append(input);return label;
 }
 function eseSongInfo(panel){

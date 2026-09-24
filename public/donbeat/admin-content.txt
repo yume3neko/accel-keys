@@ -46,6 +46,7 @@ progress{width:100%;height:18px}
 .dbm-muted{color:#aebfcb}
 .dbm-adddan{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .dbm-adddan input{max-width:380px}
+.dbm-bulk-delete{margin-top:22px;padding:15px;background:#321f26;border:1px solid #9e4b55;border-radius:10px}.dbm-bulk-delete h3{margin:0 0 8px;color:#ffd5d5}.dbm-bulk-delete select{max-width:100%}.dbm-bulk-delete .danger:disabled{opacity:.55;cursor:not-allowed}#dbmBulkStatus{white-space:pre-wrap;color:#ffc2ba}
 .dbm-dan-form{margin-top:18px}
 #manageRoot{margin:20px 0}
 #replaceNotice{padding:12px;background:#34412b;border:1px solid #758a4d;border-radius:8px}
@@ -87,7 +88,22 @@ progress{width:100%;height:18px}
 <div class="manage-head"><h2>収録曲・段位管理</h2><button id="dbmRefresh" class="secondary" type="button">一覧を更新</button></div>
 <p id="manageStatus" role="status"></p>
 <div class="dbm-grid">
-<section class="dbm-section"><div class="dbm-head"><h3>収録曲</h3><button id="dbmAddSong" type="button">＋ 曲を追加</button></div><div id="dbmSongs" class="dbm-list"></div></section>
+<section class="dbm-section">
+<div class="dbm-head"><h3>収録曲</h3><button id="dbmAddSong" type="button">＋ 曲を追加</button></div>
+<div id="dbmSongs" class="dbm-list"></div>
+<div class="dbm-bulk-delete">
+<h3>ジャンル内の曲を一括削除</h3>
+<p class="muted">R2に登録した「本家譜面」の対象ジャンルだけを削除します。創作譜面・他ジャンル・段位・GitHub内の固定曲には影響しません。削除した曲を使う段位は演奏できなくなることがあります。</p>
+<label for="dbmDeleteGenre">削除するジャンル</label>
+<select id="dbmDeleteGenre"><option value="">ジャンルを選択してください</option>
+<option>ポップス</option><option>アニメ</option><option>ボーカロイド</option><option>キッズ</option>
+<option>バラエティ</option><option>クラシック</option><option>ゲームミュージック</option>
+<option>ナムコオリジナル</option><option>その他</option></select>
+<p id="dbmBulkCount" role="status" aria-live="polite">ジャンルを選ぶと削除対象の曲数を確認できます。</p>
+<button id="dbmBulkDelete" type="button" class="danger" disabled>選択ジャンルの曲をすべて削除</button>
+<p id="dbmBulkStatus" role="status" aria-live="polite"></p>
+</div>
+</section>
 <section class="dbm-section">
 <div class="dbm-head"><h3>実装段位</h3></div><div id="dbmDans" class="dbm-list"></div>
 <h3>段位設定ファイルを登録・編集</h3>

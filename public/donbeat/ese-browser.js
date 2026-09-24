@@ -1,8 +1,8 @@
 /* ESE: open the official folder directly, lazily display TJA Japanese titles and fetch matching audio. */
 const eseState={
  path:'',items:[],query:'',loading:false,error:'',busyPath:'',
- cache:new Map(),infoCache:new Map(),requestId:0,pageSize:24,visible:24,
- activeInfo:null,activeCharts:[],audioError:'',fetchingSong:false
+ cache:new Map(),infoCache:new Map(),pendingInfo:new Map(),requestId:0,pageSize:24,visible:24,
+ activeSongPath:'',detailsOpen:true,activeInfo:null,activeCharts:[],audioError:'',fetchingSong:false
 };
 const ESE_ROOT='https://ese.tjadataba.se/ESE/ESE';
 function eseControl(tag,css,text){
@@ -37,11 +37,16 @@ function eseVisibleGenre(item){return item.type==='dir'&&!['その他のジャ�
 function eseInfoFor(item){return eseState.infoCache.get(item.path)}
 async function eseReadInfo(path){
  if(eseState.infoCache.has(path))return eseState.infoCache.get(path);
- const res=await fetch(eseApi('info',path));
- const data=await res.json();
- if(!res.ok)throw Error(data.error||'曲情報を取得できませんでした。');
- eseState.infoCache.set(path,data);
- return data;
+ if(eseState.pendingInfo.has(path))return eseState.pendingInfo.get(path);
+ const pending=(async()=>{
+  const res=await fetch(eseApi('info',path));
+  const data=await res.json();
+  if(!res.ok)throw Error(data.error||'曲情報を取得できませんでした。');
+  eseState.infoCache.set(path,data);
+  return data;
+ })();
+ eseState.pendingInfo.set(path,pending);
+ try{return await pending}finally{eseState.pendingInfo.delete(path)}
 }
 function esePreviewLabel(item){
  const cached=eseInfoFor(item);
@@ -75,6 +80,7 @@ async function eseLoadVisibleTitles(){
 async function eseBrowse(path){
  if(eseState.loading||eseState.fetchingSong)return;
  eseState.path=path;eseState.error='';eseState.query='';
+ eseState.activeSongPath='';eseState.detailsOpen=true;
  eseState.activeInfo=null;eseState.activeCharts=[];eseState.audioError='';
  eseState.visible=eseState.pageSize;
  const id=++eseState.requestId;
@@ -124,7 +130,8 @@ async function eseDownloadAudio(path){
 }
 async function eseOpenSong(path){
  if(eseState.fetchingSong||eseState.loading||loading||importing||danRun)return;
- eseState.path=path;eseState.error='';eseState.query='';
+ eseState.activeSongPath=path;eseState.detailsOpen=true;
+ eseState.error='';
  eseState.activeInfo=eseState.infoCache.get(path)||null;
  eseState.activeCharts=[];eseState.audioError='';eseState.busyPath=path;
  eseState.fetchingSong=true;renderSongSelection();
@@ -201,40 +208,71 @@ function eseAudioPicker(c){
 }
 function eseSongInfo(panel){
  const info=eseState.activeInfo;
- const box=eseControl('section','ese-song-info');
- const heading=eseControl('h3','ese-song-title',info?.title||'曲情報を読み込んでいます…');
- box.append(heading);
- if(info){
-  if(info.subtitle)box.append(eseControl('p','ese-song-subtitle',info.subtitle.replace(/^(--|\+\+)/,'')));
-  const stats=eseControl('p','ese-song-stats',(info.bpm?info.bpm+' BPM　':'')+(info.charts?.length?info.charts.map(x=>x.course+' ★'+x.level).join(' / '):'譜面を確認中'));
-  box.append(stats);
-  if(eseState.fetchingSong)box.append(eseControl('p','ese-loading','譜面と音源を自動ダウンロード中…'));
-  if(eseState.audioError)box.append(eseControl('p','ese-error','音源：'+eseState.audioError));
-  if(eseState.activeCharts.length){
-   const playable=eseState.activeCharts.filter(x=>!!(x.audioFile||x.serverAudio));
-   const label=eseControl('label','ese-difficulty-label','難易度');
-   const select=eseControl('select','ese-difficulty');
-   for(const c of eseState.activeCharts){
-    const option=eseControl('option','',((typeof names!=='undefined'&&names[c.meta.COURSE])||c.meta.COURSE||'難易度不明')+' ★'+(c.meta.LEVEL||'?'));
-    option.value=String(charts.indexOf(c));select.append(option);
-   }
-   select.value=String(charts.indexOf(chart));
-   select.onchange=async()=>{$('course').value=select.value;await choose()};
-   label.append(select);box.append(label);
-   const actions=eseControl('div','ese-song-actions');
-   const play=eseControl('button','primary','▶ 演奏スタート');
-   play.disabled=!playable.length||!playbackAssetsAvailable(chart);
-   play.onclick=()=>start();
-   const auto=eseControl('button','','オートプレイ');
-   auto.disabled=play.disabled;auto.onclick=()=>start({auto:true});
-   actions.append(play,auto);box.append(actions);
-   if(!playable.length)box.append(eseAudioPicker(chart));
-  }
-  const credit=eseControl('a','ese-source-link','元のTJA・音源をESEで確認 ↗');
-  credit.href=ESE_ROOT+'/src/branch/master/'+info.path.split('/').map(encodeURIComponent).join('/');
-  credit.target='_blank';credit.rel='noopener noreferrer';box.append(credit);
+ const selected=eseState.activeCharts.includes(chart)?chart:eseState.activeCharts[0];
+ const heading=eseControl('p','ese-song-preview-subtitle',info?.subtitle?.replace(/^(--|\\+\\+)/,'')||'');
+ if(info?.subtitle)panel.append(heading);
+ if(!info){
+  panel.append(eseControl('p','ese-loading','曲情報を読み込み中…'));
+  return;
  }
- panel.append(box);
+ if(eseState.fetchingSong){
+  const spinner=eseControl('p','ese-loading','譜面と音源を自動ダウンロード中…');
+  panel.append(spinner);
+ }
+ if(selected){
+  const label=eseControl('label','ese-difficulty-label','譜面・難易度');
+  const select=eseControl('select','ese-difficulty');
+  for(const c of eseState.activeCharts){
+   const name=(typeof names!=='undefined'&&names[c.meta.COURSE])||c.meta.COURSE||'難易度不明';
+   const option=eseControl('option','',name+' ★'+(c.meta.LEVEL||'?'));
+   option.value=String(charts.indexOf(c));
+   select.append(option);
+  }
+  select.value=String(charts.indexOf(selected));
+  select.onchange=async()=>{
+   if(loading||importing)return;
+   $('course').value=select.value;
+   await choose();
+  };
+  label.append(select);panel.append(label,featureBadges([selected]));
+  const duration=Math.max(0,Number(selected.duration)||0,selected===chart?audioBuffer?.duration||0:0);
+  let noteText='—';
+  try{
+   const range=branchNoteCountRange(selected);
+   noteText=(selected.branchEvents?.length&&range.min!==range.max
+    ?range.min+'〜'+range.max:range.max)+' ノーツ';
+  }catch{noteText=(selected.notes||[]).filter(n=>n.type<=4).length+' ノーツ'}
+  const seconds=Math.max(0,Math.floor(duration));
+  panel.append(eseControl('p','ese-song-stats',
+   (selected.bpm||info.bpm||'—')+' BPM ／ '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')+' ／ '+noteText));
+ }else{
+  const available=info.charts?.map(x=>x.course+' ★'+x.level).join(' / ')||'譜面を確認中';
+  panel.append(eseControl('p','ese-song-stats',(info.bpm||'—')+' BPM ／ '+available));
+ }
+ if(eseState.audioError)panel.append(eseControl('p','ese-error','音源：'+eseState.audioError));
+ if(eseState.error)panel.append(eseControl('p','ese-error',eseState.error));
+ if(selected){
+  const ready=playbackAssetsAvailable(selected)&&selected===chart;
+  panel.append(eseControl('p','muted',ready?'譜面準備完了・素材は演奏開始時に読み込み':
+   playbackAssetsAvailable(selected)?'譜面を選択してください。':'音源を取得できませんでした。音源を指定してください。'));
+  const actions=eseControl('div','song-choice-actions ese-song-actions');
+  for(const [title,action,primary] of [
+   ['▶ 演奏スタート',()=>start(),true],
+   ['オートプレイでスタート',()=>start({auto:true}),false],
+   ['途中からはじめる',()=>openSeek(),false]
+  ]){
+   const button=eseControl('button',primary?'primary':'',title);
+   button.disabled=!ready||loading||importing||eseState.fetchingSong;
+   button.onclick=action;actions.append(button);
+  }
+  panel.append(actions);
+  const audioLabel=eseAudioPicker(selected);
+  audioLabel.firstChild?.nodeType;
+  panel.append(audioLabel);
+ }
+ const credit=eseControl('a','ese-source-link','ESEの元データを開く ↗');
+ credit.href=ESE_ROOT+'/src/branch/master/'+info.path.split('/').map(encodeURIComponent).join('/');
+ credit.target='_blank';credit.rel='noopener noreferrer';panel.append(credit);
 }
 function renderESEBrowser(host){
  const wrapper=eseControl('section','ese-browser');

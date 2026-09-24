@@ -3,9 +3,10 @@
  const $=id=>document.getElementById(id);
  const url='/api/donbeat/manage';
  const GENRES=['ポップス','アニメ','ボーカロイド','キッズ','バラエティ','クラシック','ゲームミュージック','ナムコオリジナル','その他'];
- let managerData={songs:[],dans:[],disabledStatic:[]},staticPresets=[],danEditId=null,working=false;
+ let managerData={songs:[],dans:[],disabledStatic:[]},staticPresets=[],danEditId=null,working=false,bulkDeleting=false,bulkPreview=null,previewRequest=0;
  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function showTab(tab){
+  if(bulkDeleting)return;
   $('tabUpload').hidden=tab!=='upload';$('tabManage').hidden=tab!=='manage';
   document.querySelectorAll('[data-db-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.dbTab===tab)));
   if(tab==='manage')void loadManager();
@@ -49,6 +50,72 @@
    };
   }
  }
+
+ async function previewGenre(){
+  const request=++previewRequest,genre=$('dbmDeleteGenre').value;
+  bulkPreview=null;$('dbmBulkDelete').disabled=true;
+  if(!genre){$('dbmBulkCount').textContent='ジャンルを選ぶと削除対象の曲数を確認できます。';return null}
+  $('dbmBulkCount').textContent='R2の対象曲を確認中…';
+  try{
+   const info=await api('?action=genre-delete&genre='+encodeURIComponent(genre));
+   if(request!==previewRequest)return null;
+   bulkPreview=info;
+   $('dbmBulkCount').textContent=info.count+'曲（'+info.catalogCount+'件の登録データ）が対象です。'+
+    (info.titles.length?' 例：'+info.titles.slice(0,4).join('、'):'')+
+    '／ 対象はR2にアップロードした本家譜面のみ。';
+   $('dbmBulkDelete').disabled=bulkDeleting||!info.count;
+   return info;
+  }catch(e){
+   if(request===previewRequest)$('dbmBulkCount').textContent='対象曲を取得できません：'+e.message;
+   return null;
+  }
+ }
+ async function deleteSelectedGenre(){
+  if(bulkDeleting||working)return;
+  const genre=$('dbmDeleteGenre').value;
+  if(!GENRES.includes(genre))return;
+  // Always fetch a fresh server-generated snapshot before confirming.
+  const checked=await previewGenre();
+  if(!checked?.count)return;
+  const amount=checked.count;
+  if(!confirm('「'+genre+'」の本家譜面 '+amount+'曲をR2の収録曲一覧から削除します。\n削除した曲を使う段位が演奏できなくなる場合があります。\nこの操作は元に戻せません。続行しますか？'))return;
+  const typed=prompt('最終確認：削除するジャンル名「'+genre+'」を入力してください。');
+  if(typed?.trim()!==genre){$('dbmBulkStatus').textContent='キャンセルしました。';return}
+  bulkDeleting=true;previewRequest++;
+  $('dbmDeleteGenre').disabled=true;$('dbmBulkDelete').disabled=true;
+  $('dbmRefresh').disabled=true;$('manageRoot').setAttribute('aria-busy','true');
+  let deleted=0,remaining=checked.count,token=checked.token;
+  try{
+   for(let round=0;remaining>0;round++){
+    if(round>=2000)throw Error('処理回数が上限に達しました。もう一度曲数を確認してください。');
+    $('dbmBulkStatus').textContent='削除中… '+deleted+' / '+amount+'曲';
+    const result=await api('?action=genre-delete&genre='+encodeURIComponent(genre),{
+     method:'DELETE',headers:{'content-type':'application/json'},
+     body:JSON.stringify({confirm:genre,token})
+    });
+    if(!Number.isSafeInteger(result.deleted)||result.deleted<0||!Number.isSafeInteger(result.remaining)||
+       result.remaining<0||(result.deleted===0&&result.remaining>0))
+     throw Error('削除の進行状況を確認できませんでした。');
+    deleted+=result.deleted;remaining=result.remaining;token=result.token;
+    if(result.warnings?.length)$('dbmBulkStatus').textContent+='／ 素材の整理に注意：'+result.warnings.join('、');
+   }
+   $('dbmBulkStatus').textContent='「'+genre+'」の本家譜面 '+deleted+'曲を削除しました。';
+   window.dispatchEvent(new Event('donbeat-catalog-updated'));
+  }catch(e){
+   $('dbmBulkStatus').textContent='削除が中断されました：'+e.message+
+    '\n一部の曲は削除済みの可能性があります。最新の対象曲数を確認して、残りを再実行してください。';
+  }finally{
+   bulkDeleting=false;$('manageRoot').removeAttribute('aria-busy');
+   $('dbmDeleteGenre').disabled=false;$('dbmRefresh').disabled=false;
+   await loadManager();await previewGenre();
+  }
+ }
+ $('dbmDeleteGenre').addEventListener('change',()=>{
+  $('dbmBulkStatus').textContent='';
+  void previewGenre();
+ });
+ $('dbmBulkDelete').addEventListener('click',()=>void deleteSelectedGenre());
+
  function renderDans(){
   const hidden=new Set(managerData.disabledStatic||[]);
   const shown=[...staticPresets.filter(x=>!hidden.has(String(x.id||''))).map(x=>({...x,_static:true})),...(managerData.dans||[])];
@@ -95,6 +162,7 @@
    managerData=remote;staticPresets=Array.isArray(local.presets)?local.presets:[];
    renderSongs();renderDans();
    $('manageStatus').textContent='収録曲 '+managerData.songs.length+'件 ／ 登録段位 '+(managerData.dans||[]).length+'件';
+   if(!bulkDeleting&&$('dbmDeleteGenre').value)void previewGenre();
   }catch(err){$('manageStatus').textContent='一覧を取得できません：'+err.message}
  }
  function resetDanEditor(){

@@ -197,6 +197,7 @@
 
   // Keep every badge inside the expanded song information panel. The base
   // renderer also creates a summary badge set in the collapsed title; remove it.
+  window.donbeatRefreshSongOptionControls=injectSongOptions;
   renderSongSelection=function(){
     baseRenderSongSelection();
     document.querySelectorAll('.song-choice-title > .feature-badges').forEach(n=>n.remove());

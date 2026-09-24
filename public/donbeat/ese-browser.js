@@ -269,7 +269,11 @@ function eseSongInfo(panel){
   const audioLabel=eseAudioPicker(selected);
   const audioFileInput=audioLabel.querySelector('input');
   if(audioFileInput)audioFileInput.setAttribute('aria-label',ready?'音源を変更する':'音源を選択して演奏可能にする');
-  panel.append(audioLabel);
+  if(ready){
+   const advanced=eseControl('details','ese-audio-advanced');
+   advanced.append(eseControl('summary','','音源を変更する'),audioLabel);
+   panel.append(advanced);
+  }else panel.append(audioLabel);
  }
  const credit=eseControl('a','ese-source-link','ESEの元データを開く ↗');
  credit.href=ESE_ROOT+'/src/branch/master/'+info.path.split('/').map(encodeURIComponent).join('/');
@@ -345,11 +349,11 @@ function renderESEBrowser(host){
   const old=panel.querySelector('.ese-load-more');if(old)old.remove();
   if(depth===1&&eseState.visible<eseState.items.length){
    const more=eseControl('button','ese-load-more','さらに曲を表示（'+Math.min(eseState.pageSize,eseState.items.length-eseState.visible)+'曲）');
-   more.onclick=()=>{eseState.visible+=eseState.pageSize;draw();void eseLoadVisibleTitles()};
+   more.onclick=()=>{eseState.visible+=eseState.pageSize;draw();window.donbeatRefreshSongOptionControls?.();void eseLoadVisibleTitles()};
    panel.append(more);
   }
  };
- search.oninput=()=>{eseState.query=search.value;draw()};
+ search.oninput=()=>{eseState.query=search.value;draw();window.donbeatRefreshSongOptionControls?.()};
  draw();panel.append(results);
  const link=eseControl('a','ese-source-link','ESEリポジトリを開く ↗');
  link.href=ESE_ROOT;link.target='_blank';link.rel='noopener noreferrer';panel.append(link);

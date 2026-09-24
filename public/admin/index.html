@@ -331,7 +331,7 @@
         <p class="error" id="loginError"></p>
       </section>
       <main class="panel" id="panel">
-        <p><button id="donbeatUploadOpen" type="button">DON BEAT 譜面アップロード</button></p>
+        
         <section class="summary">
           <div><span>登録件数</span><b id="total">0</b></div>
           <div><span>プレイヤー数</span><b id="players">0</b></div>
@@ -584,16 +584,6 @@
         if (token) load();
       })();
     </script>
-    <dialog id="donbeatUpload" style="width:min(760px,94vw);max-height:90dvh;overflow:auto;background:#101619;color:#eee;border:1px solid #52616a;border-radius:10px;padding:24px">
-      <h2>DON BEAT 譜面アップロード</h2>
-      <p>ZIP・MCZ、または譜面と音源をまとめたフォルダを選択してください。</p>
-      <p>アップロードした譜面・音源は全プレイヤーに公開されます。</p>
-      <label>ファイル <input id="uploadFiles" type="file" multiple accept=".zip,.mcz,.mc,.tja,.ogg,.mp3,.wav,.m4a,.flac,.mp4,.webm,.m4v,.png,.jpg,.jpeg,.webp,.gif"></label>
-      <p><label>フォルダ <input id="uploadFolder" type="file" multiple webkitdirectory></label></p>
-      <ul id="uploadPreview"></ul><progress id="uploadProgress" max="1" value="0" style="width:100%"></progress>
-      <p id="uploadMessage" role="status"></p><button id="uploadSend" disabled>アップロードして公開</button> <button id="uploadClose">閉じる</button>
-    </dialog>
-    <script src="/donbeat/tja.js"></script><script src="/donbeat/malody.js"></script><script src="/admin/donbeat-upload.js"></script>
   </body>
 </html>
 

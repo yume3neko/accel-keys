@@ -209,8 +209,7 @@ function eseAudioPicker(c){
 function eseSongInfo(panel){
  const info=eseState.activeInfo;
  const selected=eseState.activeCharts.includes(chart)?chart:eseState.activeCharts[0];
- const heading=eseControl('p','ese-song-preview-subtitle',info?.subtitle?.replace(/^(--|\\+\\+)/,'')||'');
- if(info?.subtitle)panel.append(heading);
+ const subtitle=info?.subtitle?eseControl('p','ese-song-subtitle',info.subtitle.replace(/^(--|\\+\\+)/,'')):null;
  if(!info){
   panel.append(eseControl('p','ese-loading','曲情報を読み込み中…'));
   return;
@@ -249,6 +248,7 @@ function eseSongInfo(panel){
   const available=info.charts?.map(x=>x.course+' ★'+x.level).join(' / ')||'譜面を確認中';
   panel.append(eseControl('p','ese-song-stats',(info.bpm||'—')+' BPM ／ '+available));
  }
+ if(subtitle)panel.append(subtitle);
  if(eseState.audioError)panel.append(eseControl('p','ese-error','音源：'+eseState.audioError));
  if(eseState.error)panel.append(eseControl('p','ese-error',eseState.error));
  if(selected){
@@ -267,7 +267,8 @@ function eseSongInfo(panel){
   }
   panel.append(actions);
   const audioLabel=eseAudioPicker(selected);
-  audioLabel.firstChild?.nodeType;
+  const audioFileInput=audioLabel.querySelector('input');
+  if(audioFileInput)audioFileInput.setAttribute('aria-label',ready?'音源を変更する':'音源を選択して演奏可能にする');
   panel.append(audioLabel);
  }
  const credit=eseControl('a','ese-source-link','ESEの元データを開く ↗');
@@ -291,14 +292,22 @@ function renderESEBrowser(host){
   const description=eseControl('p','ese-browser-note',depth?'曲名は各TJAに書かれた日本語タイトルから取得します。':'ジャンルを選ぶと、ESEの曲フォルダを開きます。');
   panel.append(description);
  }
- if(eseState.error){const alert=eseControl('p','ese-error',eseState.error);alert.setAttribute('role','alert');panel.append(alert)}
- if(depth>=2){eseSongInfo(panel);return}
+ if(eseState.error&&!eseState.activeSongPath){const alert=eseControl('p','ese-error',eseState.error);alert.setAttribute('role','alert');panel.append(alert)}
+ if(depth>=2){
+  const card=eseControl('article','song-choice ese-song-card');
+  const header=eseControl('button','song-choice-title',eseState.activeInfo?.title||'曲情報を読み込み中…');
+  header.type='button';header.setAttribute('aria-expanded',String(eseState.detailsOpen));
+  header.onclick=()=>{eseState.detailsOpen=!eseState.detailsOpen;renderSongSelection()};
+  const details=eseControl('div','song-choice-panel');details.hidden=!eseState.detailsOpen;
+  if(eseState.detailsOpen)eseSongInfo(details);
+  card.append(header,details);panel.append(card);return;
+ }
  if(eseState.loading){panel.append(eseControl('p','ese-loading','ESEからフォルダ一覧を取得中…'));return}
  const search=eseControl('input','ese-search');
  search.type='search';search.placeholder=depth?'表示中の曲名を検索':'ジャンルを検索';
  search.setAttribute('aria-label','ESE内検索');
  search.value=eseState.query;panel.append(search);
- const results=eseControl('div','ese-results');
+ const results=eseControl('div','ese-results'+(depth===1?' ese-song-list':''));
  const draw=()=>{
   results.replaceChildren();
   const term=eseState.query.normalize('NFKC').toLowerCase().trim();
@@ -311,11 +320,27 @@ function renderESEBrowser(host){
   for(const item of items){
    const isGenre=depth===0;
    const label=isGenre?eseGenreName(item.name):esePreviewLabel(item);
-   const button=eseControl('button','ese-entry '+(isGenre?'ese-dir':'ese-chart'),(isGenre?'📁 ':'♫ ')+label+' ›');
-   button.type='button';button.dataset.eseItem=item.path;
-   button.title=item.name;button.disabled=eseState.fetchingSong;
-   button.onclick=()=>isGenre?void eseBrowse(item.path):void eseOpenSong(item.path);
-   results.append(button);
+   if(isGenre){
+    const button=eseControl('button','ese-entry ese-dir','📁 '+label+' ›');
+    button.type='button';button.title=item.name;button.disabled=eseState.fetchingSong;
+    button.onclick=()=>void eseBrowse(item.path);
+    results.append(button);continue;
+   }
+   const card=eseControl('article','song-choice ese-song-card');
+   const heading=eseControl('button','song-choice-title',label);
+   const opened=eseState.activeSongPath===item.path&&eseState.detailsOpen;
+   heading.type='button';heading.title=item.name;heading.dataset.eseItem=item.path;
+   heading.setAttribute('aria-expanded',String(opened));
+   heading.disabled=eseState.fetchingSong&&eseState.activeSongPath!==item.path;
+   const detail=eseControl('div','song-choice-panel');detail.hidden=!opened;
+   detail.id='ese-panel-'+items.indexOf(item);heading.setAttribute('aria-controls',detail.id);
+   heading.onclick=()=>{
+    if(eseState.activeSongPath===item.path){
+     eseState.detailsOpen=!eseState.detailsOpen;renderSongSelection();
+    }else void eseOpenSong(item.path);
+   };
+   if(opened)eseSongInfo(detail);
+   card.append(heading,detail);results.append(card);
   }
   const old=panel.querySelector('.ese-load-more');if(old)old.remove();
   if(depth===1&&eseState.visible<eseState.items.length){

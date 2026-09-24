@@ -30,21 +30,47 @@ small,.muted{color:#b1c0cd}
 progress{width:100%;height:18px}
 .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
 .badge{display:inline-block;border-radius:30px;padding:2px 10px;background:#225745;color:#b7f6d9}
+
+.secondary{background:#41515f;color:#f3f7fa}
+h3{font-size:1.1rem;margin:0 0 10px}
+.dbm-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.manage-column{min-width:0}
+.dbm-list{max-height:370px;overflow:auto;display:grid;gap:8px}
+.dbm-item{background:#101d26;border:1px solid #394f5e;border-radius:9px;padding:11px;overflow-wrap:anywhere}
+.dbm-item b{display:block}.dbm-item small{display:block;color:#acbfcd}
+.dbm-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dbm-actions button,.dbm-actions select{font-size:13px;padding:8px 10px;width:auto}
+.dbm-actions .danger{background:#603038;color:#ffdce0}.dbm-actions .secondary{background:#3d5365;color:#e5f4ff}
+.dbm-actions select{border:1px solid #607b90;border-radius:6px;background:#172734;color:white}
+#dbmDanPreview{overflow-wrap:anywhere}#dbmStatus{min-height:1.5em;color:#ffd28a}
+@media(max-width:740px){.dbm-grid{grid-template-columns:1fr}section{padding:15px}}
 </style>
-<script src="upload.js" defer></script>
+<script src="upload.js" defer></script><script src="manage.js" defer></script><script src="admin-dan-form.js" defer></script>
 </head>
 <body>
 <main>
-<header><h1>DONBEAT 曲のアップロード</h1><a href="./">← 選曲画面へ</a></header>
+<header><h1>DONBEAT 管理画面</h1><div class="row"><a href="./">← 選曲画面へ</a><button id="logout" class="secondary" type="button">ログアウト</button></div></header>
 <p>管理者専用。ジャンル名のフォルダを含む譜面・音源をR2へアップロードします。<strong>すべてのTJA／MCに対応する音源がそろい、ファイルの保存がすべて完了した場合だけ公開</strong>されます。</p>
-<section>
-<h2>1. 管理者認証</h2>
-<label for="token">管理者アップロード用トークン</label>
-<input id="token" type="password" autocomplete="off" placeholder="Cloudflare Pagesに設定したシークレット">
-<small>入力したトークンはブラウザ内の今回の操作だけで使い、保存しません。</small>
+
+<section id="donbeatManager">
+<h2>収録曲・実装段位の管理</h2>
+<p class="muted">保存済みの曲の分類・ジャンル変更、ファイルの差し替え・削除、段位の追加・削除ができます。操作ごとのトークン入力は不要です。</p>
+<div class="dbm-grid">
+ <div class="manage-column">
+  <div class="row" style="justify-content:space-between"><h3>収録曲</h3><button type="button" id="dbmRefresh" class="secondary">一覧を更新</button></div>
+  <div id="dbmSongs" class="dbm-list" aria-live="polite"></div>
+ </div>
+ <div class="manage-column">
+  <div class="row" style="justify-content:space-between"><h3>実装段位</h3><span class="muted">.dan / .txt</span></div>
+  <div id="dbmDans" class="dbm-list" aria-live="polite"></div>
+  <label for="dbmDanFile">段位設定ファイルから追加</label>
+  <input type="file" id="dbmDanFile" accept=".dan,.txt">
+  <div class="row"><button id="dbmAddDan" type="button" disabled>段位を登録</button><span id="dbmDanPreview" class="muted"></span></div>
+ </div>
+</div>
+<p id="dbmStatus" role="status"></p>
 </section>
 <section>
-<h2>2. 譜面・音源フォルダ</h2>
+<h2>新しい曲のアップロード</h2>
 <p class="muted">例：<code>本家譜面/ゲームミュージック/曲名/譜面.tja</code> と同じ階層に <code>音源.ogg</code> を配置してください。TJAは <code>WAVE:</code>、MCはBGMの <code>sound</code> に指定した音源を照合します。</p>
 <label for="folder">フォルダを選択</label>
 <input id="folder" type="file" webkitdirectory multiple>
@@ -62,10 +88,10 @@ progress{width:100%;height:18px}
 <div id="issues" role="alert" aria-live="polite"></div>
 </section>
 <section>
-<h2>3. 内容を確認して公開</h2>
+<h2>アップロード内容を確認して公開</h2>
 <p>一致しない音源、壊れた譜面、未アップロードのファイルが1つでもある場合は、曲一覧へ反映されません。</p>
 <div class="row">
-<button id="publish" disabled>R2にアップロードして公開する</button>
+<button id="publish" disabled>R2にアップロードして公開する</button><button id="restart" type="button" class="secondary" hidden>別の曲をアップロード</button>
 <span class="badge">全ファイル確認後に一括公開</span>
 </div>
 <progress id="progress" value="0" max="1" hidden></progress>

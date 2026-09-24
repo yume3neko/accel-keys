@@ -3,6 +3,7 @@ const ORIGIN='https://ese.tjadataba.se';
 const API=ORIGIN+'/api/v1/repos/ESE/ESE/contents';
 const RAW=ORIGIN+'/ESE/ESE/raw/branch/master';
 const AUDIO=/\.(?:ogg|mp3|wav|m4a|flac|opus|aac)$/i;
+const VIDEO=/\.(?:mp4|webm|m4v)$/i;
 const CHART=/\.tja$/i;
 const json=(body,status=200)=>Response.json(body,{status,headers:{'cache-control':status===200?'public, max-age=300':'no-store'}});
 function safePath(path){
@@ -57,7 +58,7 @@ function tjaMetadata(text,file){
  const subtitle=subtitleJa||(/[\u3040-\u30ff\u3400-\u9fff]/.test(metadata.SUBTITLE||'')?metadata.SUBTITLE:'');
  const chartInfo=[...text.matchAll(/^\s*COURSE\s*:\s*(.+)$/gmi)].slice(0,15).map(m=>m[1].trim());
  const levels=[...text.matchAll(/^\s*LEVEL\s*:\s*(.+)$/gmi)].slice(0,15).map(m=>m[1].trim());
- return {title,titleJa,subtitle,subtitleJa,japaneseTitleAvailable:!!titleJa||/[\u3040-\u30ff\u3400-\u9fff]/.test(title),bpm:metadata.BPM||'',wave:metadata.WAVE||'',charts:chartInfo.map((course,i)=>({course,level:levels[i]||'?'}))};
+ return {title,titleJa,subtitle,subtitleJa,japaneseTitleAvailable:!!titleJa||/[\u3040-\u30ff\u3400-\u9fff]/.test(title),bpm:metadata.BPM||'',wave:metadata.WAVE||'',videoName:metadata.VIDEO||'',charts:chartInfo.map((course,i)=>({course,level:levels[i]||'?'}))};
 }
 function findAudio(rows,wave){
  const audio=rows.filter(x=>x.type==='file'&&AUDIO.test(x.name));
@@ -72,17 +73,31 @@ function findAudio(rows,wave){
  }
  return audio.length===1?audio[0].path:null;
 }
+function findVideo(rows,videoName){
+ const video=rows.filter(x=>x.type==='file'&&VIDEO.test(x.name));
+ if(!video.length)return null;
+ const normalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/\\/g,'/').replace(/^(\.\/)+/,'');
+ const wanted=normalize(videoName),base=filename(wanted);
+ if(wanted){
+  const exact=video.find(x=>normalize(x.name)===wanted||normalize(x.path).endsWith('/'+wanted));
+  if(exact)return exact.path;
+  const match=video.find(x=>normalize(x.name)===base);
+  if(match)return match.path;
+ }
+ return video.length===1?video[0].path:null;
+}
 const mediaType=path=>{
  const ext=filename(path).split('.').pop().toLowerCase();
- return ({ogg:'audio/ogg',mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',flac:'audio/flac',opus:'audio/ogg',aac:'audio/aac'})[ext]||'application/octet-stream';
+ return ({ogg:'audio/ogg',mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',flac:'audio/flac',opus:'audio/ogg',aac:'audio/aac',mp4:'video/mp4',webm:'video/webm',m4v:'video/mp4'})[ext]||'application/octet-stream';
 };
 export async function onRequestGet({request}){
  const url=new URL(request.url),type=url.searchParams.get('type')||'list',path=safePath(url.searchParams.get('path')||'');
  if(path===null)return json({error:'無効なESEパスです。'},400);
- if(!['list','info','chart','audio'].includes(type))return json({error:'不正な取得方法です。'},400);
+ if(!['list','info','chart','audio','video'].includes(type))return json({error:'不正な取得方法です。'},400);
  if((type==='info'||type==='audio')&&!path)return json({error:'曲フォルダまたは音源が指定されていません。'},400);
  if(type==='chart'&&!CHART.test(path))return json({error:'TJAファイルだけ取得できます。'},400);
  if(type==='audio'&&!AUDIO.test(path))return json({error:'対応する音源ファイルだけ取得できます。'},400);
+ if(type==='video'&&!VIDEO.test(path))return json({error:'対応する動画ファイルだけ取得できます。'},400);
  try{
   if(type==='list'){
    const rows=await entries(path),insideSong=path.split('/').length>=2;
@@ -100,18 +115,18 @@ export async function onRequestGet({request}){
    const selected=chartOnly?tjas.find(x=>x.path===path):tjas[0];
    if(!selected)return json({error:'曲フォルダにTJAが見つかりませんでした。'},404);
    const metadata=tjaMetadata(decodeTja(await tjaBytes(selected.path)),selected.path);
-   const audio=findAudio(rows,metadata.wave);
-   return json({...metadata,path:folder,primaryTja:selected.path,tjas:tjas.map(x=>({name:x.name,path:x.path})),audio,audioMissing:!audio});
+   const audio=findAudio(rows,metadata.wave),video=findVideo(rows,metadata.videoName);
+   return json({...metadata,path:folder,primaryTja:selected.path,tjas:tjas.map(x=>({name:x.name,path:x.path})),audio,audioMissing:!audio,video});
   }
   if(type==='chart'){
    const bytes=await tjaBytes(path);
    return new Response(bytes,{headers:{'content-type':'application/octet-stream','cache-control':'public, max-age=300','x-content-type-options':'nosniff'}});
   }
   // Media is sent only for the selected song; use a stream to avoid buffering large OGGs.
-  const response=await upstream(RAW+'/'+urlPath(path),'audio/*',60000);
-  if(!response.ok)return errorResponse('音源',response.status);
-  const max=90*1024*1024,declared=Number(response.headers.get('content-length')||0);
-  if(declared>max)return json({error:'音源が90 MiBを超えています。'},413);
+  const response=await upstream(RAW+'/'+urlPath(path),type==='video'?'video/*':'audio/*',60000);
+  if(!response.ok)return errorResponse(type==='video'?'動画':'音源',response.status);
+  const max=(type==='video'?300:90)*1024*1024,declared=Number(response.headers.get('content-length')||0);
+  if(declared>max)return json({error:(type==='video'?'動画':'音源')+'のファイルが大きすぎます。'},413);
   const headers=new Headers({
    'content-type':mediaType(path),
    'cache-control':'public, max-age=300',

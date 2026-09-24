@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>DONBEAT 管理者ログイン</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Meiryo,sans-serif;background:#111820;color:#f2f4f6}
+*{box-sizing:border-box}body{min-height:100dvh;display:grid;place-items:center;padding:20px;margin:0}
+main{width:min(100%,440px);padding:28px;background:#1b2832;border:1px solid #425361;border-radius:14px;box-shadow:0 18px 60px #0005}
+h1{font-size:25px;margin:0 0 8px}p{color:#c1d0d8;line-height:1.65}
+label{display:block;margin:18px 0 7px;font-weight:600}
+input{width:100%;padding:13px;background:#0e1720;color:#fff;border:1px solid #8da3b6;border-radius:8px;font-size:16px}
+button{display:block;width:100%;border:0;border-radius:8px;padding:13px;background:#f0b65a;color:#171a1c;font-weight:800;font-size:16px;margin-top:20px}
+button:disabled{opacity:.6}
+a{color:#bedafa}#error{color:#ffaf9f;white-space:pre-wrap;min-height:22px}
+small{color:#aebec9;display:block;margin-top:16px}
+</style></head>
+<body><main><h1>DONBEAT 管理者ログイン</h1>
+<p>管理画面を開くにはCloudflare PagesのSecret <strong>DONBEAT_ADMIN_TOKEN</strong> を入力してください。ログイン後は、譜面や段位の操作時に再入力する必要はありません。</p>
+<form id="loginForm"><label for="token">管理者キー</label><input id="token" type="password" autocomplete="off" spellcheck="false" required autofocus>
+<button id="login" type="submit">ログインして管理画面を開く</button></form>
+<p id="error" role="alert"></p><small>8時間有効な、HttpOnly・Secureの管理者セッションを使用します。トークン自体はブラウザに保存しません。</small>
+<p><a href="./">← DONBEATに戻る</a></p>
+</main>
+<script>
+'use strict';
+(async()=>{
+ const form=document.getElementById('loginForm'),token=document.getElementById('token'),button=document.getElementById('login'),error=document.getElementById('error');
+ try{const r=await fetch('/api/donbeat/session',{cache:'no-store'});const d=await r.json();if(d.authenticated)location.replace('upload.html')}catch{}
+ form.addEventListener('submit',async e=>{
+  e.preventDefault();button.disabled=true;error.textContent='';
+  const supplied=token.value;
+  try{
+   const r=await fetch('/api/donbeat/session',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({token:supplied}),cache:'no-store'});
+   token.value='';
+   const data=await r.json();
+   if(!r.ok)throw Error(data.error||'認証できませんでした。');
+   location.replace('upload.html');
+  }catch(e){error.textContent=e.message||'通信エラー';button.disabled=false}
+ });
+})();
+</script></body></html>

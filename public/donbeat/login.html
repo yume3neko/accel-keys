@@ -1,0 +1,30 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>DONBEAT 管理者ログイン</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;background:#111820;color:#f1f4f7}
+body{min-height:100dvh;display:grid;place-items:center;margin:0;padding:20px}
+main{box-sizing:border-box;width:min(470px,100%);border-radius:16px;border:1px solid #415460;padding:30px;background:#1b2933}
+h1{font-size:24px;margin:4px 0 13px}.muted{color:#b7c7d2}label{display:block;font-weight:700;margin:23px 0 9px}
+input,button{font:inherit;box-sizing:border-box;width:100%;padding:14px;border-radius:10px}
+input{background:#0b171e;color:#fff;border:1px solid #758b9b}button{background:#efba65;color:#171c1f;font-weight:800;border:0;margin-top:16px;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}#status{min-height:1.6em;color:#ffb1ac}a{color:#b1d6ff}
+</style></head><body><main>
+<p class="muted">DONBEAT / ADMIN</p><h1>管理者ログイン</h1>
+<p class="muted">管理ページにアクセスするには、Cloudflare Pagesに登録した DONBEAT_ADMIN_TOKEN を入力してください。一度ログインすれば、管理操作中に再入力する必要はありません。</p>
+<form id="login"><label for="token">管理者トークン</label><input id="token" type="password" required autocomplete="current-password" autofocus><button id="submit">ログインして管理画面を開く</button></form>
+<p id="status" role="alert"></p><a href="./">← 選曲画面へ戻る</a></main>
+<script>
+(async()=>{
+ const form=document.getElementById('login'),submit=document.getElementById('submit'),status=document.getElementById('status');
+ try{const r=await fetch('/api/donbeat/admin-session',{cache:'no-store'});const data=await r.json();if(data.authenticated){location.replace('upload.html');return}}catch{}
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();submit.disabled=true;status.textContent='認証中…';
+  const input=document.getElementById('token'),token=input.value;
+  try{
+   const res=await fetch('/api/donbeat/admin-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token}),cache:'no-store'});
+   input.value='';const result=await res.json();
+   if(!res.ok)throw Error(result.error||'ログインできませんでした。');
+   location.replace('upload.html');
+  }catch(error){status.textContent=error.message||'ログインできませんでした。';submit.disabled=false}
+ });
+})();
+</script></body></html>

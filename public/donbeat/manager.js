@@ -100,14 +100,13 @@
     if(result.warnings?.length)$('dbmBulkStatus').textContent+='／ 素材の整理に注意：'+result.warnings.join('、');
    }
    $('dbmBulkStatus').textContent='「'+genre+'」の本家譜面 '+deleted+'曲を削除しました。';
-   window.dispatchEvent(new Event('donbeat-catalog-updated'));
   }catch(e){
    $('dbmBulkStatus').textContent='削除が中断されました：'+e.message+
     '\n一部の曲は削除済みの可能性があります。最新の対象曲数を確認して、残りを再実行してください。';
   }finally{
    bulkDeleting=false;$('manageRoot').removeAttribute('aria-busy');
    $('dbmDeleteGenre').disabled=false;$('dbmRefresh').disabled=false;
-   await loadManager();await previewGenre();
+   await loadManager();
   }
  }
  $('dbmDeleteGenre').addEventListener('change',()=>{

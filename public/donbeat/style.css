@@ -269,3 +269,26 @@ body.selecting .fields>label:first-child{display:none}
  .ese-entry{min-height:47px;font-size:13px}
  .ese-song-actions button{min-width:110px}
 }
+
+/* Match the original song-selection accordion for ESE song folders. */
+.ese-results.ese-song-list{display:flex;flex-direction:column;gap:12px;max-height:none;overflow:visible;padding:3px 0}
+.ese-song-list .ese-song-card{margin:0;width:100%;min-width:0;border:1px solid #454a51;border-radius:10px;background:#1b2026;overflow:hidden}
+.ese-song-card>.song-choice-title{display:block;width:100%;min-height:58px;font-weight:750}
+.ese-song-card>.song-choice-panel{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+.ese-song-card>.song-choice-panel[hidden]{display:none}
+.ese-song-card .ese-difficulty-label{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:16px}
+.ese-song-card .ese-difficulty{padding:12px;font-size:16px}
+.ese-song-card .ese-song-stats{font-size:clamp(14px,2.5vw,17px);line-height:1.6;color:#bcc3ca}
+.ese-song-card .ese-song-subtitle{font-size:clamp(14px,2.5vw,17px);line-height:1.7;color:#bcc3ca;overflow-wrap:anywhere}
+.ese-song-card .feature-badges{display:flex;gap:6px;flex-wrap:wrap;margin:0}
+.ese-song-card .feature-badge{font-size:13px}
+.ese-song-card .song-feature-options{margin:0}
+.ese-song-card .ese-song-actions{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.ese-song-card .ese-song-actions button{width:100%;min-height:49px;flex:none;font-size:16px;font-weight:750}
+.ese-song-card .ese-audio-advanced{padding:8px 12px;border:1px solid #394754;border-radius:8px;font-size:13px;color:#bcc5cb}
+.ese-song-card .ese-audio-advanced>summary{cursor:pointer}
+.ese-song-card .ese-audio-advanced .ese-audio-picker{margin-top:10px}
+@media(min-width:860px){
+ .ese-song-card .ese-song-actions{flex-direction:row}
+ .ese-song-card .ese-song-actions button{width:auto;min-width:0;flex:1}
+}

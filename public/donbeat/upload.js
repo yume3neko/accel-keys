@@ -5,7 +5,7 @@
  const ALLOWED=/\.(?:tja|mc|ogg|mp3|wav|m4a|flac|opus|aac|mp4|webm|m4v|png|jpg|jpeg|webp|gif)$/i;
  const API='/api/donbeat/admin-upload', MAX_FILE=90*1024*1024, MAX_CHART=8*1024*1024;
  const chosen=new Map(),uploaded=new Set();
- let batch=null,ready=false,busy=false,issues=[],missing=[],published=false;
+ let batch=null,ready=false,busy=false,issues=[],missing=[],published=false,replaceTarget=null;
  const norm=s=>String(s||'').normalize('NFC').toLowerCase();
  const cleanPath=s=>String(s||'').normalize('NFC').replace(/\\/g,'/');
  const basename=s=>s.split('/').pop();
@@ -22,7 +22,8 @@
   for(const [path,file] of show){const li=document.createElement('li');li.textContent=path+' ('+(file.size/1048576).toFixed(2)+' MB)';$('files').append(li)}
   if(files.length>80){const li=document.createElement('li');li.textContent='ほか '+(files.length-80)+' ファイル';$('files').append(li)}
   $('issues').textContent=issues.join('\n');
-  $('publish').disabled=!ready||busy||published||!$('token').value.trim();
+  $('publish').disabled=!ready||busy||published;
+  $('newBatch').hidden=!published;
   $('publish').textContent=published?'公開済み':busy?'アップロード中…':'R2にアップロードして公開する';
  }
  function resolve(chart,wave){
@@ -70,6 +71,7 @@
  async function inspect(){
   ready=false;issues=[];missing=[];const paths=[...chosen.keys()],scores=paths.filter(p=>CHART.test(p));
   if(!scores.length)issues.push('TJAまたはMC譜面を選択してください。');
+  if(replaceTarget&&scores.length!==1)issues.push('差し替えでは譜面ファイルを1つだけ選択してください。');
   if(paths.length>1200)issues.push('1回にアップロードできるのは1200ファイルまでです。');
   if([...chosen.values()].reduce((sum,f)=>sum+f.size,0)>4*1024**3)issues.push('合計サイズは4GB以下にしてください。');
   for(const [path,file] of chosen){
@@ -111,22 +113,23 @@
   resetUpload();await inspect();
  }
  async function requestJSON(action,payload={}){
-  const res=await fetch(API,{method:'POST',headers:{authorization:'Bearer '+$('token').value,'content-type':'application/json'},
+  const res=await fetch(API,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
    body:JSON.stringify({action,...payload}),cache:'no-store'});
+  if(res.status===401){location.replace('admin-login.html');throw Error('管理者のログイン期限が切れました。')}
   const body=await res.json().catch(()=>({error:'サーバーからの応答を取得できませんでした。'}));
   if(!res.ok)throw Error(body.error+(body.details?.length?'\n'+body.details.join('\n'):''));
   return body;
  }
  async function pushFile(path,file){
   const url=API+'?batch='+encodeURIComponent(batch)+'&path='+encodeURIComponent(path);
-  const res=await fetch(url,{method:'PUT',headers:{authorization:'Bearer '+$('token').value},body:file,cache:'no-store'});
+  const res=await fetch(url,{method:'PUT',credentials:'same-origin',body:file,cache:'no-store'});
+  if(res.status===401){location.replace('admin-login.html');throw Error('管理者のログイン期限が切れました。')}
   const data=await res.json().catch(()=>({error:'アップロード応答が不正です。'}));
   if(!res.ok)throw Error(path+'：'+data.error);
   uploaded.add(path);
  }
  async function publish(){
   if(!ready||busy||published)return;
-  if(!$('token').value.trim()){error('管理者トークンを入力してください。');return}
   busy=true;draw();$('progress').hidden=false;
   try{
    const files=[...chosen.entries()];
@@ -152,14 +155,52 @@
    const result=await requestJSON('publish',{batch});
    published=true;
    $('progress').value=files.length;
-   status('公開完了！ '+result.songCount+'譜面を追加しました。ジャンル：'+result.genres.join('、')+'\nDONBEATを再読み込みすると表示されます。',true);
+   let replacement='';
+   if(replaceTarget){
+    const target=replaceTarget;
+    try{
+     const endpoint='/api/donbeat/manage?action=song&id='+encodeURIComponent(target.id)+'&index='+target.index;
+     const response=await fetch(endpoint,{method:'DELETE',credentials:'same-origin',cache:'no-store'});
+     if(response.status===401){location.replace('admin-login.html');throw Error('管理者のログイン期限が切れました。')}
+     const body=await response.json().catch(()=>({}));
+     if(!response.ok)throw Error(body.error||'旧曲の削除に失敗しました。');
+     replacement='\n旧曲「'+target.title+'」との差し替えも完了しました。';
+     replaceTarget=null;$('replaceNotice').hidden=true;$('cancelReplace').hidden=true;
+    }catch(e){replacement='\n新しい譜面は公開されましたが、旧曲の削除に失敗しました。収録曲管理から削除してください：'+e.message}
+   }
+   status('公開完了！ '+result.songCount+'譜面を追加しました。ジャンル：'+result.genres.join('、')+replacement+'\nDONBEATの選曲画面を再読み込みすると表示されます。',true);
+   window.dispatchEvent(new Event('donbeat-catalog-updated'));
   }catch(e){error(e.message||String(e))}
   finally{busy=false;draw()}
  }
  $('folder').addEventListener('change',event=>void add(event.target.files,true));
  $('extra').addEventListener('change',event=>{void add(event.target.files,false);event.target.value=''});
  $('genre').addEventListener('change',()=>{if(!busy){resetUpload();void inspect()}});
- $('token').addEventListener('input',draw);
+ function clearSelection(){
+  if(busy)return;
+  chosen.clear();ready=false;issues=[];missing=[];resetUpload();
+  $('folder').value='';$('extra').value='';$('progress').hidden=true;$('progress').value=0;
+  draw();
+ }
+ function cancelReplace(){
+  if(busy)return;
+  replaceTarget=null;$('replaceNotice').hidden=true;$('cancelReplace').hidden=true;
+  clearSelection();
+ }
+ window.DONBEATAdminUpload={
+  startReplace(song){
+   if(busy)return;
+   clearSelection();replaceTarget={id:song.id,index:song.index,title:song.title};
+   $('replaceNotice').textContent='「'+song.title+'」を差し替えます。新しいTJA/MCと対応音源を選択してください。全件確認・公開が完了してから旧曲を削除します。';
+   $('replaceNotice').hidden=false;$('cancelReplace').hidden=false;
+   $('genre').value=song.genre||'';
+   draw();
+  },
+  cancelReplace
+ };
+ $('cancelReplace').addEventListener('click',cancelReplace);
+ $('newBatch').addEventListener('click',()=>{cancelReplace();$('status').textContent='次の曲を選択できます。'});
+
  $('publish').addEventListener('click',()=>void publish());
  draw();
 })();

@@ -1,6 +1,7 @@
+import {requireAdmin,checkWriteOrigin} from '../../_shared/donbeat-auth.js';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store'}});
-export const validPath=p=>typeof p==='string'&&p.length>0&&p.length<512&&!/[\\\x00-\x1f]/.test(p)&&p.split('/').every(x=>x&&x!=='.'&&x!=='..');
-const idOK=id=>/^[a-f0-9-]{36}$/.test(id||'');
+const validPath=p=>typeof p==='string'&&p.length>0&&p.length<512&&!/[\\\x00-\x1f]/.test(p)&&p.split('/').every(x=>x&&x!=='.'&&x!=='..');
+const idOK=id=>/^(?:import-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id||'');
 const allowed=p=>/\.(mc|tja|ogg|mp3|wav|m4a|flac|mp4|webm|m4v|png|jpe?g|webp|gif)$/i.test(p);
 const mime=p=>{
  const ext=String(p||'').split('.').pop().toLowerCase();
@@ -39,69 +40,54 @@ async function listAdmin(bucket){
  songs.sort((a,b)=>String(a.title).localeCompare(String(b.title),'ja'));dans.sort((a,b)=>String(a.title).localeCompare(String(b.title),'ja'));return {ready:true,songs,dans,disabledStatic};
 }
 export async function onRequest({request,env}){
- if(!env.ADMIN_TOKEN||request.headers.get('authorization')!=='Bearer '+env.ADMIN_TOKEN)return json({error:'管理者キーが正しくありません。'},401);
+ const blocked=await requireAdmin(request,env)||(request.method==='GET'?null:checkWriteOrigin(request));if(blocked)return blocked;
  if(!env.DONBEAT_BUCKET)return json({error:'保存先が未設定です。CloudflareでR2バケットをDONBEAT_BUCKETとして接続し、再デプロイしてください。'},503);
  const bucket=env.DONBEAT_BUCKET,url=new URL(request.url),id=url.searchParams.get('id'),action=url.searchParams.get('action')||'';
  try{
-  if(request.method==='GET')return json(await listAdmin(bucket));
+  if(request.method==='GET'){
+   if(action==='dan'){
+    if(!idOK(id)||id.startsWith('import-'))return json({error:'段位IDが不正です。'},400);
+    const [info,source]=await Promise.all([readJSON(bucket,'dan-catalog/'+id+'.json'),bucket.get('dan/'+id+'.dan')]);
+    return info&&source?json({id,title:info.title,content:await source.text()}):json({error:'段位が見つかりません。'},404);
+   }
+   if(action)return json({error:'取得操作が不正です。'},400);
+   return json(await listAdmin(bucket));
+  }
   if(action==='song'&&request.method==='PATCH'){
    if(!idOK(id))return json({error:'アップロードIDが不正です。'},400);
    if(!url.searchParams.has('index'))return json({error:'対象の曲が指定されていません。'},400);
    const index=Number(url.searchParams.get('index')),key='catalog/'+id+'.json',data=await readJSON(bucket,key);
    if(!data||!Array.isArray(data.songs)||!Number.isInteger(index)||index<0||index>=data.songs.length)return json({error:'対象の曲が見つかりません。'},404);
    const raw=await request.text();if(raw.length>1000)return json({error:'分類指定が大きすぎます。'},413);
-   const category=JSON.parse(raw).category;
-   if(category!=='official'&&category!=='creative')return json({error:'譜面の分類が不正です。'},400);
-   data.songs[index].category=category;data.songs[index].categoryManual=true;
+   const body=JSON.parse(raw),song=data.songs[index];
+   if(!Object.hasOwn(body,'category')&&!Object.hasOwn(body,'genre'))return json({error:'変更内容を指定してください。'},400);
+   if(Object.hasOwn(body,'category')){
+    if(body.category!=='official'&&body.category!=='creative')return json({error:'譜面分類が不正です。'},400);
+    song.category=body.category;song.categoryManual=true;
+   }
+   if(Object.hasOwn(body,'genre')){
+    if(!['ポップス','アニメ','ボーカロイド','キッズ','バラエティ','クラシック','ゲームミュージック','ナムコオリジナル','その他'].includes(body.genre))
+     return json({error:'ジャンルが不正です。'},400);
+    song.genre=body.genre;
+   }
    await bucket.put(key,JSON.stringify(data),{httpMetadata:{contentType:'application/json'}});
-   return json({ok:true,category});
+   return json({ok:true,category:song.category,genre:song.genre||'その他'});
   }
   if(action==='song'&&request.method==='DELETE'){
    if(!idOK(id))return json({error:'アップロードIDが不正です。'},400);const index=Number(url.searchParams.get('index'));const key='catalog/'+id+'.json',data=await readJSON(bucket,key);if(!data||!Array.isArray(data.songs)||!Number.isInteger(index)||index<0||index>=data.songs.length)return json({error:'対象の曲が見つかりません。'},404);
-   const [removed]=data.songs.splice(index,1);if(data.songs.length)await bucket.put(key,JSON.stringify(data),{httpMetadata:{contentType:'application/json'}});else{await bucket.delete(key);await removePrefix(bucket,'files/'+id+'/')};return json({ok:true,removed:removed?.title||''});
+   const [removed]=data.songs.splice(index,1);if(data.songs.length)await bucket.put(key,JSON.stringify(data),{httpMetadata:{contentType:'application/json'}});else{await bucket.delete(key);if(id.startsWith('import-')){const batch=id.slice(7);await removePrefix(bucket,'uploads/'+batch+'/');await bucket.delete('pending/'+batch+'.json')}else await removePrefix(bucket,'files/'+id+'/')};return json({ok:true,removed:removed?.title||''});
   }
   if(action==='dan'&&request.method==='POST'){
-   if(!idOK(id))return json({error:'段位IDが不正です。'},400);const raw=await request.text();if(raw.length>120000)return json({error:'段位設定が大きすぎます。'},413);const body=JSON.parse(raw),title=String(body.title||'').trim(),content=String(body.content||'');if(!title||title.length>300||!content.trim())return json({error:'段位名または設定内容が不正です。'},400);if(!/^\s*(?:TITLE\s*:|SONG1\s*:)/mi.test(content)||!/^\s*SONG1\s*:/mi.test(content))return json({error:'段位設定ファイルとして認識できません。'},400);
+   if(!idOK(id)||id.startsWith('import-'))return json({error:'段位IDが不正です。'},400);const raw=await request.text();if(raw.length>120000)return json({error:'段位設定が大きすぎます。'},413);const body=JSON.parse(raw),title=String(body.title||'').trim(),content=String(body.content||'');if(!title||title.length>300||!content.trim())return json({error:'段位名または設定内容が不正です。'},400);if(!/^\s*(?:TITLE\s*:|SONG1\s*:)/mi.test(content)||!/^\s*SONG1\s*:/mi.test(content))return json({error:'段位設定ファイルとして認識できません。'},400);
    await validateDanSongs(bucket,content);
    const file='/api/donbeat/dan/'+id;await bucket.put('dan/'+id+'.dan',content,{httpMetadata:{contentType:'text/plain; charset=utf-8'}});await bucket.put('dan-catalog/'+id+'.json',JSON.stringify({id,title,file}),{httpMetadata:{contentType:'application/json'}});await bucket.delete('dan-disabled/'+id+'.json');return json({ok:true,id,title,file});
   }
   if(action==='dan'&&request.method==='DELETE'){
-   if(!idOK(id))return json({error:'段位IDが不正です。'},400);await bucket.delete(['dan-catalog/'+id+'.json','dan/'+id+'.dan']);return json({ok:true});
+   if(!idOK(id)||id.startsWith('import-'))return json({error:'段位IDが不正です。'},400);await bucket.delete(['dan-catalog/'+id+'.json','dan/'+id+'.dan']);return json({ok:true});
   }
-  if(action==='dan-static'&&request.method==='DELETE'){
-   const key=String(url.searchParams.get('key')||'');if(!/^[a-z0-9][a-z0-9_-]{0,80}$/i.test(key))return json({error:'段位キーが不正です。'},400);await bucket.put('dan-disabled/'+key+'.json',JSON.stringify({key,disabled:true}),{httpMetadata:{contentType:'application/json'}});return json({ok:true});
+  if(action==='dan-static'&&(request.method==='POST'||request.method==='DELETE')){
+   const key=String(url.searchParams.get('key')||'');if(!/^[a-z0-9][a-z0-9_-]{0,80}$/i.test(key))return json({error:'段位キーが不正です。'},400);if(request.method==='DELETE')await bucket.put('dan-disabled/'+key+'.json',JSON.stringify({key,disabled:true}),{httpMetadata:{contentType:'application/json'}});else await bucket.delete('dan-disabled/'+key+'.json');return json({ok:true});
   }
-  if(!idOK(id))return json({error:'アップロードIDが不正です。'},400);
-  const prefix='files/'+id+'/',catalogKey='catalog/'+id+'.json';
-  if(request.method==='DELETE'){
-   await bucket.delete(catalogKey);await removePrefix(bucket,prefix);return json({ok:true});
-  }
-  if(await bucket.head(catalogKey))return json({error:'公開済みのアップロードです。'},409);
-  if(request.method==='PUT'){
-   const path=url.searchParams.get('path');if(!validPath(path)||!allowed(path))return json({error:'ファイル名・拡張子が不正です。'},400);
-   const size=Number(request.headers.get('content-length'));if(!Number.isSafeInteger(size)||size<=0||size>90*1024*1024)return json({error:'1ファイルは90MiB以下にしてください。'},413);
-   await bucket.put(prefix+path,request.body,{httpMetadata:{contentType:mime(path)}});return json({ok:true});
-  }
-  if(request.method==='POST'){
-   const raw=await request.text();if(raw.length>100000)return json({error:'曲一覧が大きすぎます。'},413);
-   const {songs}=JSON.parse(raw);if(!Array.isArray(songs)||!songs.length||songs.length>200)return json({error:'1回に1〜200曲を指定してください。'},400);
-   const output=[],needed=new Set();const asset=p=>'/api/donbeat/files/'+id+'/'+p.split('/').map(encodeURIComponent).join('/');
-   for(const s of songs){
-    if(typeof s.title!=='string'||!s.title.trim()||s.title.length>300||!validPath(s.chartPath)||!/\.(mc|tja)$/i.test(s.chartPath)||!validPath(s.audioPath)||!/\.(ogg|mp3|wav|m4a|flac)$/i.test(s.audioPath))throw Error('譜面・音源の指定が不正です。');
-    if(s.category!==undefined&&s.category!=='official'&&s.category!=='creative')throw Error('譜面の分類が不正です。');
-    const entry={title:s.title,file:asset(s.chartPath),audio:asset(s.audioPath),category:songCategory(s),categoryManual:s.categoryManual===true,features:{}};
-    for(const k of ['soflan','scrollOnNotes','scrollStop','reverseScroll','fadeOnNotes','branch','dummy','damage','fadeout','mv'])entry.features[k]=s.features?.[k]===true;
-    needed.add(s.chartPath);needed.add(s.audioPath);
-    if(s.videoPath){if(!validPath(s.videoPath)||!/\.(mp4|webm|m4v)$/i.test(s.videoPath))throw Error('動画の指定が不正です。');entry.video=asset(s.videoPath);entry.features.mv=true;needed.add(s.videoPath)}
-    if(s.spinnerPath){
-     if(!validPath(s.spinnerPath)||!/^spinner\.(png|jpe?g|webp|gif)$/i.test(s.spinnerPath.split('/').pop()))throw Error('spinner画像の指定が不正です。');
-     entry.spinner=asset(s.spinnerPath);needed.add(s.spinnerPath);
-    }
-    output.push(entry);
-   }
-   for(const p of needed)if(!await bucket.head(prefix+p))throw Error('未保存のファイル：'+p);
-   await bucket.put(catalogKey,JSON.stringify({songs:output}),{httpMetadata:{contentType:'application/json'}});return json({ok:true,count:output.length});
-  }
-  return json({error:'対応していない操作です。'},405);
+  return json({error:'この管理画面では未検証ファイルを公開できません。管理者アップロード機能をご利用ください。'},405);
  }catch(e){return json({error:e.message||'保存できませんでした。'},400)}
 }

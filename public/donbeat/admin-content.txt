@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>DONBEAT 管理画面</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Meiryo,sans-serif;background:#111820;color:#f1f4f7}
+*{box-sizing:border-box}body{margin:0;padding:20px;line-height:1.65}
+main{max-width:1100px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #344452;padding-bottom:16px}
+h1{font-size:clamp(1.5rem,3vw,2rem)}h2{font-size:1.2rem;margin:0 0 14px}h3{font-size:1.04rem}
+a{color:#b9d8ff}button,input,select,textarea{font:inherit}
+button{border:0;border-radius:9px;padding:10px 16px;background:#eeae4b;color:#1a1b1c;font-weight:750;cursor:pointer}
+button:disabled{background:#555f67;color:#ccd2d5;cursor:not-allowed}
+button.secondary{background:#354654;color:#f0f4f7}
+button.danger{background:#642d34;color:#fff1f1}
+section.manage-card{margin:20px 0;padding:20px;border-radius:13px;background:#1c2833;border:1px solid #384956}
+label{display:block;margin:12px 0 6px;font-weight:600}
+input[type=password],select,input[type=text],textarea{width:100%;max-width:600px;background:#101921;color:#fff;padding:10px;border-radius:8px;border:1px solid #6b7b8b}
+textarea{min-height:220px;max-width:none;resize:vertical;font:14px/1.55 ui-monospace,monospace}
+input[type=file]{display:block;width:100%;padding:10px;border:1px dashed #8193a2;border-radius:9px;background:#111d28}
+small,.muted{color:#b1c0cd}
+#summary{margin:12px 0;font-size:15px}#files{max-height:260px;overflow:auto;padding-left:25px;overflow-wrap:anywhere}#files li{margin:4px 0}
+#issues{white-space:pre-wrap;color:#ffc4b6;margin:12px 0}
+#status,#manageStatus,#danStatus{white-space:pre-wrap;min-height:28px}
+#status[data-kind=success]{color:#8cedbd}#status[data-kind=error]{color:#ffa79d}
+progress{width:100%;height:18px}
+.row,.manage-actions,.manage-head{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.manage-head{justify-content:space-between}
+.badge{display:inline-block;border-radius:30px;padding:2px 10px;background:#225745;color:#b7f6d9}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 0}
+.tabs button{background:#293b48;color:#d9e5ed}
+.tabs button[aria-selected=true]{background:#eeae4b;color:#16191e}
+[hidden]{display:none!important}
+.dbm-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.dbm-section{border:1px solid #344858;background:#131e27;border-radius:10px;padding:16px;min-width:0}
+.dbm-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.dbm-list{display:grid;gap:10px;max-height:70vh;overflow:auto}
+.dbm-item{border:1px solid #3c5261;background:#192734;border-radius:9px;padding:12px}
+.dbm-item b{display:block;overflow-wrap:anywhere}
+.dbm-item small{display:block;overflow-wrap:anywhere}
+.dbm-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.dbm-actions label{margin:0;font-size:13px}.dbm-actions select{width:auto;max-width:220px;padding:7px}
+.dbm-muted{color:#aebfcb}
+.dbm-adddan{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dbm-adddan input{max-width:380px}
+.dbm-dan-form{margin-top:18px}
+#manageRoot{margin:20px 0}
+#replaceNotice{padding:12px;background:#34412b;border:1px solid #758a4d;border-radius:8px}
+@media(max-width:800px){.dbm-grid{grid-template-columns:1fr}}
+@media(max-width:600px){body{padding:10px}section.manage-card{padding:13px}.dbm-section{padding:12px}header{align-items:flex-start}}
+</style>
+<script src="upload.js" defer></script>
+<script src="manager.js" defer></script>
+<script src="dan-form.js" defer></script>
+</head>
+<body><main>
+<header><div><h1>DONBEAT 管理画面</h1><p class="muted">収録曲・譜面アップロード・実装段位を一元管理</p></div>
+<div class="row"><a href="./">選曲に戻る</a><button id="logout" class="secondary" type="button">ログアウト</button></div></header>
+<nav class="tabs" aria-label="管理メニュー">
+<button type="button" data-db-tab="upload" aria-selected="true">譜面アップロード</button>
+<button type="button" data-db-tab="manage" aria-selected="false">収録曲・段位管理</button>
+</nav>
+<div id="tabUpload">
+<section class="manage-card">
+<h2>ジャンル別フォルダのアップロード</h2>
+<p class="muted">管理者としてログイン済みです。アップロード時のトークン再入力は不要です。R2への一時保存後、すべてのTJA／MCと対応音源を検証してから一括公開します。</p>
+<p id="replaceNotice" hidden></p><button id="cancelReplace" class="secondary" type="button" hidden>差し替えを中止</button>
+<p class="muted">例：<code>本家譜面/ゲームミュージック/曲名/譜面.tja</code> と <code>音源.ogg</code>。TJAの <code>WAVE:</code>、MCのBGM <code>sound</code> とファイルパスを照合します。</p>
+<label for="folder">フォルダを選択</label><input id="folder" type="file" webkitdirectory multiple>
+<label for="extra">不足した音源などを追加</label><input id="extra" type="file" multiple accept=".tja,.mc,.ogg,.mp3,.wav,.m4a,.flac,.opus,.aac,.mp4,.webm,.m4v,.png,.jpg,.jpeg,.webp,.gif">
+<label for="genre">ジャンル名がフォルダにない場合の振り分け先</label>
+<select id="genre"><option value="">自動判別（該当なしは「その他」）</option>
+<option>ポップス</option><option>アニメ</option><option>ボーカロイド</option>
+<option>キッズ</option><option>バラエティ</option><option>クラシック</option>
+<option>ゲームミュージック</option><option>ナムコオリジナル</option><option>その他</option></select>
+<p id="summary" aria-live="polite">まだファイルが選択されていません。</p>
+<ul id="files"></ul><div id="issues" role="alert" aria-live="polite"></div>
+<div class="row"><button id="publish" disabled>R2にアップロードして公開する</button><button id="newBatch" type="button" class="secondary" hidden>次のフォルダをアップロード</button><span class="badge">全ファイル確認後に公開</span></div>
+<progress id="progress" value="0" max="1" hidden></progress><p id="status" aria-live="polite"></p>
+</section>
+</div>
+<section id="tabManage" class="manage-card" hidden>
+<div id="manageRoot">
+<div class="manage-head"><h2>収録曲・段位管理</h2><button id="dbmRefresh" class="secondary" type="button">一覧を更新</button></div>
+<p id="manageStatus" role="status"></p>
+<div class="dbm-grid">
+<section class="dbm-section"><div class="dbm-head"><h3>収録曲</h3><button id="dbmAddSong" type="button">＋ 曲を追加</button></div><div id="dbmSongs" class="dbm-list"></div></section>
+<section class="dbm-section">
+<div class="dbm-head"><h3>実装段位</h3></div><div id="dbmDans" class="dbm-list"></div>
+<h3>段位設定ファイルを登録・編集</h3>
+<p class="muted">実装済み段位の編集もできます。SONGに指定する曲は収録曲に登録されている必要があります。</p>
+<label for="danFile">段位設定ファイル（.dan/.txt）</label><input id="danFile" type="file" accept=".dan,.txt">
+<label for="danTitle">段位名</label><input id="danTitle" type="text" maxlength="300" placeholder="例：十段">
+<label for="danContent">設定内容</label><textarea id="danContent" spellcheck="false" placeholder="TITLE:十段&#10;SONG1:曲名,3&#10;EXAM1:90,100"></textarea>
+<div class="row"><button type="button" id="danSave">段位を実装</button><button type="button" id="danCancel" class="secondary">編集をクリア</button></div>
+<p id="danStatus" role="status"></p>
+<h3>一時的に非表示にした固定段位</h3><div id="dbmDisabledDans" class="dbm-list"></div>
+</section>
+</div>
+</div>
+</section>
+</main></body></html>

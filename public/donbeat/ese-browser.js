@@ -149,6 +149,14 @@ async function eseOpenSong(path){
      // Prefer ESE's Japanese subtitle and never fall back to an English-only subtitle.
      c.meta.SUBTITLE=String(c.meta.SUBTITLEJA||'').trim()||info.subtitle||
       (/[\u3040-\u30ff\u3400-\u9fff]/.test(c.meta.SUBTITLE||'')?c.meta.SUBTITLE:'');
+     // Display the MV badge only when the ESE folder actually has a video.
+     if(info.video){
+      c.serverVideo=eseApi('video',info.video);
+      c.meta.VIDEO=info.video.split('/').pop();
+     }else{
+      delete c.meta.VIDEO;
+      if(c.features)c.features.mv=false;
+     }
      c.category='official';
      c._esePath=filePath;c._eseTja=filePath;c._eseFolder=info.path;c.sourcePath=filePath;
     }

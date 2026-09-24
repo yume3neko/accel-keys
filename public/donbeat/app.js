@@ -5,7 +5,7 @@ let mvFile=null,mvURL=null,mvPlaying=false,spinnerFile=null,spinnerURL=null,play
 const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d');let charts=[],chart,audioFiles=new Map(),audioBuffer=null,audioContext,source,state='ready',notes=[],startAt=0,pausedTime=0,score=0,combo=0,maxCombo=0,good=0,ok=0,miss=0,rolls=0,soul=0,feedback='',feedbackAt=-10,auto=false,demoMode=true,beatIndex=0,width=1000,height=230,raf=0,loading=false,practiceTarget=null,judgeFrom=-Infinity,pauseResumeUntil=-Infinity,importing=false,activeSongRate=1;
 const demo=`TITLE:練習譜面\nSUBTITLE:伴奏なし・打音のみ\nBPM:120\nOFFSET:0\nCOURSE:Easy\nLEVEL:3\nBALLOON:8\n#START\n0000,\n1000100010001000,\n1000200010002000,\n1010100010102000,\n1020102010201020,\n3000400030004000,\n5000000000000008,\n#GOGOSTART\n1010202010102020,\n1110200011102000,\n1020102010201020,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000200010201000,\n1000000000000000,\n0000,\n#END\nCOURSE:Normal\nLEVEL:4\nBALLOON:8,10,12\n#START\n0000,\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Hard\nLEVEL:6\nBALLOON:12,14,16\n#START\n0000,\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Oni\nLEVEL:8\nBALLOON:16,20,24\n#START\n0000,\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Edit\nLEVEL:10\nBALLOON:24,30,36\n#START\n0000,\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END`;
 const names={Easy:'かんたん',Normal:'ふつう',Hard:'むずかしい',Oni:'おに',Edit:'裏',0:'かんたん',1:'ふつう',2:'むずかしい',3:'おに',4:'裏'};
-var expandedSong=null,openSongFolder='official',songFolderTouched=false;
+var expandedSong=null,openSongFolder='official',songFolderTouched=false,openOfficialGenre=null;
 const officialSongNames=new Set(['BATTLE NO.1','六本の薔薇','六本の薔薇と采の歌','Nivalis','Nivalis*Anima','魔宵月','エンジェルドリーム','銀の黎明','銀の黎明か、黒の晶華か。','銀の黎明か、黒の晶華か','リスドンヴァルナ','リスドンヴァルナの黄昏','らんぶる','らんぶる乱舞'].map(normalizeSongTitle));
 let musicGain,effectGain;
 function audio(){if(!audioContext)audioContext=new (window.AudioContext||window.webkitAudioContext)();if(!musicGain){musicGain=audioContext.createGain();effectGain=audioContext.createGain();musicGain.connect(audioContext.destination);effectGain.connect(audioContext.destination);applyVolumes()}return audioContext}
@@ -596,38 +596,71 @@ function songCategory(c){
  if(officialSongNames.has(normalizeSongTitle(c?.meta?.TITLE))||officialSongNames.has(normalizeSongTitle(c?.serverEntry?.title)))return 'official';
  return explicit==='official'||explicit==='creative'?explicit:'creative';
 }
+
+const officialGenreOrder=['ポップス','アニメ','ボーカロイド','キッズ','バラエティ','クラシック','ゲームミュージック','ナムコオリジナル','その他'];
+function normalizeOfficialGenre(value){
+ const key=String(value||'').normalize('NFKC').trim().toLowerCase().replace(/[\s　・_\-/]/g,'');
+ const aliases=[
+  ['ポップス',/^(?:pop|pops|jpop|ポップス|ポップ)$/],
+  ['アニメ',/^(?:anime|アニメ)$/],
+  ['ボーカロイド',/^(?:vocaloid|ボーカロイド|ボカロ)$/],
+  ['キッズ',/^(?:kids|children|キッズ|キッズ民謡|童謡|民謡)$/],
+  ['バラエティ',/^(?:variety|バラエティ)$/],
+  ['クラシック',/^(?:classic|classical|クラシック)$/],
+  ['ゲームミュージック',/^(?:game|gamemusic|ゲーム|ゲームミュージック)$/],
+  ['ナムコオリジナル',/^(?:namco|namcooriginal|ナムコ|ナムコオリジナル)$/]
+ ];
+ return aliases.find(([,pattern])=>pattern.test(key))?.[0]||'その他';
+}
+function songOfficialGenre(c){
+ return normalizeOfficialGenre(c?.genre||c?.serverEntry?.genre||c?.meta?.GENREJA||c?.meta?.GENRE);
+}
 function songGroups(){
  const grouped={official:new Map(),creative:new Map()};
  charts.forEach((c,index)=>{
-  const folder=grouped[songCategory(c)],title=c.meta.TITLE||'無題';
-  if(!folder.has(title))folder.set(title,[]);
-  folder.get(title).push({c,index});
+  const category=songCategory(c),title=c.meta.TITLE||'無題';
+  if(category==='official'){
+   const genre=songOfficialGenre(c);
+   if(!grouped.official.has(genre))grouped.official.set(genre,new Map());
+   const songs=grouped.official.get(genre);
+   if(!songs.has(title))songs.set(title,[]);
+   songs.get(title).push({c,index});
+  }else{
+   if(!grouped.creative.has(title))grouped.creative.set(title,[]);
+   grouped.creative.get(title).push({c,index});
+  }
  });
  return grouped;
+}
+function officialSongCount(groups){
+ let total=0;
+ for(const songs of groups.values())total+=songs.size;
+ return total;
 }
 function renderSongSelection(){
  const host=$('songSelectionList');if(!host)return;host.replaceChildren();
  const grouped=songGroups();
- if(!songFolderTouched)openSongFolder=grouped.official.size?'official':'creative';
+ if(!songFolderTouched)openSongFolder=officialSongCount(grouped.official)?'official':'creative';
  for(const [category,label] of [['official','本家譜面'],['creative','創作譜面']]){
   const folder=document.createElement('section');folder.className='song-folder';
   const toggle=document.createElement('button');toggle.className='song-folder-title';toggle.type='button';
   const openedFolder=openSongFolder===category;
   toggle.setAttribute('aria-expanded',String(openedFolder));
   const folderName=document.createElement('span');folderName.className='song-folder-name';folderName.textContent=label;
-  const count=document.createElement('span');count.className='song-folder-count';count.textContent=grouped[category].size+'曲';
+  const count=document.createElement('span');count.className='song-folder-count';count.textContent=(category==='official'?officialSongCount(grouped.official):grouped.creative.size)+'曲';
   const chevron=document.createElement('span');chevron.className='song-folder-chevron';chevron.textContent=openedFolder?'−':'＋';
   toggle.append(folderName,count,chevron);toggle.onclick=()=>{
    songFolderTouched=true;openSongFolder=openSongFolder===category?null:category;expandedSong=null;renderSongSelection();
   };
   const list=document.createElement('div');list.className='song-folder-list';list.hidden=!openedFolder;
   folder.append(toggle,list);host.append(folder);
+
   if(!openedFolder)continue;
-  if(!grouped[category].size){const empty=document.createElement('p');empty.className='song-folder-empty';empty.textContent='このフォルダにはまだ曲がありません。';list.append(empty)}
-  for(const [title,entries] of grouped[category]){
+  const renderRows=(songs,target,genre)=>{
+  for(const [title,entries] of songs){
   const item=document.createElement('article');item.className='song-choice';
   const heading=document.createElement('button');heading.className='song-choice-title';heading.textContent=title;
-  const songKey=category+'::'+title;const opened=expandedSong===songKey;heading.setAttribute('aria-expanded',String(opened));
+  const songKey=category+'::'+(genre?genre+'::':'')+title;const opened=expandedSong===songKey;heading.setAttribute('aria-expanded',String(opened));
   const panel=document.createElement('div');panel.className='song-choice-panel';panel.id='song-panel-'+entries[0].index;panel.hidden=!opened;heading.setAttribute('aria-controls',panel.id);
   heading.onclick=async()=>{
    if(expandedSong===songKey){expandedSong=null;renderSongSelection();return}
@@ -655,7 +688,31 @@ function renderSongSelection(){
    }
    panel.append(actions);
   }
-  const badges=featureBadges(entries.map(e=>e.c));heading.append(badges);item.append(heading,panel);list.append(item);
+  const badges=featureBadges(entries.map(e=>e.c));heading.append(badges);item.append(heading,panel);target.append(item);
+  }
+  };
+  if(category==='official'){
+   for(const genre of officialGenreOrder){
+    const songs=grouped.official.get(genre)||new Map();
+    const section=document.createElement('section');section.className='song-genre-folder';
+    const genreToggle=document.createElement('button');genreToggle.className='song-genre-title';genreToggle.type='button';
+    const genreOpen=openOfficialGenre===genre;
+    genreToggle.setAttribute('aria-expanded',String(genreOpen));
+    const name=document.createElement('span');name.className='song-genre-name';name.textContent=genre;
+    const count=document.createElement('span');count.className='song-genre-count';count.textContent=songs.size+'曲';
+    const chevron=document.createElement('span');chevron.className='song-folder-chevron';chevron.textContent=genreOpen?'−':'＋';
+    genreToggle.append(name,count,chevron);
+    genreToggle.onclick=()=>{openOfficialGenre=genreOpen?null:genre;expandedSong=null;renderSongSelection()};
+    const genreList=document.createElement('div');genreList.className='song-genre-list';genreList.hidden=!genreOpen;
+    if(genreOpen){
+     if(songs.size)renderRows(songs,genreList,genre);
+     else{const empty=document.createElement('p');empty.className='song-folder-empty';empty.textContent='このジャンルにはまだ曲がありません。';genreList.append(empty)}
+    }
+    section.append(genreToggle,genreList);list.append(section);
+   }
+  }else{
+   if(grouped.creative.size)renderRows(grouped.creative,list,null);
+   else{const empty=document.createElement('p');empty.className='song-folder-empty';empty.textContent='このフォルダにはまだ曲がありません。';list.append(empty)}
   }
  }
 }
@@ -770,8 +827,8 @@ async function prepareServerChart(c){
    }
   }
   if(!parsed.length)throw Error('対応する譜面がありません');
-  for(const chart of parsed){chart.serverEntry=entry;chart.category=entry.category;chart.categoryManual=entry.categoryManual===true;chart.meta.TITLE=chart.meta.TITLE||entry.title;}
-  const index=charts.indexOf(c);charts.splice(index,1,...parsed);c=parsed[0];expandedSong=songCategory(c)+'::'+c.meta.TITLE;fillCourses();$('course').value=index;
+  for(const chart of parsed){chart.serverEntry=entry;chart.category=entry.category;chart.categoryManual=entry.categoryManual===true;chart.genre=entry.genre;chart.meta.TITLE=chart.meta.TITLE||entry.title;}
+  const index=charts.indexOf(c);charts.splice(index,1,...parsed);c=parsed[0];const loadedCategory=songCategory(c);if(loadedCategory==='official')openOfficialGenre=songOfficialGenre(c);expandedSong=loadedCategory+'::'+(loadedCategory==='official'?songOfficialGenre(c)+'::':'')+c.meta.TITLE;fillCourses();$('course').value=index;
  }
  return c;
 }
@@ -783,7 +840,7 @@ async function loadServerCatalog(){
   const added=data.songs.map((e,i)=>{
    if(typeof e.file!=='string'||!e.file||typeof e.title!=='string')throw Error('曲のtitleとfileを指定してください');
    const entry={...e,url:serverURL(e.file,url)};
-   return {features:e.features||{},category:e.category,categoryManual:e.categoryManual===true,serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
+   return {features:e.features||{},category:e.category,categoryManual:e.categoryManual===true,genre:e.genre,serverEntry:entry,serverPlaceholder:true,meta:{TITLE:e.title,COURSE:'読み込み前',LEVEL:'?'},notes:[],dummyNotes:[],bars:[],beats:[],bpm:'—',duration:0};
   });
   charts.push(...added);const selected=charts.indexOf(chart);fillCourses();$('course').value=Math.max(0,selected);renderSongSelection();
  }catch(e){$('fileinfo').textContent='収録曲一覧を読み込めません：'+e.message}

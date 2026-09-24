@@ -604,6 +604,8 @@ function songCategory(c){
 function songGroups(){
  const grouped={official:new Map(),creative:new Map()};
  charts.forEach((c,index)=>{
+  // ESE songs are presented in their original genre as expandable cards, not duplicated in saved songs.
+  if(c._eseFolder)return;
   const folder=grouped[songCategory(c)],title=c.meta.TITLE||'無題';
   if(!folder.has(title))folder.set(title,[]);
   folder.get(title).push({c,index});

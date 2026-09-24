@@ -219,3 +219,18 @@ body.selecting .fields>label:first-child{display:none}
 .song-folder-list .song-choice{margin:9px 0}
 .song-folder-empty{padding:15px;color:#aeb5bf;font-size:14px}
 @media(max-width:600px){.song-folder-title{padding:13px;font-size:18px}.song-folder-list{padding:2px 7px 7px}}
+
+/* Second-level folders inside 本家譜面. */
+.song-genre-folder{margin:9px 0;border:1px solid #3b4652;border-radius:9px;background:#1c2530;overflow:hidden}
+.song-genre-title{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:11px 16px;border:0;border-radius:0;background:#273340;color:#e6edf4;text-align:left;font-size:17px;font-weight:700}
+.song-genre-title:hover{background:#314252}
+.song-genre-title[aria-expanded=true]{background:#37403d;color:#ffe0a1}
+.song-genre-name{flex:1;min-width:0}
+.song-genre-count{flex:none;font-size:12px;font-weight:500;color:#acbdcb}
+.song-genre-list{padding:6px 12px 12px;background:#19222b}
+.song-genre-list[hidden]{display:none}
+.song-genre-list .song-choice{margin:8px 0}
+@media(max-width:600px){
+ .song-genre-title{min-height:43px;padding:10px 11px;font-size:15px}
+ .song-genre-list{padding:4px 6px 8px}
+}

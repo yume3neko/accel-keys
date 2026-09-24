@@ -39,12 +39,75 @@ async function listAdmin(bucket){
  cursor=undefined;do{const page=await bucket.list({prefix:'dan-disabled/',cursor});for(const o of page.objects)disabledStatic.push(o.key.slice('dan-disabled/'.length,-5));cursor=page.truncated?page.cursor:undefined}while(cursor);
  songs.sort((a,b)=>String(a.title).localeCompare(String(b.title),'ja'));dans.sort((a,b)=>String(a.title).localeCompare(String(b.title),'ja'));return {ready:true,songs,dans,disabledStatic};
 }
+
+const bulkGenres=['ポップス','アニメ','ボーカロイド','キッズ','バラエティ','クラシック','ゲームミュージック','ナムコオリジナル','その他'];
+function normalizeCatalogGenre(value){
+ const key=String(value||'').normalize('NFKC').trim().toLowerCase().replace(/[\s　・_\-/]/g,'');
+ const aliases=[
+  ['ポップス',/^(?:pop|pops|jpop|ポップス|ポップ)$/],
+  ['アニメ',/^(?:anime|アニメ)$/],
+  ['ボーカロイド',/^(?:vocaloid|ボーカロイド|ボカロ)$/],
+  ['キッズ',/^(?:kids|children|キッズ|キッズ民謡|童謡|民謡)$/],
+  ['バラエティ',/^(?:variety|バラエティ)$/],
+  ['クラシック',/^(?:classic|classical|クラシック)$/],
+  ['ゲームミュージック',/^(?:game|gamemusic|ゲーム|ゲームミュージック)$/],
+  ['ナムコオリジナル',/^(?:namco|namcooriginal|ナムコ|ナムコオリジナル)$/]
+ ];
+ return aliases.find(([,test])=>test.test(key))?.[0]||'その他';
+}
+const genreMatches=(song,genre)=>songCategory(song)==='official'&&normalizeCatalogGenre(song?.genre)===genre;
+async function genreCatalogs(bucket,genre){
+ // R2 uploads only. Static GitHub catalog entries remain outside this operation.
+ const catalogs=[];let cursor;
+ do{
+  const page=await bucket.list({prefix:'catalog/',cursor,limit:1000});
+  for(const item of page.objects){
+   if(!/^catalog\/(?:import-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.json$/i.test(item.key))continue;
+   const data=await readJSON(bucket,item.key);
+   if(!Array.isArray(data?.songs))continue;
+   const match=data.songs.filter(song=>genreMatches(song,genre));
+   if(match.length)catalogs.push({key:item.key,data,match});
+  }
+  cursor=page.truncated?page.cursor:undefined;
+ }while(cursor);
+ catalogs.sort((a,b)=>a.key.localeCompare(b.key));
+ return catalogs;
+}
+function genreCount(catalogs){return catalogs.reduce((sum,item)=>sum+item.match.length,0)}
+async function genreToken(genre,catalogs){
+ // A stale preview cannot authorize deletion if even one target catalog changed.
+ const contents=JSON.stringify([genre,...catalogs.map(item=>[item.key,item.data.songs])]);
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(contents));
+ return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+async function clearPublishedBatch(bucket,key){
+ const id=key.slice('catalog/'.length,-5);
+ const prefix=id.startsWith('import-')?'uploads/'+id.slice('import-'.length)+'/':'files/'+id+'/';
+ // Always read the first page afresh: deleting objects during cursor pagination
+ // can otherwise skip objects when a batch has more than 1000 files.
+ for(let round=0;round<20;round++){
+  const page=await bucket.list({prefix,limit:1000});
+  if(!page.objects.length)break;
+  await bucket.delete(page.objects.map(item=>item.key));
+  if(!page.truncated)break;
+ }
+ if(id.startsWith('import-'))await bucket.delete('pending/'+id.slice('import-'.length)+'.json');
+}
+
 export async function onRequest({request,env}){
  const blocked=await requireAdmin(request,env)||(request.method==='GET'?null:checkWriteOrigin(request));if(blocked)return blocked;
  if(!env.DONBEAT_BUCKET)return json({error:'保存先が未設定です。CloudflareでR2バケットをDONBEAT_BUCKETとして接続し、再デプロイしてください。'},503);
  const bucket=env.DONBEAT_BUCKET,url=new URL(request.url),id=url.searchParams.get('id'),action=url.searchParams.get('action')||'';
  try{
   if(request.method==='GET'){
+   if(action==='genre-delete'){
+    const genre=url.searchParams.get('genre');
+    if(!bulkGenres.includes(genre))return json({error:'削除対象のジャンルを指定してください。'},400);
+    const catalogs=await genreCatalogs(bucket,genre),count=genreCount(catalogs);
+    return json({genre,count,catalogCount:catalogs.length,
+     titles:catalogs.flatMap(item=>item.match.map(song=>song.title)).slice(0,12),
+     token:await genreToken(genre,catalogs),scope:'official-r2'});
+   }
    if(action==='dan'){
     if(!idOK(id)||id.startsWith('import-'))return json({error:'段位IDが不正です。'},400);
     const [info,source]=await Promise.all([readJSON(bucket,'dan-catalog/'+id+'.json'),bucket.get('dan/'+id+'.dan')]);
@@ -72,6 +135,39 @@ export async function onRequest({request,env}){
    }
    await bucket.put(key,JSON.stringify(data),{httpMetadata:{contentType:'application/json'}});
    return json({ok:true,category:song.category,genre:song.genre||'その他'});
+  }
+  if(action==='genre-delete'&&request.method==='DELETE'){
+   const genre=url.searchParams.get('genre');
+   if(!bulkGenres.includes(genre))return json({error:'削除対象のジャンルを指定してください。'},400);
+   const raw=await request.text();
+   if(raw.length>1024)return json({error:'確認情報が大きすぎます。'},413);
+   const body=JSON.parse(raw);
+   if(body?.confirm!==genre||!(/^[0-9a-f]{64}$/i.test(body?.token||'')))
+    return json({error:'削除の確認が完了していません。'},400);
+   const catalogs=await genreCatalogs(bucket,genre),before=genreCount(catalogs);
+   if(body.token!==await genreToken(genre,catalogs))
+    return json({error:'確認後に対象曲が変更されました。最新の曲数を再確認してください。'},409);
+   if(before===0)return json({deleted:0,remaining:0,completed:true,token:body.token});
+   let deleted=0;const warnings=[];
+   // Limit each invocation so large libraries can be cleared in repeatable batches.
+   for(const item of catalogs.slice(0,8)){
+    const keep=item.data.songs.filter(song=>!genreMatches(song,genre));
+    deleted+=item.data.songs.length-keep.length;
+    item.data.songs=keep;item.match=[];
+    if(keep.length){
+     // Keep a multi-genre upload's shared audio and other assets intact.
+     await bucket.put(item.key,JSON.stringify(item.data),{httpMetadata:{contentType:'application/json'}});
+    }else{
+     // Unpublish first, then reclaim the now-unreferenced upload folder.
+     await bucket.delete(item.key);
+     try{await clearPublishedBatch(bucket,item.key)}
+     catch(e){warnings.push('削除済みの曲の素材を整理できませんでした：'+item.key)}
+    }
+   }
+   const remaining=before-deleted;
+   return json({deleted,remaining,completed:remaining===0,
+    token:await genreToken(genre,catalogs.filter(item=>item.data.songs.some(song=>genreMatches(song,genre)))),
+    warnings});
   }
   if(action==='song'&&request.method==='DELETE'){
    if(!idOK(id))return json({error:'アップロードIDが不正です。'},400);const index=Number(url.searchParams.get('index'));const key='catalog/'+id+'.json',data=await readJSON(bucket,key);if(!data||!Array.isArray(data.songs)||!Number.isInteger(index)||index<0||index>=data.songs.length)return json({error:'対象の曲が見つかりません。'},404);

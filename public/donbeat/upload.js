@@ -115,6 +115,7 @@
  async function requestJSON(action,payload={}){
   const res=await fetch(API,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
    body:JSON.stringify({action,...payload}),cache:'no-store'});
+  if(res.status===401){location.replace('admin-login.html');throw Error('管理者のログイン期限が切れました。')}
   const body=await res.json().catch(()=>({error:'サーバーからの応答を取得できませんでした。'}));
   if(!res.ok)throw Error(body.error+(body.details?.length?'\n'+body.details.join('\n'):''));
   return body;
@@ -122,6 +123,7 @@
  async function pushFile(path,file){
   const url=API+'?batch='+encodeURIComponent(batch)+'&path='+encodeURIComponent(path);
   const res=await fetch(url,{method:'PUT',credentials:'same-origin',body:file,cache:'no-store'});
+  if(res.status===401){location.replace('admin-login.html');throw Error('管理者のログイン期限が切れました。')}
   const data=await res.json().catch(()=>({error:'アップロード応答が不正です。'}));
   if(!res.ok)throw Error(path+'：'+data.error);
   uploaded.add(path);
@@ -159,6 +161,7 @@
     try{
      const endpoint='/api/donbeat/manage?action=song&id='+encodeURIComponent(target.id)+'&index='+target.index;
      const response=await fetch(endpoint,{method:'DELETE',credentials:'same-origin',cache:'no-store'});
+     if(response.status===401){location.replace('admin-login.html');throw Error('管理者のログイン期限が切れました。')}
      const body=await response.json().catch(()=>({}));
      if(!response.ok)throw Error(body.error||'旧曲の削除に失敗しました。');
      replacement='\n旧曲「'+target.title+'」との差し替えも完了しました。';

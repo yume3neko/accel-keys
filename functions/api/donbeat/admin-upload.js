@@ -1,3 +1,4 @@
+import {requireSession} from '../../_lib/donbeat-session.js';
 // DONBEAT R2 imports: all files must arrive and every TJA/MC must resolve its BGM
 // before the catalog is written. The catalog object is the only publication marker.
 const CHART=/\.(tja|mc)$/i, AUDIO=/\.(ogg|mp3|wav|m4a|flac|opus|aac)$/i;
@@ -80,15 +81,6 @@ function parseChart(text,path){
  if(unique.length>1)throw Error('1つのTJAに複数の異なるWAVEがあります。譜面ごとに分けてください。');
  return {title:String(meta.TITLEJA||meta.TITLE||path.split('/').pop().replace(/\.tja$/i,'')).trim(),waves:waves.slice(0,1),genre:meta.GENRE||''};
 }
-async function authorized(request,env){
- if(typeof env.DONBEAT_ADMIN_TOKEN!=='string'||env.DONBEAT_ADMIN_TOKEN.length<16)return {error:bad('管理者用シークレット DONBEAT_ADMIN_TOKEN が未設定です。',503)};
- const supplied=request.headers.get('authorization')||'';
- if(!supplied.startsWith('Bearer ')||supplied.length>4000)return {error:bad('管理者認証が必要です。',401)};
- const digest=async value=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)));
- const [a,b]=await Promise.all([digest(supplied.slice(7)),digest(env.DONBEAT_ADMIN_TOKEN)]);
- let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];
- return diff?{error:bad('管理者トークンが正しくありません。',401)}:{};
-}
 async function readManifest(bucket,id){
  const item=await bucket.get(manifestKey(id));
  return item?item.json():null;
@@ -120,7 +112,7 @@ function mediaURL(id,path){
  return '/api/donbeat/media?batch='+encodeURIComponent(id)+'&path='+encodeURIComponent(path);
 }
 export async function onRequestPost({request,env}){
- const auth=await authorized(request,env);if(auth.error)return auth.error;
+ const auth=await requireSession(request,env);if(auth)return auth;
  const bucket=env.DONBEAT_BUCKET;if(!bucket)return bad('R2のDONBEAT_BUCKETが設定されていません。',503);
  if(Number(request.headers.get('content-length'))>250000)return bad('リクエストが大きすぎます。',413);
  let body;try{body=await request.json()}catch{return bad('JSONの形式が不正です。')}
@@ -176,7 +168,7 @@ export async function onRequestPost({request,env}){
  return json({published:true,songCount:songs.length,genres:[...new Set(songs.map(s=>s.genre))]});
 }
 export async function onRequestPut({request,env}){
- const auth=await authorized(request,env);if(auth.error)return auth.error;
+ const auth=await requireSession(request,env);if(auth)return auth;
  const bucket=env.DONBEAT_BUCKET;if(!bucket)return bad('R2が設定されていません。',503);
  const params=new URL(request.url).searchParams,id=params.get('batch'),raw=params.get('path');
  if(!UUID.test(id||''))return bad('アップロードIDが不正です。');

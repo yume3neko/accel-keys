@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "include": [
+    "/api/*",
+    "/donbeat/upload.html",
+    "/donbeat/upload"
+  ],
+  "exclude": []
+}

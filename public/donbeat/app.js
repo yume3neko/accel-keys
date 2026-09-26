@@ -12,8 +12,8 @@ function audio(){if(!audioContext)audioContext=new (window.AudioContext||window.
 function tone(type,when){const ac=audio(),osc=ac.createOscillator(),gain=ac.createGain();osc.type=type===1?'sine':'triangle';const t=when??ac.currentTime;osc.frequency.setValueAtTime(type===1?180:900,t);osc.frequency.exponentialRampToValueAtTime(type===1?55:250,t+.085);gain.gain.setValueAtTime(.23,t);gain.gain.exponentialRampToValueAtTime(.001,t+.12);osc.connect(gain).connect(effectGain);osc.start(t);osc.stop(t+.13)}
 function judgmentOffsetSeconds(){return Number($('offset').value||0)/1000*activeSongRate}
 function time(){return state==='playing'?(audioContext.currentTime-startAt)*activeSongRate:pausedTime}
-function stopAudio(){clearAutoPads();stopMV();if(source){try{source.stop()}catch{}source=null}}
-function scheduleAudio(t){stopAudio();if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.playbackRate.value=activeSongRate;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t/activeSongRate);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
+function stopAudio(){stopMedleyAudio();clearAutoPads();stopMV();if(source){try{source.stop()}catch{}source=null}}
+function scheduleAudio(t){stopAudio();if(medleyActive()){scheduleMedleyAudio(t);return}if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.playbackRate.value=activeSongRate;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t/activeSongRate);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
 function reset(){document.body.classList.add('selecting');document.body.classList.remove('desktop-play');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;clearScoreGains();if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true}seek.disabled=!chart?.measures?.length;renderSongSelection();draw()}
 function syncRebuiltChart(next){
  let index=charts.indexOf(chart);
@@ -139,8 +139,8 @@ function showScoreGain(points){
  setTimeout(remove,1000);
 }
 function update(){$('score').textContent=String(score).padStart(7,'0');$('combo').textContent=combo;$('good').textContent=good;$('ok').textContent=ok;$('miss').textContent=miss;$('roll').textContent=rolls;$('gauge').style.width=soul+'%';$('gaugeText').textContent=Math.floor(soul)+'%';updateDanHUD();updateDanPauseRemaining()}
-function judgmentWindows(){const level=Number(chart?.meta?.LEVEL);return Number.isFinite(level)&&level>0&&level<=5?{good:.041708,ok:.108442,miss:.125125}:{good:.025025,ok:.075075,miss:.108442}}
-function judgeCore(n,error){notifyDanJudgment(error);n.done=true;const noteScore=chartNoteScore(chart);if(error<=judgmentWindows().good){good++;score+=noteScore;showScoreGain(noteScore);soul=Math.min(100,soul+130/soulNoteCount());feedback='良'}else if(error<=judgmentWindows().ok){ok++;const gain=Math.floor(noteScore/2/10)*10;score+=gain;showScoreGain(gain);soul=Math.min(100,soul+65/soulNoteCount());feedback='可'}else{miss++;combo=0;soul=Math.max(0,soul-260/soulNoteCount());feedback='不可';feedbackAt=time();update();return}combo++;maxCombo=Math.max(combo,maxCombo);feedbackAt=time();update()}
+function judgmentWindows(n){const level=Number(medleySourceChart(n)?.meta?.LEVEL);return Number.isFinite(level)&&level>0&&level<=5?{good:.041708,ok:.108442,miss:.125125}:{good:.025025,ok:.075075,miss:.108442}}
+function judgeCore(n,error){const before=medleyActive()?danStats():null;notifyDanJudgment(error);n.done=true;const noteScore=medleyActive()?danRun.medley.segments[n.medleyIndex].noteScore:chartNoteScore(chart);if(error<=judgmentWindows(n).good){good++;score+=noteScore;showScoreGain(noteScore);soul=Math.min(100,soul+130/soulNoteCount());feedback='良'}else if(error<=judgmentWindows(n).ok){ok++;const gain=Math.floor(noteScore/2/10)*10;score+=gain;showScoreGain(gain);soul=Math.min(100,soul+65/soulNoteCount());feedback='可'}else{miss++;combo=0;soul=Math.max(0,soul-260/soulNoteCount());feedback='不可';feedbackAt=time();medleyRecord(n,before,error);update();return}combo++;maxCombo=Math.max(combo,maxCombo);feedbackAt=time();medleyRecord(n,before,error);update()}
 // Auto rolls use about 30 hits/sec. Balloons may accelerate up to 60 hits/sec
 // when needed so that required hits fit inside the balloon duration.
 const AUTO_ROLL_HZ=30,AUTO_BALLOON_MAX_HZ=60;
@@ -154,15 +154,17 @@ function autoBalloonHits(n,t){
 function autoRollHits(n,t){if(n.type===7||n.type===9)return autoBalloonHits(n,t);const duration=n.end-n.time;if(duration<=0||t<n.time)return 0;return Math.floor((Math.min(t-n.time,duration-1e-9)+1e-12)/(1/AUTO_ROLL_HZ))+1}
 function addRollHitsCore(r,count=1){
   if(r.done||count<=0)return;
+  const before=medleyActive()?danStats():null;
   if(r.type===7||r.type===9)count=Math.min(count,r.required-r.hits);
   r.hits+=count;rolls+=count;if(r.type===7||r.type===9)balloonRolls+=count;const gain=count*100;score+=gain;showScoreGain(gain);
   feedback='';
   if((r.type===7||r.type===9)&&r.hits>=r.required){r.done=true;balloonPops++;feedback=''}
-  feedbackAt=time();update();
+  feedbackAt=time();medleyRecord(r,before);update();
 }
-function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(playTime<pauseResumeUntil)return;const t=playTime-judgmentOffsetSeconds();if(t<judgeFrom)return;const damage=notes.find(n=>n.type===10&&!n.done&&!n.ghost&&Math.abs(n.time-t)<=judgmentWindows().miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows().miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&((n.type>=5&&n.type<=7)||n.type===9)&&t>=n.time&&t<=n.end);if(r&&(![7,9].includes(r.type)||type===1))addRollHits(r)}
-function songDuration(){return Math.max(.001,chart.duration+(danRun?0:1),danRun?Math.max(0,...chart.notes.map(n=>(n.end??n.time)+judgmentWindows().miss+.001)):0,audioBuffer?.duration||0)}
+function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(playTime<pauseResumeUntil)return;const t=playTime-judgmentOffsetSeconds();if(t<judgeFrom)return;const damage=notes.find(n=>n.type===10&&!n.done&&!n.ghost&&Math.abs(n.time-t)<=judgmentWindows(n).miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows(n).miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&((n.type>=5&&n.type<=7)||n.type===9)&&t>=n.time&&t<=n.end);if(r&&(![7,9].includes(r.type)||type===1))addRollHits(r)}
+function songDuration(){if(medleyActive())return chart.duration+Math.max(0,judgmentOffsetSeconds())+.126;return Math.max(.001,chart.duration+(danRun?0:1),danRun?Math.max(0,...chart.notes.map(n=>(n.end??n.time)+judgmentWindows().miss+.001)):0,audioBuffer?.duration||0)}
 function updateProgress(t=time()){
+  if(medleyActive()){const seg=medleySegmentAt(t),fraction=Math.max(0,Math.min(1,(t-seg.start)/(seg.end-seg.start))),percent=(seg.index+fraction)/danRun.medley.segments.length*100;$('songProgressFill').style.transform=`scaleX(${fraction})`;$('courseProgress').hidden=false;$('courseProgressFill').style.transform=`scaleX(${percent/100})`;$('courseProgress').setAttribute('aria-valuenow',String(Math.floor(percent)));$('songProgress').setAttribute('aria-valuenow',String(Math.floor(fraction*100)));return}
   const songFraction=state==='result'?1:state==='ready'?0:Math.max(0,Math.min(1,t/songDuration()));
   const percent=danRun?Math.min(100,(danRun.index+((state==='dan-break'||danRun.results.length>danRun.index)?1:songFraction))/Math.max(1,danRun.config.songs.length)*100):songFraction*100;
   $('songProgressFill').style.transform=`scaleX(${songFraction})`;
@@ -171,33 +173,33 @@ function updateProgress(t=time()){
   $('courseProgress').setAttribute('aria-valuenow',String(Math.floor(percent)));
   $('songProgress').setAttribute('aria-valuenow',String(Math.floor(songFraction*100)));
 }
-function finish(){if(danRun){finishDanSong();return}pausedTime=time();state='result';updateProgress();stopAudio();document.body.classList.remove('playing');unlock();$('pause').disabled=true;showSingleResult();}
+function finish(){if(medleyActive()){finishMedley();return}if(danRun){finishDanSong();return}pausedTime=time();state='result';updateProgress();stopAudio();document.body.classList.remove('playing');unlock();$('pause').disabled=true;showSingleResult();}
 
 function loop(){
- updateBranchRoute();
+ updateMedleyDisplay(time());updateBranchRoute();
  const t=time(),adjust=judgmentOffsetSeconds(),resumeLead=t<pauseResumeUntil;
  if(!resumeLead)updateDummyPlayback(t-adjust);
  if(!resumeLead){
   for(const n of notes){
    if(n.done)continue;
-   if(n.type===10){if(t-adjust>n.time+judgmentWindows().miss)n.done=true;continue}
+   if(n.type===10){if(t-adjust>n.time+judgmentWindows(n).miss)n.done=true;continue}
    if(n.ghost){if(t>(n.end??n.time)+.15)n.done=true;continue}
    if(n.type<=4){
     if(auto&&t>=n.time+adjust){pulseAutoPad(n.type===1||n.type===3?1:2,n.type===3||n.type===4);tone(n.type===1||n.type===3?1:2);judge(n,0)}
-    else if(t-adjust>n.time+judgmentWindows().miss)judge(n,1)
+    else if(t-adjust>n.time+judgmentWindows(n).miss)judge(n,1)
    }else if(auto){
     const count=autoRollHits(n,t-adjust)-n.hits;
     if(count>0){addRollHits(n,count);pulseAutoPad(n.type===7||n.type===9?1:n.hits%2+1);tone(n.type===7||n.type===9?1:n.hits%2+1)}
    }
   }
  }
- if(danRun&&!danRun.failed&&danCurrentFailed()){danRun.failed=true;updateDanHUD()}
+ if(danRun&&!danRun.failed&&danCurrentFailed()){danRun.failed=true;updateDanHUD();if(medleyActive()){finishMedley(true);return}}
  $('status').textContent=resumeLead?'2小節巻き戻し中 · 判定なし':danRun?.failed?'不合格確定 · この曲の終了まで演奏できます':!auto&&t-adjust<judgeFrom?'助走中 · 判定なし → '+judgeFrom.toFixed(2)+'秒から':auto?'オートプレイ中':practiceTarget===null?'演奏中':'途中から演奏中';
  draw();if(t>songDuration()){finish();return}raf=requestAnimationFrame(loop)
 }
 function resize(){const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);width=r.width;height=r.height;canvas.width=width*dpr;canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
 function isGogoTime(c,t){const events=c.gogoEvents||[];let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<=t)lo=mid+1;else hi=mid}return lo>0&&events[lo-1].active;}
-function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const t=time(),fade=applyChartFade(t),y=height*.5,target=width<600?76:125,speed=Number($('speed').value),r=Math.min(26,height*.19);updateVisualBpm(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.clearRect(0,0,width,height);ctx.fillStyle=chart.videoFile?'#171b2044':'#171b20';ctx.fillRect(0,y-r-20,width,2*r+40);if(isGogoTime(chart,t)){const glow=ctx.createLinearGradient(0,0,width,0);glow.addColorStop(0,'rgba(240,120,40,0.35)');glow.addColorStop(1,'rgba(240,120,40,0)');ctx.fillStyle=glow;ctx.fillRect(0,y-r-20,width,2*r+40)}drawBranchLaneShade(t,y,r,fade.lane);ctx.strokeStyle='#333940';ctx.lineWidth=1;for(let i of [-1,1]){ctx.beginPath();ctx.moveTo(0,y+i*(r+20));ctx.lineTo(width,y+i*(r+20));ctx.stroke()}ctx.fillStyle='#f8c2590c';ctx.fillRect(0,0,target+40,height);const pos=n=>target+(chart.visual?malodyDistance(chart,n.time,n.scroll)-malodyDistance(chart,t,n.scroll):(n.time-t)*(n.bpm/120)*n.scroll)*speed*240;for(const b of chart.bars){const x=pos(b);if(x<0||x>width)continue;ctx.strokeStyle='#ffffff20';ctx.beginPath();ctx.moveTo(x,y-r-18);ctx.lineTo(x,y+r+18);ctx.stroke()}ctx.strokeStyle='#dbd3bd';ctx.lineWidth=3;ctx.beginPath();ctx.arc(target,y,r+8,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#d6c9a05c';ctx.lineWidth=1;ctx.beginPath();ctx.arc(target,y,r+14,0,Math.PI*2);ctx.stroke();const drawBranchNote=(n,noteY,position,endPosition,alpha=1)=>{
+function draw(){updateHibiki();updateAutoPads();syncMV();updateProgress();const t=time(),fade=applyChartFade(t),y=height*.5,target=width<600?76:125,speed=Number($('speed').value),r=Math.min(26,height*.19);updateVisualBpm(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.clearRect(0,0,width,height);ctx.fillStyle=chart.videoFile?'#171b2044':'#171b20';ctx.fillRect(0,y-r-20,width,2*r+40);if(isGogoTime(chart,t)){const glow=ctx.createLinearGradient(0,0,width,0);glow.addColorStop(0,'rgba(240,120,40,0.35)');glow.addColorStop(1,'rgba(240,120,40,0)');ctx.fillStyle=glow;ctx.fillRect(0,y-r-20,width,2*r+40)}drawBranchLaneShade(t,y,r,fade.lane);ctx.strokeStyle='#333940';ctx.lineWidth=1;for(let i of [-1,1]){ctx.beginPath();ctx.moveTo(0,y+i*(r+20));ctx.lineTo(width,y+i*(r+20));ctx.stroke()}ctx.fillStyle='#f8c2590c';ctx.fillRect(0,0,target+40,height);const pos=n=>target+(medleyActive()?medleyDistance(n,t):chart.visual?malodyDistance(chart,n.time,n.scroll)-malodyDistance(chart,t,n.scroll):(n.time-t)*(n.bpm/120)*n.scroll)*speed*240;for(const b of chart.bars){const x=pos(b);if(x<0||x>width)continue;ctx.strokeStyle='#ffffff20';ctx.beginPath();ctx.moveTo(x,y-r-18);ctx.lineTo(x,y+r+18);ctx.stroke()}ctx.strokeStyle='#dbd3bd';ctx.lineWidth=3;ctx.beginPath();ctx.arc(target,y,r+8,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#d6c9a05c';ctx.lineWidth=1;ctx.beginPath();ctx.arc(target,y,r+14,0,Math.PI*2);ctx.stroke();const drawBranchNote=(n,noteY,position,endPosition,alpha=1)=>{
  if(n.done||(t<pauseResumeUntil&&n.time<pauseResumeUntil)||(n.dummy&&t>(n.end??n.time)+.15))return;
  let x=position(n),nr=n.type===3||n.type===4||n.type===6?r*1.25:r;
  ctx.globalAlpha=(n.ghost?.25:1)*(n.dummy?(n.dummyOpacity??.7):1)*fade.note*alpha;
@@ -229,7 +231,7 @@ if(swap?.active.outgoingNotes?.length){
   const n=swap.active.outgoingNotes[i],noteY=branchNoteY(t,n,y,2*r+40,true);
   drawBranchNote(n,noteY,oldPos,oldPos,1);
  }
-}if(danRun){ctx.globalAlpha=fade.lane;ctx.fillStyle='#fff';ctx.font='700 14px sans-serif';ctx.textAlign='left';ctx.textBaseline='bottom';const remaining=notes.filter(n=>n.type<=4&&!n.done).length+danRun.config.songs.slice(danRun.index+1).reduce((sum,e)=>sum+e.chart.notes.filter(n=>n.type<=4).length,0);ctx.fillText('残り '+remaining+' ノーツ',12,height-6)}drawBranchDetails(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.textAlign='center';const judgment=$('judgmentOverlay');judgment.textContent=feedback&&t-feedbackAt<.45?feedback:'';judgment.style.left=target+'px';judgment.style.top=Math.max(20,y-r-36)+'px';judgment.style.color=feedback==='不可'?'#aaa':feedback==='可'?'#fff':'#ffd565';judgment.style.opacity=fade.lane;$('status').style.opacity=1;if(state==='playing'&&t<(notes[0]?.time??0)-.2){ctx.font='700 15px sans-serif';ctx.fillStyle='#bfc2c3';ctx.fillText('まもなくスタート',width/2,height-18)}}
+}if(danRun){ctx.globalAlpha=fade.lane;ctx.fillStyle='#fff';ctx.font='700 14px sans-serif';ctx.textAlign='left';ctx.textBaseline='bottom';const remaining=notes.filter(n=>n.type<=4&&!n.done).length+(medleyActive()?0:danRun.config.songs.slice(danRun.index+1).reduce((sum,e)=>sum+e.chart.notes.filter(n=>n.type<=4).length,0));ctx.fillText('残り '+remaining+' ノーツ',12,height-6)}drawBranchDetails(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.textAlign='center';const judgment=$('judgmentOverlay');judgment.textContent=feedback&&t-feedbackAt<.45?feedback:'';judgment.style.left=target+'px';judgment.style.top=Math.max(20,y-r-36)+'px';judgment.style.color=feedback==='不可'?'#aaa':feedback==='可'?'#fff':'#ffd565';judgment.style.opacity=fade.lane;$('status').style.opacity=1;if(state==='playing'&&t<(notes[0]?.time??0)-.2){ctx.font='700 15px sans-serif';ctx.fillStyle='#bfc2c3';ctx.fillText('まもなくスタート',width/2,height-18)}}
 async function choose(){
  if(importing||danRun)return;seekTarget=0;let chosen=charts[Number($('course').value)||0];loading=true;
  try{if(chosen.serverEntry)chosen=await prepareServerChart(chosen)}
@@ -319,7 +321,7 @@ function attachVideos(list,files){for(const c of list){const name=c.meta.VIDEO;i
 function stopMV(){const v=$('mv');if(v&&typeof v.pause==='function')v.pause();mvPlaying=false;}
 function syncMV(){const v=$('mv');if(!v||typeof v.play!=='function')return;const visualsAllowed=playbackVisualChart===chart||state==='playing'||state==='paused',file=visualsAllowed&&chart?._mvEnabled!==false?(chart?.videoFile||null):null;
  if(file!==mvFile){stopMV();if(mvURL)URL.revokeObjectURL(mvURL);mvFile=file;mvURL=file?URL.createObjectURL(file):null;v.removeAttribute('src');if(mvURL)v.src=mvURL;v.load();v.parentElement.classList.toggle('has-mv',!!file);v.onerror=()=>{v.parentElement.classList.remove('has-mv');};}
- if(!file)return;v.playbackRate=activeSongRate;const t=time();if(state!=='playing'||t<0){stopMV();return}if(v.readyState<1)return;
+ if(!file)return;v.playbackRate=activeSongRate;const clock=time(),t=medleyActive()?clock-medleySegmentAt(clock).shift:clock;if(state!=='playing'||t<0){stopMV();return}if(v.readyState<1)return;
  const desired=Math.min(t,Number.isFinite(v.duration)?v.duration:t);if(Math.abs(v.currentTime-desired)>.2)v.currentTime=desired;
  if(!mvPlaying&&!v.ended){mvPlaying=true;v.muted=true;v.play().catch(()=>{mvPlaying=false})}}
 
@@ -329,7 +331,7 @@ function chartFadeAt(events,t){
  for(const e of [...(events||[])].sort((a,b)=>a.time-b.time)){if(e.time>t)break;for(const key of e.mode==='all'?keys:[e.mode]){if(!keys.includes(key))continue;const from=valueAt(tracks[key],e.time);tracks[key]={from,to:e.direction,time:e.time,end:e.end};}}
  return Object.fromEntries(keys.map(key=>[key,valueAt(tracks[key],t)]));
 }
-function applyChartFade(t){const fade=state==='playing'&&chart?._fadeEnabled!==false?chartFadeAt(chart.fades,t):{info:1,lane:1,note:1,button:1};document.querySelectorAll('.scorebar,#danHud,.song-progress').forEach(n=>n.style.opacity=fade.info);document.querySelectorAll('.pads').forEach(n=>n.style.opacity=fade.button);const lane=canvas.parentElement;if(lane){const mvActive=chart?._mvEnabled!==false&&!!chart.videoFile;lane.style.backgroundColor=mvActive?'rgba(16,19,23,'+(.267*fade.lane)+')':'rgba(16,19,23,'+fade.lane+')';lane.style.borderColor='rgba(68,68,68,'+fade.lane+')'}return fade;}
+function applyChartFade(t){const fade=state==='playing'&&chart?._fadeEnabled!==false?(medleyActive()?chartFadeAt(medleySegmentAt(t).original.fades,t-medleySegmentAt(t).shift):chartFadeAt(chart.fades,t)):{info:1,lane:1,note:1,button:1};document.querySelectorAll('.scorebar,#danHud,.song-progress').forEach(n=>n.style.opacity=fade.info);document.querySelectorAll('.pads').forEach(n=>n.style.opacity=fade.button);const lane=canvas.parentElement;if(lane){const mvActive=chart?._mvEnabled!==false&&!!chart.videoFile;lane.style.backgroundColor=mvActive?'rgba(16,19,23,'+(.267*fade.lane)+')':'rgba(16,19,23,'+fade.lane+')';lane.style.borderColor='rgba(68,68,68,'+fade.lane+')'}return fade;}
 
 // Four beats per revolution at x1; signed scroll supports stops and reverse motion.
 var hibikiMotion;
@@ -463,7 +465,7 @@ function branchNoteY(t,n,baseY,laneHeight,outgoing=false){
  const offset=laneHeight*(1-p);
  return baseY+(active.direction==='down'?-offset:offset);
 }
-function judge(n,error){n.branchQuality=error<=judgmentWindows().good?1:error<=judgmentWindows().ok?.5:0;const before=score;judgeCore(n,error);branchScoreLog.push({time:n.time,score:score-before});}
+function judge(n,error){n.branchQuality=error<=judgmentWindows(n).good?1:error<=judgmentWindows(n).ok?.5:0;const before=score;judgeCore(n,error);branchScoreLog.push({time:n.time,score:score-before});}
 function addRollHits(r,count=1){const before=r.hits||0;addRollHitsCore(r,count);const hits=(r.hits||0)-before;if(hits>0)branchRollLog.push({time:time(),hits});}
 function branchReachableRoutes(e){
  const routeAt=v=>v>=e.high?'M':v>=e.low?'E':'N',set=new Set(),eps=1e-7;

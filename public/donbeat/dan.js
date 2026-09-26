@@ -10,9 +10,11 @@ function danPendingTitle(song,index){if(pendingDan.config.hide?.includes(index+1
 
 function refreshDanSongs(){
  const box=$('danSummary');box.replaceChildren();if(!pendingDan){box.append(danNode('p','段位設定ファイルを読み込んでください。'));return}
- const c=pendingDan.config;box.append(danNode('h3',c.name));
+ const c=pendingDan.config;box.append(danNode('h3',c.name));if(c.mode==='MEDLEY')box.append(danNode('p','メドレーモード · 曲間待機なし','dan-preview-status'));
  let totalCharts;try{totalCharts=resolveDanConfig(true).songs.map(e=>e.chart)}catch{}
- if(totalCharts){
+ if(totalCharts&&c.mode==='MEDLEY'){
+ try{const built=buildMedley(totalCharts.map(chart=>({chart})),c.songs);box.append(danNode('p','合計演奏時間（目安）：'+Math.ceil(built.chart.duration)+'秒 ／ 合計ノーツ数：'+built.chart.notes.filter(n=>n.type<=4).length.toLocaleString(),'dan-preview-totals'))}catch(e){box.append(danNode('p',e.message,'dan-preview-status'))}
+ }else if(totalCharts){
  const count=totalCharts.reduce((sum,c)=>sum+branchReferenceNoteCount(c),0);
  const seconds=Math.ceil(totalCharts.reduce((sum,c)=>{const first=c.notes[0]?.time||0,lead=Math.min(0,first-4);let end=Math.max(0,c.duration||0);for(const n of c.notes)end=Math.max(end,(n.end??n.time)+.126);return sum+Math.max(end,c.preloadedAudio?.duration||0)-lead},0)+Math.max(0,totalCharts.length-1)*3);
  const duration=(seconds>=3600?Math.floor(seconds/3600)+'時間':'')+Math.floor(seconds%3600/60)+'分'+String(seconds%60).padStart(2,'0')+'秒';
@@ -27,7 +29,7 @@ function refreshDanSongs(){
  c.songs.forEach((song,i)=>{let entry;try{entry=resolveDanConfig(true,i).songs[0]}catch{}
  const card=danNode('section',undefined,'result-song');card.append(danNode('h3',(i+1)+'. '+danPendingTitle(song,i)));
  const difficulty=song.course!==undefined?['かんたん','ふつう','むずかしい','おに','裏おに'][song.course]:entry?.chart.meta.LEVEL&&entry.chart.meta.LEVEL!=='?'?'★ '+entry.chart.meta.LEVEL:'';
- if(difficulty)card.append(danNode('p',difficulty));
+ if(difficulty)card.append(danNode('p',difficulty));if(song.range)card.append(danNode('p',song.range[0]+'秒〜'+song.range[1]+'秒（終了位置を含まない）'));if(song.measures)card.append(danNode('p',song.measures[0]+'小節〜'+song.measures[1]+'小節の直前'));
  card.append(danNode('p',entry?(entry.demo||playbackAssetsAvailable(entry.chart)?'準備完了':'音源未読込'):'譜面未読込','dan-preview-status'));
  for(const r of c.conditions.filter(r=>r.scope==='song'))card.append(danNode('p',condition(r,i),'dan-preview-condition'));
  list.append(card)});box.append(list);
@@ -43,6 +45,9 @@ function parseDanConfig(text){
  const split=k=>get(k).split(',').map(x=>x.trim());const name=get('TITLE');if(!name)fail('TITLE が空です。');
  const songKeys=[...fields.keys()].filter(k=>/^SONG\d+$/.test(k)).sort((a,b)=>Number(a.slice(4))-Number(b.slice(4)));
  if(!songKeys.length)fail('SONG1 が必要です。');const songs=songKeys.map((k,i)=>{if(k!=='SONG'+(i+1)||!get(k))fail('SONGは1から連番で曲名を指定してください。');const value=get(k);if(value.startsWith('"')){const match=value.match(/^"((?:[^"]|"")*)"(?:\s*,\s*([0-4]))?\s*$/);if(!match||!match[1].trim())fail(k+' の引用符または難易度番号が不正です。例：SONG1:"DESTRUCTION 3,2,1",3');const song={chart:match[1].replace(/""/g,'"')};if(match[2]!==undefined)song.course=Number(match[2]);return song}const at=value.lastIndexOf(',');if(at<0)return {chart:value};const title=value.slice(0,at).trim(),difficulty=value.slice(at+1).trim();if(!title||! /^[0-4]$/.test(difficulty))fail(k+' の難易度番号は0〜4です（MCは番号を省略）。');return {chart:title,course:Number(difficulty)}});
+ const mode=(fields.get('MODE')||'NORMAL').toUpperCase();if(!['NORMAL','MEDLEY'].includes(mode))fail('MODE は NORMAL / MEDLEY です。');
+ const rangeKeys=[];
+ songs.forEach((song,i)=>{for(const [prefix,property] of [['RANGE','range'],['MEASURES','measures']]){const key=prefix+(i+1);if(!fields.has(key))continue;if(mode!=='MEDLEY')fail(key+' は MODE:MEDLEY で使用してください。');const parts=split(key),v=parts.map(Number);if(parts.length!==2||parts.some(x=>!x)||v.some(x=>!Number.isFinite(x))||v[1]<=v[0]||(property==='measures'&&v.some(x=>!Number.isSafeInteger(x)||x<1)))fail(key+' は 開始,終了 の順で指定してください。');song[property]=v;rangeKeys.push(key)}if(song.range&&song.measures)fail('RANGE と MEASURES は同じ曲に併用できません。')});
  const gaugeParts=split('EXAM1');if(gaugeParts.length!==2)fail('EXAM1 は 赤合格,金合格 です。');const [gauge,goldGauge]=gaugeParts.map(number);if(goldGauge>100||gauge>100||goldGauge<gauge)fail('魂ゲージは0〜100、金を通常以上にしてください。');
  const types={best:'good',good:'ok',miss:'miss',score:'score',roll:'rolls',combo:'maxCombo',allcombo:'allcombo'},conditions=[];
  const exams=[...fields.keys()].filter(k=>/^EXAM\d+$/.test(k)&&k!=='EXAM1').sort((a,b)=>Number(a.slice(4))-Number(b.slice(4)));
@@ -50,8 +55,8 @@ function parseDanConfig(text){
  if(scope==='1')values=[limits(parts.slice(2))];else if(scope==='2'&&parts.length===2)values=songs.map((_,i)=>limits(split(key+'-'+(i+1))));else fail(key+' の範囲は 1（全体）/ 2（曲別）です。');
  for(const v of values){c.red.push(v.red);c.gold.push(v.gold);c.ops.push(v.op)}conditions.push(c);}
  const hide=fields.has('HIDE')&&get('HIDE')?split('HIDE').map(number):[];if(hide.some(n=>n<1||n>songs.length))fail('HIDEの曲番号は1〜曲数の範囲で指定してください。');
- const allowed=new Set(['TITLE','HIDE','EXAM1',...songKeys,...exams]);for(const key of exams){const c=conditions[exams.indexOf(key)];if(c.scope==='song')songs.forEach((_,i)=>allowed.add(key+'-'+(i+1)))}for(const key of fields.keys())if(!allowed.has(key))fail('不明な項目：'+key);
- return {name,songs,gauge,goldGauge,conditions,hide};
+ const allowed=new Set(['TITLE','MODE','HIDE','EXAM1',...songKeys,...exams,...rangeKeys]);for(const key of exams){const c=conditions[exams.indexOf(key)];if(c.scope==='song')songs.forEach((_,i)=>allowed.add(key+'-'+(i+1)))}for(const key of fields.keys())if(!allowed.has(key))fail('不明な項目：'+key);
+ return {name,mode,songs,gauge,goldGauge,conditions,hide};
 }
 function danOp(c,i=0){return c.ops?.[i]||(danOp(c,danRun.index)!=='m'?'le':'m')}
 function danLabel(c,i=0){return danOp(c,i)==='m'?'以上':danOp(c,i)==='l'?'未満':'以下'}
@@ -69,7 +74,7 @@ function resolveDanConfig(preview=false,onlyIndex=null){
 }
 async function tryStartPendingDan(){if(!pendingDan||!pendingDan.armed||danRun)return;refreshDanSongs();} 
 function danStats(){return {score,good,ok,miss,rolls,maxCombo,balloonRolls,balloonPops,allcombo:good+ok+rolls}}
-function danSongStats(){const now=danStats(),base=danRun.baseline;return {score:now.score-base.score,good:now.good-base.good,ok:now.ok-base.ok,miss:now.miss-base.miss,rolls:now.rolls-base.rolls,soul,balloonRolls:now.balloonRolls-(base.balloonRolls||0),balloonPops:now.balloonPops-(base.balloonPops||0),maxCombo:danRun.songMaxCombo,allcombo:now.good-base.good+now.ok-base.ok+now.rolls-base.rolls}}
+function danSongStats(){if(medleyActive())return {...danRun.medley.stats[danRun.index],soul};const now=danStats(),base=danRun.baseline;return {score:now.score-base.score,good:now.good-base.good,ok:now.ok-base.ok,miss:now.miss-base.miss,rolls:now.rolls-base.rolls,soul,balloonRolls:now.balloonRolls-(base.balloonRolls||0),balloonPops:now.balloonPops-(base.balloonPops||0),maxCombo:danRun.songMaxCombo,allcombo:now.good-base.good+now.ok-base.ok+now.rolls-base.rolls}}
 function danPass(value,threshold,c,i=0){const op=danOp(c,i);return op==='l'?value<threshold:op==='le'?value<=threshold:value>=threshold}
 function evaluateDan(config,results,totals,gauge,complete=false){const status=gold=>{if(complete&&gauge<(gold?config.goldGauge:config.gauge))return false;for(const condition of config.conditions){const limits=gold?condition.gold:condition.red;if(condition.scope==='total'){if((complete||danOp(condition)!=='m')&&!danPass(totals[condition.type],limits[0],condition))return false}else{for(let i=0;i<results.length;i++)if(!danPass(results[i][condition.type],limits[i],condition,i))return false}}return true};return {pass:status(false),gold:status(true)}}
 function danExceededMaximum(){if(!danRun)return false;const r=evaluateDan(danRun.config,danRun.results,danStats(),soul,false);if(!r.pass)return true;const current=danSongStats();return danRun.config.conditions.some(c=>c.scope==='song'&&danOp(c,danRun.index)!=='m'&&!danPass(current[c.type],c.red[danRun.index],c,danRun.index))}
@@ -91,14 +96,14 @@ function danPossibleStats(songOnly){
 }
 function danUnplayedMaximum(c){const normal=c.notes.filter(n=>n.type<=4).length,noteScore=chartNoteScore(c),result={good:normal,ok:0,miss:0,maxCombo:normal,rolls:0,score:normal*noteScore};for(const n of c.notes){if(!((n.type>=5&&n.type<=7)||n.type===9))continue;const hits=danRun.config.auto?autoRollHits(n,n.end):(n.type===7||n.type===9)?n.required:Infinity;result.rolls+=hits;result.score+=hits*100;}result.ok=normal;result.miss=normal+(danRun.config.auto?0:c.notes.filter(n=>n.type===10).length);result.allcombo=normal+result.rolls;return result}
 function danCurrentFailed(){
- if(!danRun)return false;if(danRun.failed||danExceededMaximum())return true;
+ if(!danRun)return false;if(medleyActive())return medleyFailed();if(danRun.failed||danExceededMaximum())return true;
  const whole=danPossibleStats(false),current=danPossibleStats(true);
  for(const c of danRun.config.conditions){const key=c.scope==='song'?danRun.index:0;if(danOp(c,key)==='m'&&!danPass((c.scope==='song'?current:whole)[c.type],c.red[key],c,key))return true;if(c.scope==='song')for(let i=danRun.index+1;i<danRun.config.songs.length;i++)if(danOp(c,i)==='m'&&!danPass(danUnplayedMaximum(danRun.config.songs[i].chart)[c.type],c.red[i],c,i))return true}
  // Gauge is checked at the end, or earlier only if no possible remaining gain can reach it.
  let maxGauge=soul;for(let i=danRun.index;i<danRun.config.songs.length;i++){const c=danRun.config.songs[i].chart,total=c.notes.filter(n=>n.type<=4).length,remaining=(i===danRun.index?notes:c.notes).filter(n=>n.type<=4&&!(i===danRun.index&&n.done)).length;maxGauge=Math.min(100,maxGauge+remaining*130/soulNoteCount())}
  return maxGauge+1e-9<danRun.config.gauge;
 }
-function notifyDanJudgment(error){if(!danRun)return;danRun.songCombo=error<=judgmentWindows().ok?danRun.songCombo+1:0;danRun.songMaxCombo=Math.max(danRun.songMaxCombo,danRun.songCombo)}
+function notifyDanJudgment(error){if(!danRun||medleyActive())return;danRun.songCombo=error<=judgmentWindows().ok?danRun.songCombo+1:0;danRun.songMaxCombo=Math.max(danRun.songMaxCombo,danRun.songCombo)}
 function gaugeColor(value,red,gold){return value>=gold?'rainbow':value>=red?'yellow':'red'}
 function updateSoulDisplay(){const red=danRun?danRun.config.gauge:80,gold=danRun?danRun.config.goldGauge:100;
  $('gauge').className=gaugeColor(soul,red,gold);$('soulRed').style.left=red+'%';$('soulGold').style.left=gold+'%';
@@ -139,9 +144,9 @@ async function launchDan(automatic=false){
   }
   pendingDan.armed=false;
   danRun={config,index:0,results:[],baseline:{score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0},songCombo:0,songMaxCombo:0,original:{chart,charts,audioBuffer,demoMode},audioResumePromise:resumePromise,finished:false,failed:false};
-  $('danDialog').close();loading=false;await beginDanSong();
+  $('danDialog').close();if(config.mode==='MEDLEY')await beginMedley();else{loading=false;await beginDanSong();}
  }catch(e){
-  $('danError').textContent='開始できませんでした：'+e.message;if(danRun)exitDan()
+  $('danError').textContent='開始できませんでした：'+e.message;if(danRun)exitDan();$('danDialog').showModal()
  }finally{
   loading=false;$('danPlayAuto').disabled=false;$('danPlay').disabled=false;$('danClose').disabled=false
  }

@@ -2,6 +2,19 @@
 const danPool=[],danMetrics={ok:{label:'可',direction:'max'},miss:{label:'不可',direction:'max'},good:{label:'良',direction:'min'},rolls:{label:'連打',direction:'min'},score:{label:'スコア',direction:'min'},allcombo:{label:'たたけた数',direction:'min'},maxCombo:{label:'最大コンボ',direction:'min'}};
 let danRun=null,danTimer=null,danNextId=1;
 function danNode(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n}
+// A package containing a course and local assets is self-contained.  Do not
+// let loaded catalog (R2) charts, earlier imports or practice charts shadow it.
+function danHasLocalAssets(files,configFile){
+ return files.some(f=>f!==configFile&&/\.(?:mc|tja|ogg|mp3|wav|m4a|flac|mp4|webm|m4v|png|jpe?g|webp|gif)$/i.test(f.name));
+}
+function rememberDanImportedCharts(loaded,incoming=null){
+ const course=incoming||pendingDan;
+ if(course?.localOnly)for(const c of loaded)course.localCharts.add(c);
+}
+function danCandidateCharts(){
+ if(!pendingDan?.localOnly)return danPool;
+ return danPool.filter(entry=>pendingDan.localCharts.has(entry.chart));
+}
 function rememberDanCharts(){for(const c of charts){const old=danPool.findIndex(e=>c.sourcePath&&e.chart.sourcePath===c.sourcePath&&e.chart.meta.COURSE===c.meta.COURSE&&e.chart!==c);if(old>=0)danPool.splice(old,1);const demo=!!c.builtinDemo,entry=danPool.find(e=>e.chart===c);if(entry)entry.demo=demo;else danPool.push({id:String(danNextId++),chart:c,demo})}if($('danDialog').open)refreshDanSongs()}
 function danSongLabel(entry){const c=entry.chart;return (c.meta.TITLE||'無題')+' / '+(names[c.meta.COURSE]||c.meta.COURSE||'おに')+(entry.demo?'（練習曲）':c.audioFile?'':'（音源未選択）')}
 let pendingDan=null;
@@ -10,7 +23,7 @@ function danPendingTitle(song,index){if(pendingDan.config.hide?.includes(index+1
 
 function refreshDanSongs(){
  const box=$('danSummary');box.replaceChildren();if(!pendingDan){box.append(danNode('p','段位設定ファイルを読み込んでください。'));return}
- const c=pendingDan.config;box.append(danNode('h3',c.name));if(c.mode==='MEDLEY')box.append(danNode('p','メドレーモード · 曲間待機なし','dan-preview-status'));
+ const c=pendingDan.config;box.append(danNode('h3',c.name));if(pendingDan.localOnly)box.append(danNode('p','この段位はローカルで読み込んだ課題曲のみ検索します（収録曲・以前の読み込みは対象外）。','dan-preview-status'));if(c.mode==='MEDLEY')box.append(danNode('p','メドレーモード · 曲間待機なし','dan-preview-status'));
  let totalCharts;try{totalCharts=resolveDanConfig(true).songs.map(e=>e.chart)}catch{}
  if(totalCharts&&c.mode==='MEDLEY'){
  try{const built=buildMedley(totalCharts.map(chart=>({chart})),c.songs);box.append(danNode('p','合計演奏時間（目安）：'+Math.ceil(built.chart.duration)+'秒 ／ 合計ノーツ数：'+built.chart.notes.filter(n=>n.type<=4).length.toLocaleString(),'dan-preview-totals'))}catch(e){box.append(danNode('p',e.message,'dan-preview-status'))}
@@ -65,13 +78,14 @@ function danOp(c,i=0){return c.ops?.[i]||(danOp(c,danRun.index)!=='m'?'le':'m')}
 function danLabel(c,i=0){return danOp(c,i)==='m'?'以上':danOp(c,i)==='l'?'未満':'以下'}
 function resolveDanConfig(preview=false,onlyIndex=null){
  if(!pendingDan)throw Error('段位設定ファイルを読み込んでください。');const c=pendingDan.config,dir=pendingDan.path.split('/').slice(0,-1).join('/');
- const selected=c.songs.map((song,i)=>{if(onlyIndex!==null&&i!==onlyIndex)return null;const path=normalizedPath(dir+'/'+song.chart);let matches=danPool.filter(e=>e.chart.sourcePath&&normalizedPath(e.chart.sourcePath)===path);
- if(!matches.length)matches=danPool.filter(e=>e.chart.sourcePath&&normalizedPath(e.chart.sourcePath)===normalizedPath(song.chart));
- if(!matches.length)matches=danPool.filter(e=>e.chart.sourcePath&&normalizedPath(e.chart.sourcePath).endsWith('/'+normalizedPath(song.chart)));
- if(!matches.length)matches=danPool.filter(e=>e.chart.importName&&normalizedPath(e.chart.importName)===normalizedPath(song.chart));
- if(!matches.length)matches=danPool.filter(e=>(e.chart.meta.TITLE||'').normalize('NFC')===song.chart.normalize('NFC'));
+ const candidates=danCandidateCharts();
+ const selected=c.songs.map((song,i)=>{if(onlyIndex!==null&&i!==onlyIndex)return null;const path=normalizedPath(dir+'/'+song.chart);let matches=candidates.filter(e=>e.chart.sourcePath&&normalizedPath(e.chart.sourcePath)===path);
+ if(!matches.length)matches=candidates.filter(e=>e.chart.sourcePath&&normalizedPath(e.chart.sourcePath)===normalizedPath(song.chart));
+ if(!matches.length)matches=candidates.filter(e=>e.chart.sourcePath&&normalizedPath(e.chart.sourcePath).endsWith('/'+normalizedPath(song.chart)));
+ if(!matches.length)matches=candidates.filter(e=>e.chart.importName&&normalizedPath(e.chart.importName)===normalizedPath(song.chart));
+ if(!matches.length)matches=candidates.filter(e=>(e.chart.meta.TITLE||'').normalize('NFC')===song.chart.normalize('NFC'));
  if(song.course!==undefined){const courses={easy:0,normal:1,hard:2,oni:3,edit:4};matches=matches.filter(e=>{if(/\.mc$/i.test(e.chart.sourcePath||''))return false;const course=String(e.chart.meta.COURSE||'Oni').trim().toLowerCase();return (Object.hasOwn(courses,course)?courses[course]:/^[0-4]$/.test(course)?Number(course):-1)===song.course});}
- if(matches.length!==1)throw Error((i+1)+'曲目：'+danPendingTitle(song,i)+(matches.length?' が複数あります。難易度番号や譜面の相対パスで特定してください。':' に一致する譜面・難易度がありません。指定を確認して譜面を追加してください。'));
+ if(matches.length!==1)throw Error((i+1)+'曲目：'+danPendingTitle(song,i)+(matches.length?' が複数あります。難易度番号や譜面の相対パスで特定してください。':pendingDan.localOnly?' に一致するローカル譜面・難易度がありません。課題曲を追加するか相対パスを確認してください（収録曲は検索しません）。':' に一致する譜面・難易度がありません。指定を確認して譜面を追加してください。'));
  const target=matches[0].chart,demo=!!target.builtinDemo;if(!preview&&!demo&&!playbackAssetsAvailable(target))throw Error((i+1)+'曲目の音源 '+(target.meta.WAVE||'')+' が見つかりません。');return {...matches[0],demo};});
  return {...c,songs:selected.filter(Boolean),auto:false};
 }

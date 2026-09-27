@@ -15,6 +15,61 @@ function install(c,specs=[{range:[0,2]},{range:[1,3]}]){
  c.entries=[{chart:structuredClone(plain)},{chart:{...structuredClone(plain),meta:{TITLE:'B',LEVEL:'3'}}}];c.specs=specs;
  vm.runInContext(`const built=buildMedley(entries,specs);chart=built.chart;notes=chart.notes.map(n=>({...n,done:false,hits:0}));danRun={index:0,config:{songs:built.segments.map(s=>({chart:s.chart})),conditions:[],gauge:0,goldGauge:100,auto:false},medley:{...built,stats:built.segments.map(medleyEmptyStats)},results:[]}`,c);
 }
+function danMatchingEnv(){
+ const c=env();
+ vm.runInContext("function normalizedPath(s){return s.normalize('NFC').toLowerCase()}function playbackAssetsAvailable(){return true}",c);
+ return c;
+}
+test('mixed local dan upload searches only its own charts, not R2 or earlier uploads',()=>{
+ const c=danMatchingEnv();
+ c.setting={name:'course.dan'};c.chartFile={name:'Same.tja'};c.audioFile={name:'music.ogg'};
+ c.local={...structuredClone(plain),sourcePath:'pack/Same.tja',importName:'course-pack.zip',meta:{TITLE:'Same',COURSE:'Oni'}};
+ c.remote={...structuredClone(plain),sourcePath:'r2/Same.tja',importName:'course-pack.zip',serverEntry:{file:'r2/Same.tja'},meta:{TITLE:'Same',COURSE:'Oni'}};
+ c.previous={...structuredClone(plain),sourcePath:'older/Same.tja',meta:{TITLE:'Same',COURSE:'Oni'}};
+ vm.runInContext("pendingDan={config:parseDanConfig('TITLE:Course\\nSONG1:Same,3\\nEXAM1:80,100'),path:'pack/course.dan',localOnly:danHasLocalAssets([setting,chartFile,audioFile],setting),localCharts:new Set()};danPool.push({chart:remote},{chart:previous},{chart:local});rememberDanImportedCharts([local],pendingDan)",c);
+ assert.equal(vm.runInContext('pendingDan.localOnly',c),true);
+ assert.equal(vm.runInContext('danCandidateCharts().length',c),1);
+ assert.equal(vm.runInContext('resolveDanConfig(true).songs[0].chart===local',c),true);
+ assert.equal(vm.runInContext("pendingDan.config.songs[0].chart='r2/Same.tja';(()=>{try{resolveDanConfig(true);return false}catch(e){return /ローカル譜面/.test(e.message)}})()",c),true);
+});
+test('local upload scope activates for charts or media but not dan-only or README',()=>{
+ const c=danMatchingEnv();c.setting={name:'course.dan'};
+ for(const name of ['a.tja','a.MC','audio.ogg','image.webp','video.mp4']){
+  c.extra={name};
+  assert.equal(vm.runInContext('danHasLocalAssets([setting,extra],setting)',c),true,name);
+ }
+ assert.equal(vm.runInContext('danHasLocalAssets([setting],setting)',c),false);
+ c.extra={name:'README.txt'};
+ assert.equal(vm.runInContext('danHasLocalAssets([setting,extra],setting)',c),false);
+});
+test('missing bundled song never falls back to a remote chart with the same title',()=>{
+ const c=danMatchingEnv();
+ c.local={...structuredClone(plain),sourcePath:'pack/Other.tja',meta:{TITLE:'Other',COURSE:'Oni'}};
+ c.remote={...structuredClone(plain),sourcePath:'r2/Missing.tja',serverEntry:{file:'r2/Missing.tja'},meta:{TITLE:'Missing',COURSE:'Oni'}};
+ vm.runInContext("pendingDan={config:parseDanConfig('TITLE:Course\\nSONG1:Missing,3\\nEXAM1:80,100'),path:'pack/course.dan',localOnly:true,localCharts:new Set([local])};danPool.push({chart:local},{chart:remote})",c);
+ assert.throws(()=>vm.runInContext('resolveDanConfig(true)',c),/一致するローカル譜面/);
+ assert.equal(vm.runInContext('pendingDan.localCharts.size',c),1);
+});
+test('dan-only files retain catalog matching and local packages can receive additional charts',()=>{
+ const c=danMatchingEnv();
+ c.remote={...structuredClone(plain),sourcePath:'r2/R2.tja',serverEntry:{file:'r2/R2.tja'},meta:{TITLE:'R2',COURSE:'Oni'}};
+ c.first={...structuredClone(plain),sourcePath:'pack/First.tja',meta:{TITLE:'First',COURSE:'Oni'}};
+ c.later={...structuredClone(plain),sourcePath:'pack/Next.tja',meta:{TITLE:'Next',COURSE:'Oni'}};
+ vm.runInContext("pendingDan={config:parseDanConfig('TITLE:Course\\nSONG1:R2,3\\nEXAM1:80,100'),path:'course.dan',localOnly:false,localCharts:new Set()};danPool.push({chart:remote},{chart:first},{chart:later})",c);
+ assert.equal(vm.runInContext('resolveDanConfig(true).songs[0].chart===remote',c),true);
+ vm.runInContext("pendingDan={config:parseDanConfig('TITLE:Course\\nSONG1:Next,3\\nEXAM1:80,100'),path:'pack/course.dan',localOnly:true,localCharts:new Set([first])}",c);
+ assert.throws(()=>vm.runInContext('resolveDanConfig(true)',c),/一致するローカル譜面/);
+ vm.runInContext('rememberDanImportedCharts([later])',c);
+ assert.equal(vm.runInContext('resolveDanConfig(true).songs[0].chart===later',c),true);
+});
+test('bundled TJA retains difficulty matching with two charts in the same file',()=>{
+ const c=danMatchingEnv();
+ c.easy={...structuredClone(plain),sourcePath:'pack/Multi.tja',meta:{TITLE:'Multi',COURSE:'Easy'}};
+ c.oni={...structuredClone(plain),sourcePath:'pack/Multi.tja',meta:{TITLE:'Multi',COURSE:'Oni'}};
+ c.remote={...structuredClone(plain),sourcePath:'r2/Multi.tja',serverEntry:{file:'r2/Multi.tja'},meta:{TITLE:'Multi',COURSE:'Oni'}};
+ vm.runInContext("pendingDan={config:parseDanConfig('TITLE:Course\\nSONG1:Multi,3\\nEXAM1:80,100'),path:'pack/course.dan',localOnly:true,localCharts:new Set()};danPool.push({chart:easy},{chart:oni},{chart:remote});rememberDanImportedCharts([easy,oni])",c);
+ assert.equal(vm.runInContext('resolveDanConfig(true).songs[0].chart===oni',c),true);
+});
 test('mode defaults, quoted titles, ranges and invalid configuration',()=>{
  const c=env();c.config='TITLE:test\nMODE:MEDLEY\nSONG1:"A,B",3\nRANGE1:1.25,5\nSONG2:B\nMEASURES2:2,5\nEXAM1:80,100';
  assert.equal(vm.runInContext('parseDanConfig(config).mode',c),'MEDLEY');

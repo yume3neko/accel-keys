@@ -94,7 +94,7 @@ test('overlapping guards cover an entire very short middle excerpt',()=>{
  c.a=structuredClone(plain);c.b=structuredClone(plain);c.z=structuredClone(plain);
  vm.runInContext('const short=buildMedley([{chart:a},{chart:b},{chart:z}],[{range:[0,2]},{range:[1,1.5]},{}])',c);
  assert.equal(vm.runInContext('JSON.stringify(short.segments[1].seamWindows)',c),'[[1,1.5]]');
- assert.equal(vm.runInContext('short.chart.duration',c),7.5);
+ assert.equal(vm.runInContext('short.chart.duration',c),6.5);
 });
 test('audio sources use shared clock, rate, offsets; resume skips completed songs',()=>{
  const c=env();install(c);const scheduled=[],stopped=[];

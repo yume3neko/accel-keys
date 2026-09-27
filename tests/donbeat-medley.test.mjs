@@ -66,6 +66,17 @@ test('impossible per-song minimum and total maximum fail; future notes stay reac
  vm.runInContext("danRun.config.conditions=[{scope:'total',type:'miss',red:[1],gold:[1],ops:['l']}]",c);
  assert.equal(vm.runInContext('medleyFailed()',c),true);
 });
+test('autoplay previews the whole medley even if its roll exam is unattainable',()=>{
+ const c=env();install(c);
+ vm.runInContext("danRun.config.conditions=[{scope:'total',type:'rolls',red:[100],gold:[500],ops:['m']}];danRun.config.auto=true;now=-4",c);
+ assert.equal(vm.runInContext('medleyFailed()',c),false);
+ vm.runInContext('now=1',c);
+ assert.equal(vm.runInContext('medleyFailed()',c),false);
+ vm.runInContext('danRun.config.auto=false',c);
+ assert.equal(vm.runInContext('medleyFailed()',c),true);
+ vm.runInContext('now=-4',c);
+ assert.equal(vm.runInContext('medleyFailed()',c),false);
+});
 test('untrimmed final MC-style note at duration is preserved',()=>{
  const c=env();c.c={...structuredClone(plain),duration:3};
  assert.equal(vm.runInContext('buildMedley([{chart:c}],[{}]).chart.notes.length',c),4);

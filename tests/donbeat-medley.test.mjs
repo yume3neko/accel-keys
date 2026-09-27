@@ -39,6 +39,63 @@ test('TJA measures account for OFFSET, BPM changes and meter; clipped rolls',()=
  assert.equal(vm.runInContext('mb.chart.motion[0].bpm',c),240);
  assert.throws(()=>vm.runInContext('medleyRange(tc,{measures:[1,99]})',c));
 });
+test('seam guard removes overlapping TJA/MC fades and leaves remote effects alone',()=>{
+ const c=env();
+ c.previous={...structuredClone(plain),fades:[
+  {time:.25,end:.75,direction:0,mode:'lane'},
+  {time:1.8,end:2.7,direction:0,mode:'all'}
+ ]};
+ c.next={...structuredClone(plain),fades:[
+  {time:1.2,end:1.8,direction:0,mode:'note'},
+  {time:2.5,end:3,direction:1,mode:'note'}
+ ]};
+ vm.runInContext('const guarded=buildMedley([{chart:previous},{chart:next}],[{range:[0,2.5]},{range:[1,3]}]);danRun={medley:guarded}',c);
+ assert.equal(vm.runInContext('JSON.stringify(guarded.segments[0].seamWindows)',c),'[[1.5,2.5]]');
+ assert.equal(vm.runInContext('JSON.stringify(guarded.segments[1].seamWindows)',c),'[[1,2]]');
+ assert.equal(vm.runInContext('JSON.stringify(guarded.segments.map(s=>s.safeFades.map(f=>f.time)))',c),'[[0.25],[2.5]]');
+ assert.equal(vm.runInContext('medleySeamActive(2.25)',c),true);
+ assert.equal(vm.runInContext('medleySeamActive(2.5)',c),true);
+ assert.equal(vm.runInContext('medleySeamActive(3.6)',c),false);
+ assert.equal(vm.runInContext('JSON.stringify(medleyFadeAt(2.5))',c),'{"info":1,"lane":1,"note":1,"button":1}');
+ c.chartFadeAt=(events)=>({length:events.length});
+ assert.equal(vm.runInContext('medleyFadeAt(.5).length',c),1);
+ assert.equal(vm.runInContext('medleyFadeAt(4).length',c),1);
+});
+test('incoming/outgoing visual guards cancel MC jumps and scroll without changing notes',()=>{
+ const c=env();
+ c.first={...structuredClone(plain),notes:[
+  {time:.5,type:1,bpm:120,scroll:4},
+  {time:2,type:2,bpm:120,scroll:4}
+ ],visual:[
+  {time:0,distance:0,jumpDistance:0,rate:1,bpm:120,scroll:1,hs:1},
+  {time:1.75,distance:1.75,jumpDistance:8,rate:4,bpm:120,scroll:4,hs:1},
+  {time:2.25,distance:3.75,jumpDistance:8,rate:4,bpm:120,scroll:4,hs:1}
+ ]};
+ c.second=structuredClone(plain);
+ vm.runInContext('const guardedMotion=buildMedley([{chart:first},{chart:second}],[{range:[0,2.5]},{}]);danRun={medley:guardedMotion}',c);
+ assert.equal(vm.runInContext('medleyDistance(guardedMotion.chart.notes[1],1.75)',c),.25);
+ assert.equal(vm.runInContext('medleyDistance(guardedMotion.chart.notes[0],.25)',c),1);
+ assert.equal(vm.runInContext('guardedMotion.chart.notes[1].time',c),2);
+ assert.equal(vm.runInContext('guardedMotion.chart.notes[1].scroll',c),4);
+ assert.equal(vm.runInContext('first.visual[1].jumpDistance',c),8);
+ assert.equal(vm.runInContext('guardedMotion.chart.motion.filter(m=>m.time<=2).at(-1).scroll',c),1);
+ assert.equal(vm.runInContext('medleyDistance(guardedMotion.chart.notes[1],2.75)',c),-.75);
+});
+test('TJA scroll near a join is only disabled for visual movement, not source chart',()=>{
+ const c=env();
+ c.tja='TITLE:Scroll\nBPM:120\nCOURSE:Oni\n#START\n1000,\n#SCROLL 4\n1000,\n#END';
+ vm.runInContext('const tjaChart=parseTJA(tja).charts[0];const guardedTja=buildMedley([{chart:tjaChart},{chart:structuredClone(plain)}],[{range:[0,2.5]},{}]);danRun={medley:guardedTja}',c);
+ assert.equal(vm.runInContext('guardedTja.chart.notes[1].scroll',c),4);
+ assert.equal(vm.runInContext('medleyDistance(guardedTja.chart.notes[1],1.75)',c),.25);
+ assert.equal(vm.runInContext('guardedTja.chart.motion.filter(m=>m.time<=2).at(-1).hs',c),1);
+});
+test('overlapping guards cover an entire very short middle excerpt',()=>{
+ const c=env();
+ c.a=structuredClone(plain);c.b=structuredClone(plain);c.z=structuredClone(plain);
+ vm.runInContext('const short=buildMedley([{chart:a},{chart:b},{chart:z}],[{range:[0,2]},{range:[1,1.5]},{}])',c);
+ assert.equal(vm.runInContext('JSON.stringify(short.segments[1].seamWindows)',c),'[[1,1.5]]');
+ assert.equal(vm.runInContext('short.chart.duration',c),7.5);
+});
 test('audio sources use shared clock, rate, offsets; resume skips completed songs',()=>{
  const c=env();install(c);const scheduled=[],stopped=[];
  c.musicGain={};c.audio=()=>({createBufferSource:()=>({playbackRate:{value:1},connect(){},start(...args){scheduled.push(args)},stop(){stopped.push(1)},disconnect(){}})});

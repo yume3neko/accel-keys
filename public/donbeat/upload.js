@@ -135,7 +135,7 @@
    const files=[...chosen.entries()];
    if(!batch){
     status('アップロードを準備中…');
-    const begun=await requestJSON('begin',{files:files.map(([path,file])=>({path,size:file.size})),genre:$('genre').value});
+    const begun=await requestJSON('begin',{files:files.map(([path,file])=>({path,size:file.size})),genre:$('genre').value,category:document.querySelector('input[name="uploadCategory"]:checked').value});
     batch=begun.batch;
    }
    let cursor=0,finished=uploaded.size,failures=[];
@@ -175,6 +175,7 @@
  }
  $('folder').addEventListener('change',event=>void add(event.target.files,true));
  $('extra').addEventListener('change',event=>{void add(event.target.files,false);event.target.value=''});
+ document.querySelectorAll('input[name="uploadCategory"]').forEach(r=>r.addEventListener('change',()=>{if(!busy)resetUpload()}));
  $('genre').addEventListener('change',()=>{if(!busy){resetUpload();void inspect()}});
  function clearSelection(){
   if(busy)return;
@@ -194,6 +195,7 @@
    $('replaceNotice').textContent='「'+song.title+'」を差し替えます。新しいTJA/MCと対応音源を選択してください。全件確認・公開が完了してから旧曲を削除します。';
    $('replaceNotice').hidden=false;$('cancelReplace').hidden=false;
    $('genre').value=song.genre||'';
+   document.querySelector('input[name="uploadCategory"][value="'+(song.category==='creative'?'creative':'official')+'"]').checked=true;
    draw();
   },
   cancelReplace

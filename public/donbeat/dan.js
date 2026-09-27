@@ -29,7 +29,10 @@ function refreshDanSongs(){
  c.songs.forEach((song,i)=>{let entry;try{entry=resolveDanConfig(true,i).songs[0]}catch{}
  const card=danNode('section',undefined,'result-song');card.append(danNode('h3',(i+1)+'. '+danPendingTitle(song,i)));
  const difficulty=song.course!==undefined?['かんたん','ふつう','むずかしい','おに','裏おに'][song.course]:entry?.chart.meta.LEVEL&&entry.chart.meta.LEVEL!=='?'?'★ '+entry.chart.meta.LEVEL:'';
- if(difficulty)card.append(danNode('p',difficulty));if(song.range)card.append(danNode('p',song.range[0]+'秒〜'+song.range[1]+'秒（終了位置を含まない）'));if(song.measures)card.append(danNode('p',song.measures[0]+'小節〜'+song.measures[1]+'小節の直前'));
+ if(difficulty)card.append(danNode('p',difficulty));
+ const last=c.mode==='MEDLEY'&&i===c.songs.length-1;
+ if(song.range){const end=last?'曲の最後まで':song.range[1]+'秒（終了位置を含まない）';card.append(danNode('p',song.range[0]+'秒〜'+end))}
+ if(song.measures){const end=last?'曲の最後まで':song.measures[1]+'小節の直前';card.append(danNode('p',song.measures[0]+'小節〜'+end))}
  card.append(danNode('p',entry?(entry.demo||playbackAssetsAvailable(entry.chart)?'準備完了':'音源未読込'):'譜面未読込','dan-preview-status'));
  for(const r of c.conditions.filter(r=>r.scope==='song'))card.append(danNode('p',condition(r,i),'dan-preview-condition'));
  list.append(card)});box.append(list);

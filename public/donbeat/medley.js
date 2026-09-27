@@ -2,19 +2,20 @@
 
 // A medley uses one chart clock. Audio sources are reserved against that same
 // AudioContext clock; animation-frame latency never controls the next song.
-function medleyRange(c,spec={}){
+function medleyRange(c,spec={},finalSong=false){
  let from=Math.min(0,c.measures?.[0]?.time??c.notes[0]?.time??0),to=Math.max(c.duration||0,c.preloadedAudio?.duration||0,...c.notes.map(n=>(n.end??n.time)+.001));
  if(spec.range){[from,to]=spec.range}
- if(spec.measures){const [a,b]=spec.measures,list=c.measures||[];if(a>list.length||b>list.length+1)throw Error('小節の指定が譜面の範囲を超えています。');from=list[a-1].time;to=b===list.length+1?list[list.length-1].end:list[b-1].time}
- if(!Number.isFinite(from)||!Number.isFinite(to)||to<=from)throw Error('メドレーの演奏区間が不正です。');
+ if(spec.measures){const [a,b]=spec.measures,list=c.measures||[];if(a>list.length||(!finalSong&&b>list.length+1))throw Error('小節の指定が譜面の範囲を超えています。');from=list[a-1].time;if(!finalSong)to=b===list.length+1?list[list.length-1].end:list[b-1].time}
  const first=c.measures?.[0]?.time??Math.min(0,c.notes[0]?.time??0),last=Math.max(c.duration||0,c.preloadedAudio?.duration||0,...c.notes.map(n=>(n.end??n.time)+.001));
+ if(finalSong)to=last;
+ if(!Number.isFinite(from)||!Number.isFinite(to)||to<=from)throw Error('メドレーの演奏区間が不正です。');
  if(from<Math.min(0,first)-1e-7||to>last+1e-7)throw Error('メドレーの演奏区間が譜面・音源の範囲を超えています。');
  return {from,to};
 }
 function buildMedley(entries,specs){
  const combined={meta:{...entries[0].chart.meta},bpm:entries[0].chart.bpm,notes:[],dummyNotes:[],bars:[],measures:[],beats:[],motion:[],gogoEvents:[],fades:[],duration:0},segments=[];
  for(let i=0;i<entries.length;i++){
-  const original=entries[i].chart,c=original._tja?rebuildTjaBranches(original,[]):original,{from,to}=medleyRange(c,specs[i]);
+  const original=entries[i].chart,c=original._tja?rebuildTjaBranches(original,[]):original,{from,to}=medleyRange(c,specs[i],i===entries.length-1);
   const start=combined.duration,end=start+to-from,shift=start-from;
   const segment={index:i,original:c,from,to,start,end,shift,buffer:original.preloadedAudio||null};segments.push(segment);
   const move=n=>({...n,time:n.time+shift,...(n.end!==undefined?{end:Math.min(n.end,to)+shift}:{}),medleyIndex:i});

@@ -37,6 +37,34 @@ function medleyMotionAt(c,t){
  for(const e of c.motion||c.visual||[]){if(e.time>t)break;state={...state,...e}}
  return state;
 }
+// Rebuild only the visual distance track: TJA #ABSCROLL and MC scroll/jump
+// are ignored at joins, but #SCROLL/MC hs, BPM and timing are retained.
+function medleySeamVisual(c,windows){
+ if(!c.visual?.length||!windows.length)return c.visual;
+ const inside=t=>windows.some(([lo,hi])=>t>=lo&&t<hi);
+ const events=c.visual.map(e=>({time:e.time,source:e,order:0}));
+ for(const [lo,hi] of windows){events.push({time:lo,order:1},{time:hi,order:1});}
+ events.sort((a,b)=>a.time-b.time||a.order-b.order);
+ let bpm=c.bpm||120,scroll=1,hs=1,originalJump=0,jumpDistance=0,distance=0,previous=events[0].time;
+ const result=[];
+ for(const e of events){
+  if(e.time>previous){
+   const midpoint=(previous+e.time)/2;
+   distance+=(e.time-previous)*bpm/120*(inside(midpoint)?1:scroll);
+  }
+  if(e.source){
+   const v=e.source;
+   bpm=v.bpm??bpm;scroll=v.scroll??scroll;hs=v.hs??hs;
+   const jump=Number.isFinite(v.jumpDistance)?v.jumpDistance:originalJump;
+   if(!inside(e.time))jumpDistance+=jump-originalJump;
+   originalJump=jump;
+  }
+  const effectiveScroll=inside(e.time)?1:scroll;
+  result.push({time:e.time,bpm,scroll:effectiveScroll,hs,rate:bpm/120*effectiveScroll,distance,jumpDistance});
+  previous=e.time;
+ }
+ return result;
+}
 function buildMedley(entries,specs){
  const combined={meta:{...entries[0].chart.meta},bpm:entries[0].chart.bpm,notes:[],dummyNotes:[],bars:[],measures:[],beats:[],motion:[],gogoEvents:[],fades:[],duration:0},segments=[];
  for(let i=0;i<entries.length;i++){
@@ -46,19 +74,21 @@ function buildMedley(entries,specs){
   // Drop fades that start near or overlap a join. Effects in unused
   // material before a selected excerpt must never carry into that excerpt.
   const safeFades=(c.fades||[]).filter(e=>e.time>=from&&!seamWindows.some(([lo,hi])=>e.time<=hi&&(e.end??e.time)>=lo));
-  const segment={index:i,original:c,from,to,start,end,shift,seamWindows,safeFades,buffer:original.preloadedAudio||null};segments.push(segment);
+  const segment={index:i,original:c,from,to,start,end,shift,seamWindows,safeFades,visualChart:c.visual?.length?{bpm:c.bpm,visual:medleySeamVisual(c,seamWindows)}:null,buffer:original.preloadedAudio||null};segments.push(segment);
   const move=n=>({...n,time:n.time+shift,...(n.end!==undefined?{end:Math.min(n.end,to)+shift}:{}),medleyIndex:i});
   for(const key of ['notes','dummyNotes','bars','beats'])combined[key].push(...(c[key]||[]).filter(n=>n.time>=from&&n.time<to).map(move));
   combined.measures.push(...(c.measures||[]).filter(m=>m.end>from&&m.time<to).map(m=>({...move(m),time:Math.max(m.time,from)+shift})));
-  // Keep the spinner and visual-BPM indicator neutral in seam windows,
-  // even when a scroll/HS effect started earlier in the source chart.
-  const seed=medleyMotionAt(c,from),entryGuard=medleyInSeam(segment,from);
-  combined.motion.push({...seed,...(entryGuard?{scroll:1,hs:1}:{}),time:start});
+  // Only the display scroll (#ABSCROLL / MC scroll) is neutralized.
+  // Preserve TJA #SCROLL / MC hs and BPM events even inside a seam.
+  const seed=medleyMotionAt(c,from);
+  combined.motion.push({...seed,...(medleyInSeam(segment,from)?{scroll:1}:{}),time:start});
   for(const e of c.motion||c.visual||[]){
-   if(e.time>from&&e.time<to&&!medleyInSeam(segment,e.time))combined.motion.push({...e,time:e.time+shift});
+   if(e.time>from&&e.time<to){
+    combined.motion.push({...e,...(medleyInSeam(segment,e.time)?{scroll:1}:{}),time:e.time+shift});
+   }
   }
   for(const [lo,hi] of seamWindows){
-   if(lo>from)combined.motion.push({...medleyMotionAt(c,lo),scroll:1,hs:1,time:lo+shift});
+   if(lo>from)combined.motion.push({...medleyMotionAt(c,lo),scroll:1,time:lo+shift});
    if(hi<to)combined.motion.push({...medleyMotionAt(c,hi),time:hi+shift});
   }
   combined.motion.sort((a,b)=>a.time-b.time);
@@ -82,36 +112,16 @@ function medleySeamActive(t){
 function medleySourceChart(n){return medleyActive()&&n?.medleyIndex!==undefined?danRun.medley.segments[n.medleyIndex].original:chart}
 function medleyDistance(n,t){
  const s=danRun.medley.segments[n.medleyIndex],c=s.original,local=t-s.shift,nt=n.time-s.shift;
- // For notes in the join itself, ignore the original note's HS/scroll too.
- const hs=medleyInSeam(s,nt)?1:(n.scroll??1),rate=(n.bpm||c.bpm||120)/120*hs;
- // Most TJA charts have no global visual track; keep their per-note drawing
- // path as inexpensive as it was before the seam guard.
- if(!c.visual?.length)return (n.time-t)*rate;
- const raw=at=>malodyDistance(c,at,hs);
- if(!s.seamWindows.length)return raw(nt)-raw(local);
- // Window endpoints depend on HS but not on note BPM. Cache these per
- // segment so long medleys do not repeat the same distance lookup per frame.
- const cache=s._visualWindowCache||(s._visualWindowCache=new Map());
- let windows=cache.get(hs);
- if(!windows){
-  windows=s.seamWindows.map(([lo,hi])=>({lo,hi,loDistance:raw(lo),hiDistance:raw(hi)}));
-  cache.set(hs,windows);
- }
+ // Never suppress TJA #SCROLL or MC hs: both are stored per note.
+ const hs=n.scroll??1,rate=(n.bpm||c.bpm||120)/120*hs;
+ if(!s.visualChart)return (n.time-t)*rate;
+ const raw=at=>malodyDistance(s.visualChart,at,hs);
  const guarded=at=>{
-  // Do not bring a gimmick from before the incoming excerpt into its preview.
+  // Project adjacent notes from the join without inheriting motion
+  // from an unused portion of the previous/next song.
   if(s.index>0&&at<s.from)return raw(s.from)+(at-s.from)*rate;
-  // Similarly, extrapolate the outgoing lane neutrally beyond its cut.
-  if(s.index<danRun.medley.segments.length-1&&at>s.to)return guarded(s.to)+(at-s.to)*rate;
-  let distance=raw(at);
-  for(const {lo,hi,loDistance,hiDistance} of windows){
-   if(at<=lo)break;
-   const stop=Math.min(at,hi);
-   // Replace the original motion (including jumps) with a normal scroll,
-   // retaining visual continuity on both sides of the protected window.
-   const originalChange=stop===hi?hiDistance-loDistance:raw(stop)-loDistance;
-   distance+=rate*(stop-lo)-originalChange;
-  }
-  return distance;
+  if(s.index<danRun.medley.segments.length-1&&at>s.to)return raw(s.to)+(at-s.to)*rate;
+  return raw(at);
  };
  return guarded(nt)-guarded(local);
 }

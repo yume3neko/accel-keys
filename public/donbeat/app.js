@@ -258,7 +258,7 @@ async function loadFiles(files){
   const configs=[];
   for(const f of expanded.filter(f=>/\.(dan|txt|json)$/i.test(f.name))){const text=await decodeDanText(f);if(/\.dan$/i.test(f.name)||/^\s*(?:SONG1|EXAM1)\s*:/mi.test(text))configs.push({file:f,text});}
   if(configs.length>1)throw Error('段位設定ファイルは1つずつ読み込んでください。');
-  const incoming=configs.length?{config:parseDanConfig(configs[0].text),path:filePath(configs[0].file),armed:true}:null;
+  const incoming=configs.length?{config:parseDanConfig(configs[0].text),path:filePath(configs[0].file),armed:true,localOnly:danHasLocalAssets(expanded,configs[0].file),localCharts:new Set()}:null;
   const loaded=[],skipped=[];
   for(const f of chartFiles){
    let parsed;try{const bytes=await f.arrayBuffer();let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{text=new TextDecoder('shift-jis').decode(bytes)}parsed=/\.mc$/i.test(f.name)?parseMalody(text):parseTJA(text)}catch(e){skipped.push(f.name+'：'+e.message);continue}
@@ -289,6 +289,9 @@ async function loadFiles(files){
   attachSpinners([...danPool.map(e=>e.chart),...loaded],expanded);
   // Commit only after parsing succeeds; importing a broken package keeps the current song.
   if(loaded.length){audioFiles=new Map();charts=[...loaded,...charts.filter(c=>c.serverEntry)];demoMode=false;fillCourses()}
+   // Keep the mixed local course locked to charts from this import.  Further
+   // local chart uploads can complete the package, but older/R2 charts cannot.
+   rememberDanImportedCharts(loaded,incoming);
   for(const f of sounds)if(sounds.filter(a=>a.name.toLowerCase()===f.name.toLowerCase()).length===1)audioFiles.set(f.name.toLowerCase(),f);
   if(!loaded.length&&sounds.length){const match=audioFiles.get((chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase());if(match)chart.audioFile=match}
   if(incoming)pendingDan=incoming;

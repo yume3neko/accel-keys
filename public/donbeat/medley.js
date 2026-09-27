@@ -12,19 +12,56 @@ function medleyRange(c,spec={},finalSong=false){
  if(from<Math.min(0,first)-1e-7||to>last+1e-7)throw Error('メドレーの演奏区間が譜面・音源の範囲を超えています。');
  return {from,to};
 }
+// Visual-only protection around each join. Audio, notes and judgment timing
+// always retain their original timestamps and chart metadata.
+const MEDLEY_SEAM_GUARD_SECONDS=1;
+function medleySeamWindows(index,count,from,to){
+ const windows=[];
+ if(index>0)windows.push([from,Math.min(to,from+MEDLEY_SEAM_GUARD_SECONDS)]);
+ if(index<count-1)windows.push([Math.max(from,to-MEDLEY_SEAM_GUARD_SECONDS),to]);
+ windows.sort((a,b)=>a[0]-b[0]);
+ const merged=[];
+ for(const [lo,hi] of windows){
+  if(hi<=lo)continue;
+  const last=merged[merged.length-1];
+  if(last&&lo<=last[1])last[1]=Math.max(last[1],hi);
+  else merged.push([lo,hi]);
+ }
+ return merged;
+}
+function medleyInSeam(segment,local){
+ return segment.seamWindows.some(([lo,hi])=>local>=lo&&local<=hi);
+}
+function medleyMotionAt(c,t){
+ let state={bpm:c.bpm||120,scroll:1,hs:1};
+ for(const e of c.motion||c.visual||[]){if(e.time>t)break;state={...state,...e}}
+ return state;
+}
 function buildMedley(entries,specs){
  const combined={meta:{...entries[0].chart.meta},bpm:entries[0].chart.bpm,notes:[],dummyNotes:[],bars:[],measures:[],beats:[],motion:[],gogoEvents:[],fades:[],duration:0},segments=[];
  for(let i=0;i<entries.length;i++){
   const original=entries[i].chart,c=original._tja?rebuildTjaBranches(original,[]):original,{from,to}=medleyRange(c,specs[i],i===entries.length-1);
   const start=combined.duration,end=start+to-from,shift=start-from;
-  const segment={index:i,original:c,from,to,start,end,shift,buffer:original.preloadedAudio||null};segments.push(segment);
+  const seamWindows=medleySeamWindows(i,entries.length,from,to);
+  // Drop fades that start near or overlap a join. Effects in unused
+  // material before a selected excerpt must never carry into that excerpt.
+  const safeFades=(c.fades||[]).filter(e=>e.time>=from&&!seamWindows.some(([lo,hi])=>e.time<=hi&&(e.end??e.time)>=lo));
+  const segment={index:i,original:c,from,to,start,end,shift,seamWindows,safeFades,buffer:original.preloadedAudio||null};segments.push(segment);
   const move=n=>({...n,time:n.time+shift,...(n.end!==undefined?{end:Math.min(n.end,to)+shift}:{}),medleyIndex:i});
   for(const key of ['notes','dummyNotes','bars','beats'])combined[key].push(...(c[key]||[]).filter(n=>n.time>=from&&n.time<to).map(move));
   combined.measures.push(...(c.measures||[]).filter(m=>m.end>from&&m.time<to).map(m=>({...move(m),time:Math.max(m.time,from)+shift})));
-  // Seed persistent motion at each entry, including changes before the cut.
-  let motion={bpm:c.bpm,scroll:1,hs:1};for(const e of c.motion||c.visual||[]){if(e.time>from)break;motion={...motion,...e}}
-  combined.motion.push({...motion,time:start});
-  combined.motion.push(...(c.motion||c.visual||[]).filter(e=>e.time>from&&e.time<to).map(move));
+  // Keep the spinner and visual-BPM indicator neutral in seam windows,
+  // even when a scroll/HS effect started earlier in the source chart.
+  const seed=medleyMotionAt(c,from),entryGuard=medleyInSeam(segment,from);
+  combined.motion.push({...seed,...(entryGuard?{scroll:1,hs:1}:{}),time:start});
+  for(const e of c.motion||c.visual||[]){
+   if(e.time>from&&e.time<to&&!medleyInSeam(segment,e.time))combined.motion.push({...e,time:e.time+shift});
+  }
+  for(const [lo,hi] of seamWindows){
+   if(lo>from)combined.motion.push({...medleyMotionAt(c,lo),scroll:1,hs:1,time:lo+shift});
+   if(hi<to)combined.motion.push({...medleyMotionAt(c,hi),time:hi+shift});
+  }
+  combined.motion.sort((a,b)=>a.time-b.time);
   let gogo=false;for(const e of c.gogoEvents||[]){if(e.time>from)break;gogo=e.active}
   combined.gogoEvents.push({time:start,active:gogo},...(c.gogoEvents||[]).filter(e=>e.time>from&&e.time<to).map(move));
   segment.chart={...c,_tja:undefined,_branchScoreBasis:undefined,_branchMasterNoteCount:undefined,notes:combined.notes.filter(n=>n.medleyIndex===i),duration:end};
@@ -37,8 +74,39 @@ function buildMedley(entries,specs){
 }
 function medleyActive(){return !!danRun?.medley}
 function medleySegmentAt(t){const segments=danRun.medley.segments;return segments.find(s=>t<s.end)||segments[segments.length-1]}
+function medleySeamActive(t){
+ if(!medleyActive())return false;
+ const s=medleySegmentAt(t);
+ return medleyInSeam(s,t-s.shift);
+}
 function medleySourceChart(n){return medleyActive()&&n?.medleyIndex!==undefined?danRun.medley.segments[n.medleyIndex].original:chart}
-function medleyDistance(n,t){const s=danRun.medley.segments[n.medleyIndex],c=s.original,local=t-s.shift,nt=n.time-s.shift;return c.visual?malodyDistance(c,nt,n.scroll)-malodyDistance(c,local,n.scroll):(n.time-t)*(n.bpm/120)*n.scroll}
+function medleyDistance(n,t){
+ const s=danRun.medley.segments[n.medleyIndex],c=s.original,local=t-s.shift,nt=n.time-s.shift;
+ // For notes in the join itself, ignore the original note's HS/scroll too.
+ const hs=medleyInSeam(s,nt)?1:(n.scroll??1),rate=(n.bpm||c.bpm||120)/120*hs;
+ const raw=at=>c.visual?.length?malodyDistance(c,at,hs):at*rate;
+ const guarded=at=>{
+  // Do not bring a gimmick from before the incoming excerpt into its preview.
+  if(s.index>0&&at<s.from)return raw(s.from)+(at-s.from)*rate;
+  // Similarly, extrapolate the outgoing lane neutrally beyond its cut.
+  if(s.index<danRun.medley.segments.length-1&&at>s.to)return guarded(s.to)+(at-s.to)*rate;
+  let distance=raw(at);
+  for(const [lo,hi] of s.seamWindows){
+   if(at<=lo)break;
+   const stop=Math.min(at,hi);
+   // Replace the entire original motion (including jump offsets) with a
+   // normal linear scroll, retaining positional continuity at both edges.
+   distance+=rate*(stop-lo)-(raw(stop)-raw(lo));
+  }
+  return distance;
+ };
+ return guarded(nt)-guarded(local);
+}
+function medleyFadeAt(t){
+ const s=medleySegmentAt(t);
+ if(medleyInSeam(s,t-s.shift))return {info:1,lane:1,note:1,button:1};
+ return chartFadeAt(s.safeFades,t-s.shift);
+}
 function medleyEmptyStats(){return {score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0,balloonRolls:0,balloonPops:0,allcombo:0,soul:0,combo:0}}
 function medleyRecord(n,before,error){
  if(!medleyActive()||n.medleyIndex===undefined)return;

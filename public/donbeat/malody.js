@@ -69,23 +69,66 @@ function parseMalody(text){
  const features={fadeOnNotes:hasNoteFadeout(notes,fades),scrollOnNotes:hasNoteScrollGimmick(notes,visual),soflan:timing.some(e=>e.bpm!==timing[0].bpm)||effects.some(e=>(e.scroll!==undefined&&e.scroll!==1)||(e.hs!==undefined&&e.hs<0)),fadeout:effects.some(e=>e.fade===0)};
  return {charts:[{features,meta:{TITLE:song.titleorg||song.title||'無題',SUBTITLE:[song.artistorg||song.artist,d.meta.creator].filter(Boolean).join(' / '),COURSE:version,LEVEL:level,VIDEO:d.meta.video||'',WAVE:sound?.sound||''},notes:notes.filter(n=>!n.dummy),dummyNotes:notes.filter(n=>n.dummy),bars,measures,visual,fades,gogoEvents:effects.filter(e=>e.ggt!==undefined).map(e=>({time:seconds(e.position)-offset,active:!!e.ggt})),beats:[],bpm:timing[0].bpm,duration:seconds(lastBeat)-offset,warnings:[...warnings]}],warnings:[...warnings]};
 }
+// Read only the ZIP directory and one entry at a time. In particular, large
+// medley packs must not be copied into a single multi-gigabyte ArrayBuffer.
+const CHART_ARCHIVE_LIMIT=1024*1024*1024,CHART_ARCHIVE_EXPANDED_LIMIT=2*1024*1024*1024;
 async function readChartArchive(file){
- if(file.size>256*1024*1024)throw Error('MCZ / ZIPは256MB以下にしてください。');const bytes=new Uint8Array(await file.arrayBuffer()),v=new DataView(bytes.buffer);let end=-1;
- for(let p=bytes.length-22;p>=Math.max(0,bytes.length-65557);p--)if(v.getUint32(p,true)===0x06054b50&&p+22+v.getUint16(p+20,true)===bytes.length){end=p;break}
- if(end<0)throw Error('有効なZIP形式ではありません。');const count=v.getUint16(end+10,true);if(v.getUint16(end+4,true)||v.getUint16(end+6,true)||count===65535)throw Error('分割ZIP・ZIP64には対応していません。');let p=v.getUint32(end+16,true),total=0;const files=[];
+ if(file.size>CHART_ARCHIVE_LIMIT)throw Error('MCZ / ZIPは1GB以下にしてください。大きい場合は解凍してフォルダを選択してください。');
+ const tailSize=Math.min(file.size,65557),tail=new Uint8Array(await file.slice(file.size-tailSize).arrayBuffer()),tailView=new DataView(tail.buffer);
+ let end=-1;
+ for(let p=tail.length-22;p>=0;p--)if(tailView.getUint32(p,true)===0x06054b50&&p+22+tailView.getUint16(p+20,true)===tail.length){end=p;break}
+ if(end<0)throw Error('有効なZIP形式ではありません。');
+ const count=tailView.getUint16(end+10,true),directorySize=tailView.getUint32(end+12,true),directoryOffset=tailView.getUint32(end+16,true);
+ if(tailView.getUint16(end+4,true)||tailView.getUint16(end+6,true)||count===65535||directoryOffset===0xffffffff||directorySize===0xffffffff)throw Error('分割ZIP・ZIP64には対応していません。解凍してフォルダを選択してください。');
+ const absoluteEnd=file.size-tailSize+end;
+ if(directorySize>16*1024*1024||directoryOffset+directorySize>absoluteEnd)throw Error('ZIPの一覧が破損しています。');
+ const directory=new Uint8Array(await file.slice(directoryOffset,directoryOffset+directorySize).arrayBuffer()),v=new DataView(directory.buffer);
+ let p=0,total=0;const entries=[];
  for(let i=0;i<count;i++){
-  if(p+46>bytes.length||v.getUint32(p,true)!==0x02014b50)throw Error('ZIPの一覧が破損しています。');const flags=v.getUint16(p+8,true),method=v.getUint16(p+10,true),compressed=v.getUint32(p+20,true),size=v.getUint32(p+24,true),nl=v.getUint16(p+28,true),extra=v.getUint16(p+30,true),comment=v.getUint16(p+32,true),local=v.getUint32(p+42,true),crc=v.getUint32(p+16,true);
-  if(p+46+nl+extra+comment>bytes.length)throw Error('ZIPの一覧が不完全です。');const nameBytes=bytes.slice(p+46,p+46+nl);let name;try{name=new TextDecoder('utf-8',{fatal:true}).decode(nameBytes)}catch{name=new TextDecoder('shift-jis').decode(nameBytes)}p+=46+nl+extra+comment;
+  if(p+46>directory.length||v.getUint32(p,true)!==0x02014b50)throw Error('ZIPの一覧が破損しています。');
+  const flags=v.getUint16(p+8,true),method=v.getUint16(p+10,true),compressed=v.getUint32(p+20,true),size=v.getUint32(p+24,true),nl=v.getUint16(p+28,true),extra=v.getUint16(p+30,true),comment=v.getUint16(p+32,true),local=v.getUint32(p+42,true),crc=v.getUint32(p+16,true);
+  if(p+46+nl+extra+comment>directory.length)throw Error('ZIPの一覧が不完全です。');
+  const nameBytes=directory.subarray(p+46,p+46+nl);let name;
+  try{name=new TextDecoder('utf-8',{fatal:true}).decode(nameBytes)}catch{name=new TextDecoder('shift-jis').decode(nameBytes)}p+=46+nl+extra+comment;
   if(!/\.(mc|tja|json|dan|txt|mp4|webm|m4v|ogg|mp3|wav|m4a|flac|png|jpe?g|webp|gif)$/i.test(name))continue;
-  if(flags&1)throw Error('パスワード付きZIPには対応していません。');if(![0,8].includes(method))throw Error('このZIP圧縮方式には対応していません。');if(size>128*1024*1024||(total+=size)>256*1024*1024)throw Error('展開後のファイルサイズが大きすぎます。');
-  if(local+30>bytes.length||v.getUint32(local,true)!==0x04034b50)throw Error('ZIPのファイル情報が破損しています。');const begin=local+30+v.getUint16(local+26,true)+v.getUint16(local+28,true);if(begin+compressed>bytes.length)throw Error('ZIPのデータが不完全です。');let data=bytes.slice(begin,begin+compressed);
-  if(method===8){let stream;try{stream=new DecompressionStream('deflate-raw')}catch{throw Error('このブラウザではMCZ展開を利用できません。ZIPを解凍してフォルダを選択してください。')}const reader=new Blob([data]).stream().pipeThrough(stream).getReader(),chunks=[];let length=0;while(true){const r=await reader.read();if(r.done)break;length+=r.value.length;if(length>size){await reader.cancel();throw Error('ZIPの展開サイズが不正です。')}chunks.push(r.value)}data=new Uint8Array(length);let cursor=0;for(const c of chunks){data.set(c,cursor);cursor+=c.length}}
-  if(data.length!==size||crc32(data)!==crc)throw Error('ZIPの整合性確認に失敗しました。');const f=new File([data],name.split(/[\\/]/).pop());Object.defineProperty(f,'chartPath',{value:name.replace(/\\/g,'/')});files.push(f);
+  if(flags&1)throw Error('パスワード付きZIPには対応していません。');
+  if(![0,8].includes(method))throw Error('このZIP圧縮方式には対応していません。');
+  if(size>256*1024*1024||(total+=size)>CHART_ARCHIVE_EXPANDED_LIMIT)throw Error('展開後のファイルは1つ256MB、合計2GB以下にしてください。大きい場合は解凍してフォルダを選択してください。');
+  if(entries.length>=10000)throw Error('ZIP内のファイル数が多すぎます。');
+  entries.push({name,flags,method,compressed,size,local,crc});
  }
- if(!files.some(f=>/\.(mc|tja|json|dan|txt)$/i.test(f.name)))throw Error('MCZ / ZIP内にMC・TJA譜面または段位設定ファイルがありません。');return files;
+ if(p!==directory.length)throw Error('ZIPの一覧が不完全です。');
+ if(!entries.some(e=>/\.(mc|tja|json|dan|txt)$/i.test(e.name)))throw Error('MCZ / ZIP内にMC・TJA譜面または段位設定ファイルがありません。');
+ const files=[];
+ for(const entry of entries){
+  const {name,flags,method,compressed,size,local,crc}=entry;
+  if(local+30>directoryOffset)throw Error('ZIPのファイル情報が破損しています。');
+  const header=new DataView(await file.slice(local,local+30).arrayBuffer());
+  if(header.getUint32(0,true)!==0x04034b50||header.getUint16(8,true)!==method||header.getUint16(6,true)!==flags)throw Error('ZIPのファイル情報が破損しています。');
+  const begin=local+30+header.getUint16(26,true)+header.getUint16(28,true);
+  if(begin+compressed>directoryOffset)throw Error('ZIPのデータが不完全です。');
+  const source=file.slice(begin,begin+compressed);
+  let payload;
+  if(method===8){
+   let stream;try{stream=source.stream().pipeThrough(new DecompressionStream('deflate-raw'))}
+   catch{throw Error('このブラウザではMCZ展開を利用できません。ZIPを解凍してフォルダを選択してください。')}
+   const reader=stream.getReader(),chunks=[];let length=0,check=0xffffffff;
+   try{while(true){const r=await reader.read();if(r.done)break;length+=r.value.length;if(length>size){await reader.cancel();throw Error('ZIPの展開サイズが不正です。')}check=crc32Update(r.value,check);chunks.push(r.value)}}catch(e){throw Error('ZIPのデータを展開できませんでした：'+(e.message||e))}
+   if(length!==size||(check^0xffffffff)>>>0!==crc)throw Error('ZIPの整合性確認に失敗しました。');
+   payload=chunks;
+  }else{
+   if(compressed!==size)throw Error('ZIPのデータが不完全です。');
+   let check=0xffffffff;const reader=source.stream().getReader();while(true){const r=await reader.read();if(r.done)break;check=crc32Update(r.value,check)}
+   if((check^0xffffffff)>>>0!==crc)throw Error('ZIPの整合性確認に失敗しました。');
+   payload=[source];
+  }
+  const f=new File(payload,name.split(/[\\/]/).pop());Object.defineProperty(f,'chartPath',{value:name.replace(/\\/g,'/')});files.push(f);
+ }
+ return files;
 }
 const crcTable=Array.from({length:256},(_,i)=>{for(let j=0;j<8;j++)i=(i&1)?0xedb88320^(i>>>1):i>>>1;return i>>>0});
-function crc32(data){let c=0xffffffff;for(const b of data)c=crcTable[(c^b)&255]^(c>>>8);return (c^0xffffffff)>>>0}
+function crc32Update(data,seed=0xffffffff){let c=seed;for(const b of data)c=crcTable[(c^b)&255]^(c>>>8);return c>>>0}
+function crc32(data){return (crc32Update(data)^0xffffffff)>>>0}
 function malodyDistance(chart,t,hs=1){const events=chart.visual;if(!events?.length)return t*chart.bpm/120*hs;let lo=0,hi=events.length;if(t<events[0].time)return (events[0].distance+(t-events[0].time)*chart.bpm/120)*hs;while(lo+1<hi){const mid=(lo+hi)>>1;if(events[mid].time<=t)lo=mid;else hi=mid}const e=events[lo];return (e.distance+(t-e.time)*e.rate+(e.jumpDistance||0))*hs}
 Object.assign(root,{parseMalody,readChartArchive,malodyDistance});if(typeof module!=='undefined')module.exports={parseMalody,readChartArchive,malodyDistance};
 })(typeof window!=='undefined'?window:globalThis);

@@ -88,6 +88,10 @@ function updateMedleyDisplay(t){
 }
 function medleyFailed(){
  const run=danRun,t=time()-judgmentOffsetSeconds(),m=run.medley;
+ // Autoplay is a full-course preview; its fixed roll rate must not
+ // terminate the course early when a manual roll exam is unreachable.
+ // Avoid a failure result during the leading pre-roll for manual play, too.
+ if(run.config.auto||t<0)return false;
  const possible=m.stats.map(s=>({...s}));let remaining=0;
  for(const n of notes){if(n.done)continue;const p=possible[n.medleyIndex],s=m.segments[n.medleyIndex];
   if(n.type<=4){p.good++;p.ok++;p.miss++;p.allcombo++;p.score+=s.noteScore;p.maxCombo++;remaining++}

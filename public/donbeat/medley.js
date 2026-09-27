@@ -84,19 +84,32 @@ function medleyDistance(n,t){
  const s=danRun.medley.segments[n.medleyIndex],c=s.original,local=t-s.shift,nt=n.time-s.shift;
  // For notes in the join itself, ignore the original note's HS/scroll too.
  const hs=medleyInSeam(s,nt)?1:(n.scroll??1),rate=(n.bpm||c.bpm||120)/120*hs;
- const raw=at=>c.visual?.length?malodyDistance(c,at,hs):at*rate;
+ // Most TJA charts have no global visual track; keep their per-note drawing
+ // path as inexpensive as it was before the seam guard.
+ if(!c.visual?.length)return (n.time-t)*rate;
+ const raw=at=>malodyDistance(c,at,hs);
+ if(!s.seamWindows.length)return raw(nt)-raw(local);
+ // Window endpoints depend on HS but not on note BPM. Cache these per
+ // segment so long medleys do not repeat the same distance lookup per frame.
+ const cache=s._visualWindowCache||(s._visualWindowCache=new Map());
+ let windows=cache.get(hs);
+ if(!windows){
+  windows=s.seamWindows.map(([lo,hi])=>({lo,hi,loDistance:raw(lo),hiDistance:raw(hi)}));
+  cache.set(hs,windows);
+ }
  const guarded=at=>{
   // Do not bring a gimmick from before the incoming excerpt into its preview.
   if(s.index>0&&at<s.from)return raw(s.from)+(at-s.from)*rate;
   // Similarly, extrapolate the outgoing lane neutrally beyond its cut.
   if(s.index<danRun.medley.segments.length-1&&at>s.to)return guarded(s.to)+(at-s.to)*rate;
   let distance=raw(at);
-  for(const [lo,hi] of s.seamWindows){
+  for(const {lo,hi,loDistance,hiDistance} of windows){
    if(at<=lo)break;
    const stop=Math.min(at,hi);
-   // Replace the entire original motion (including jump offsets) with a
-   // normal linear scroll, retaining positional continuity at both edges.
-   distance+=rate*(stop-lo)-(raw(stop)-raw(lo));
+   // Replace the original motion (including jumps) with a normal scroll,
+   // retaining visual continuity on both sides of the protected window.
+   const originalChange=stop===hi?hiDistance-loDistance:raw(stop)-loDistance;
+   distance+=rate*(stop-lo)-originalChange;
   }
   return distance;
  };

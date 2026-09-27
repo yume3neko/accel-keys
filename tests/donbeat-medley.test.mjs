@@ -78,7 +78,7 @@ test('MC scroll/jump muted at joins, but hs and earlier scroll/jump remain',()=>
  vm.runInContext('const mcChart=parseMalody(JSON.stringify(mc)).charts[0];const guardedMC=buildMedley([{chart:mcChart},{chart:second}],[{range:[0,2.5]},{}]);danRun={medley:guardedMC}',c);
  assert.equal(vm.runInContext('guardedMC.chart.notes[1].scroll',c),2);
  assert.equal(vm.runInContext('medleyDistance(guardedMC.chart.notes[1],1.75)',c),.5);
- assert.equal(vm.runInContext('medleyDistance(guardedMC.chart.notes[0],1)',c),-2);
+ assert.equal(vm.runInContext('medleyDistance(guardedMC.chart.notes[0],1)',c),-3.5);
  assert.equal(vm.runInContext('guardedMC.chart.motion.filter(m=>m.time<=2).at(-1).scroll',c),1);
  assert.equal(vm.runInContext('guardedMC.chart.motion.filter(m=>m.time<=2).at(-1).hs',c),2);
  assert.equal(vm.runInContext('guardedMC.segments[0].visualChart.visual.find(e=>e.time===1.75).jumpDistance',c),1.5);

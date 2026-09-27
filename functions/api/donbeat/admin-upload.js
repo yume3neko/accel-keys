@@ -1,6 +1,7 @@
 import {requireAdmin,checkWriteOrigin} from '../../_shared/donbeat-auth.js';
 // DONBEAT R2 imports: all files must arrive and every TJA/MC must resolve its BGM
 // before the catalog is written. The catalog object is the only publication marker.
+const VIDEO=/\.(mp4|webm|m4v)$/i;
 const CHART=/\.(tja|mc)$/i, AUDIO=/\.(ogg|mp3|wav|m4a|flac|opus|aac)$/i;
 const ALLOWED=/\.(tja|mc|ogg|mp3|wav|m4a|flac|opus|aac|mp4|webm|m4v|png|jpg|jpeg|webp|gif)$/i;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -60,7 +61,7 @@ function parseChart(text,path){
    throw Error('Malody太鼓モード（mode:5）の譜面ではありません。');
   const bgms=[...new Set(d.note.filter(n=>Number(n.type)===1&&typeof n.sound==='string'&&n.sound.trim()).map(n=>n.sound.trim()))];
   if(!d.note.some(n=>n.sound===undefined&&Number.isFinite(Number(n.style))))throw Error('演奏できる音符がありません。');
-  return {title:String(d.meta?.song?.titleorg||d.meta?.song?.title||path.split('/').pop().replace(/\.mc$/i,'')).trim(),waves:bgms,genre:d.meta?.genre||''};
+  return {title:String(d.meta?.song?.titleorg||d.meta?.song?.title||path.split('/').pop().replace(/\.mc$/i,'')).trim(),waves:bgms,video:d.meta?.video||'',genre:d.meta?.genre||''};
  }
  const meta={},waves=[],lines=text.split(/\r?\n/);
  let started=false,hasNotes=false,hasSingle=false,activeStyle='';
@@ -79,7 +80,7 @@ function parseChart(text,path){
  if(!hasSingle||!hasNotes)throw Error('演奏できる1人用の音符がありません。');
  const unique=[...new Set(waves.map(norm))];
  if(unique.length>1)throw Error('1つのTJAに複数の異なるWAVEがあります。譜面ごとに分けてください。');
- return {title:String(meta.TITLEJA||meta.TITLE||path.split('/').pop().replace(/\.tja$/i,'')).trim(),waves:waves.slice(0,1),genre:meta.GENRE||''};
+ return {title:String(meta.TITLEJA||meta.TITLE||path.split('/').pop().replace(/\.tja$/i,'')).trim(),waves:waves.slice(0,1),video:meta.VIDEO||'',genre:meta.GENRE||''};
 }
 async function readManifest(bucket,id){
  const item=await bucket.get(manifestKey(id));
@@ -131,7 +132,7 @@ export async function onRequestPost({request,env}){
    if(!files.some(f=>CHART.test(f.path)))throw Error('TJAまたはMC譜面を含めてください。');
   }catch(e){return bad(e.message)}
   const id=crypto.randomUUID();
-  const manifest={id,files,genre:GENRES.includes(body.genre)?body.genre:null,createdAt:new Date().toISOString()};
+  const manifest={id,files,genre:GENRES.includes(body.genre)?body.genre:null,category:body.category==='creative'?'creative':'official',createdAt:new Date().toISOString()};
   await bucket.put(manifestKey(id),JSON.stringify(manifest),{httpMetadata:{contentType:'application/json'}});
   return json({batch:id,count:files.length,total});
  }
@@ -159,8 +160,12 @@ export async function onRequestPost({request,env}){
   if(matches.some(m=>!m.path||objects.get(m.path)?.size===0))continue;
   const audio=matches[0].path;
   const genre=inferGenre(f.path,manifest.genre,metadata.genre);
+  const videos=[...objects.keys()].filter(path=>VIDEO.test(path));
+  const requested=metadata.video?resolvePath(f.path,metadata.video):null;
+  const video=requested&&videos.find(path=>norm(path)===norm(requested));
+  if(metadata.video&&!video){issues.push(f.path+'：MVが見つかりません '+metadata.video);continue}
   songs.push({title:metadata.title||f.path.split('/').pop(),file:mediaURL(id,f.path),
-   audio:mediaURL(id,audio),genre,category:'official',categoryManual:true});
+   audio:mediaURL(id,audio),...(video?{video:mediaURL(id,video)}:{}),genre,category:manifest.category==='creative'?'creative':'official',categoryManual:true});
  }
  if(issues.length)return bad('譜面と音源がすべてそろっていないため公開しませんでした。',409,issues.slice(0,100));
  // Single manifest write makes the fully uploaded batch visible at once.

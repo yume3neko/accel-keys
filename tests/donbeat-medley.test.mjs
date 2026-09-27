@@ -61,33 +61,49 @@ test('seam guard removes overlapping TJA/MC fades and leaves remote effects alon
  assert.equal(vm.runInContext('medleyFadeAt(.5).length',c),1);
  assert.equal(vm.runInContext('medleyFadeAt(4).length',c),1);
 });
-test('incoming/outgoing visual guards cancel MC jumps and scroll without changing notes',()=>{
+test('MC scroll/jump muted at joins, but hs and earlier scroll/jump remain',()=>{
  const c=env();
- c.first={...structuredClone(plain),notes:[
-  {time:.5,type:1,bpm:120,scroll:4},
-  {time:2,type:2,bpm:120,scroll:4}
- ],visual:[
-  {time:0,distance:0,jumpDistance:0,rate:1,bpm:120,scroll:1,hs:1},
-  {time:1.75,distance:1.75,jumpDistance:8,rate:4,bpm:120,scroll:4,hs:1},
-  {time:2.25,distance:3.75,jumpDistance:8,rate:4,bpm:120,scroll:4,hs:1}
- ]};
+ c.mc={
+  meta:{mode:5,song:{title:'MC Seam'},version:'Oni'},
+  time:[{beat:[0,0,1],bpm:120}],
+  note:[{beat:[0,0,1],type:1,sound:'music.ogg'},{beat:[0,0,1],style:0},{beat:[0,4,1],style:0},{beat:[0,8,1],style:0}],
+  effect:[
+   {beat:[0,1,1],scroll:3},
+   {beat:[0,2,1],jump:500},
+   {beat:[0,3,1],hs:2},
+   {beat:[0,7,2],scroll:4,jump:2000}
+  ]
+ };
  c.second=structuredClone(plain);
- vm.runInContext('const guardedMotion=buildMedley([{chart:first},{chart:second}],[{range:[0,2.5]},{}]);danRun={medley:guardedMotion}',c);
- assert.equal(vm.runInContext('medleyDistance(guardedMotion.chart.notes[1],1.75)',c),.25);
- assert.equal(vm.runInContext('medleyDistance(guardedMotion.chart.notes[0],.25)',c),1);
- assert.equal(vm.runInContext('guardedMotion.chart.notes[1].time',c),2);
- assert.equal(vm.runInContext('guardedMotion.chart.notes[1].scroll',c),4);
- assert.equal(vm.runInContext('first.visual[1].jumpDistance',c),8);
- assert.equal(vm.runInContext('guardedMotion.chart.motion.filter(m=>m.time<=2).at(-1).scroll',c),1);
- assert.equal(vm.runInContext('medleyDistance(guardedMotion.chart.notes[1],2.75)',c),-.75);
+ vm.runInContext('const mcChart=parseMalody(JSON.stringify(mc)).charts[0];const guardedMC=buildMedley([{chart:mcChart},{chart:second}],[{range:[0,2.5]},{}]);danRun={medley:guardedMC}',c);
+ assert.equal(vm.runInContext('guardedMC.chart.notes[1].scroll',c),2);
+ assert.equal(vm.runInContext('medleyDistance(guardedMC.chart.notes[1],1.75)',c),.5);
+ assert.equal(vm.runInContext('medleyDistance(guardedMC.chart.notes[0],1)',c),-2);
+ assert.equal(vm.runInContext('guardedMC.chart.motion.filter(m=>m.time<=2).at(-1).scroll',c),1);
+ assert.equal(vm.runInContext('guardedMC.chart.motion.filter(m=>m.time<=2).at(-1).hs',c),2);
+ assert.equal(vm.runInContext('guardedMC.segments[0].visualChart.visual.find(e=>e.time===1.75).jumpDistance',c),1.5);
+ assert.equal(vm.runInContext('mcChart.visual.find(e=>e.time===1.75).jumpDistance',c),17.5);
 });
-test('TJA scroll near a join is only disabled for visual movement, not source chart',()=>{
+test('TJA ABSCROLL muted but SCROLL, BPM and GOGO survive the join',()=>{
  const c=env();
- c.tja='TITLE:Scroll\nBPM:120\nCOURSE:Oni\n#START\n1000,\n#SCROLL 4\n1000,\n#END';
+ c.tja='TITLE:Scroll\nBPM:120\nCOURSE:Oni\n#START\n#ABSCROLL 3\n1000,\n#SCROLL 4\n#ABSCROLL 6\n#BPMCHANGE 240\n#GOGOSTART\n1000,\n#END';
  vm.runInContext('const tjaChart=parseTJA(tja).charts[0];const guardedTja=buildMedley([{chart:tjaChart},{chart:structuredClone(plain)}],[{range:[0,2.5]},{}]);danRun={medley:guardedTja}',c);
  assert.equal(vm.runInContext('guardedTja.chart.notes[1].scroll',c),4);
- assert.equal(vm.runInContext('medleyDistance(guardedTja.chart.notes[1],1.75)',c),.25);
- assert.equal(vm.runInContext('guardedTja.chart.motion.filter(m=>m.time<=2).at(-1).hs',c),1);
+ assert.equal(vm.runInContext('medleyDistance(guardedTja.chart.notes[0],.5)',c),-1.5);
+ assert.equal(vm.runInContext('medleyDistance(guardedTja.chart.notes[1],1.75)',c),1);
+ assert.equal(vm.runInContext('guardedTja.chart.motion.filter(m=>m.time<=2).at(-1).scroll',c),1);
+ assert.equal(vm.runInContext('guardedTja.chart.motion.filter(m=>m.time<=2).at(-1).hs',c),4);
+ assert.equal(vm.runInContext('guardedTja.chart.motion.filter(m=>m.time<=2).at(-1).bpm',c),240);
+ assert.equal(vm.runInContext('guardedTja.chart.gogoEvents.find(e=>e.time===2).active',c),true);
+ assert.equal(vm.runInContext('tjaChart.visual.filter(e=>e.time===2).at(-1).scroll',c),6);
+});
+test('TJA SCROLL still works when there is no ABSCROLL track',()=>{
+ const c=env();c.tja='TITLE:Scroll\nBPM:120\nCOURSE:Oni\n#START\n1000,\n#SCROLL 4\n1000,\n#END';
+ vm.runInContext('const noAb=parseTJA(tja).charts[0];const guarded=buildMedley([{chart:noAb},{chart:structuredClone(plain)}],[{range:[0,2.5]},{}]);danRun={medley:guarded}',c);
+ assert.equal(vm.runInContext('guarded.segments[0].visualChart',c),null);
+ assert.equal(vm.runInContext('guarded.chart.notes[1].scroll',c),4);
+ assert.equal(vm.runInContext('medleyDistance(guarded.chart.notes[1],1.75)',c),1);
+ assert.equal(vm.runInContext('guarded.chart.motion.filter(m=>m.time<=2).at(-1).hs',c),4);
 });
 test('overlapping guards cover an entire very short middle excerpt',()=>{
  const c=env();

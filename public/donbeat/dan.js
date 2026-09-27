@@ -20,6 +20,7 @@ function danSongLabel(entry){const c=entry.chart;return (c.meta.TITLE||'無題')
 let pendingDan=null;
 function danPreviewTitle(c){if(!c)return '？？？';const title=(c.meta.TITLE||'').normalize('NFC').trim(),file=(c.importName||c.sourcePath||'').split('/').pop().replace(/\.[^.]+$/,'').normalize('NFC').trim();return title&&title===file?title:'？？？'}
 function danPendingTitle(song,index){if(pendingDan.config.hide?.includes(index+1))return '？？？';let entry;try{entry=resolveDanConfig(true,index).songs[0]}catch{}return entry?.chart.meta.TITLE||song.chart}
+function danErrorTitle(song,index){return pendingDan.config.hide?.includes(index+1)?'？？？':song.chart}
 
 function refreshDanSongs(){
  const box=$('danSummary');box.replaceChildren();if(!pendingDan){box.append(danNode('p','段位設定ファイルを読み込んでください。'));return}
@@ -85,7 +86,7 @@ function resolveDanConfig(preview=false,onlyIndex=null){
  if(!matches.length)matches=candidates.filter(e=>e.chart.importName&&normalizedPath(e.chart.importName)===normalizedPath(song.chart));
  if(!matches.length)matches=candidates.filter(e=>(e.chart.meta.TITLE||'').normalize('NFC')===song.chart.normalize('NFC'));
  if(song.course!==undefined){const courses={easy:0,normal:1,hard:2,oni:3,edit:4};matches=matches.filter(e=>{if(/\.mc$/i.test(e.chart.sourcePath||''))return false;const course=String(e.chart.meta.COURSE||'Oni').trim().toLowerCase();return (Object.hasOwn(courses,course)?courses[course]:/^[0-4]$/.test(course)?Number(course):-1)===song.course});}
- if(matches.length!==1)throw Error((i+1)+'曲目：'+danPendingTitle(song,i)+(matches.length?' が複数あります。難易度番号や譜面の相対パスで特定してください。':pendingDan.localOnly?' に一致するローカル譜面・難易度がありません。課題曲を追加するか相対パスを確認してください（収録曲は検索しません）。':' に一致する譜面・難易度がありません。指定を確認して譜面を追加してください。'));
+ if(matches.length!==1)throw Error((i+1)+'曲目：'+danErrorTitle(song,i)+(matches.length?' が複数あります。難易度番号や譜面の相対パスで特定してください。':pendingDan.localOnly?' に一致するローカル譜面・難易度がありません。課題曲を追加するか相対パスを確認してください（収録曲は検索しません）。':' に一致する譜面・難易度がありません。指定を確認して譜面を追加してください。'));
  const target=matches[0].chart,demo=!!target.builtinDemo;if(!preview&&!demo&&!playbackAssetsAvailable(target))throw Error((i+1)+'曲目の音源 '+(target.meta.WAVE||'')+' が見つかりません。');return {...matches[0],demo};});
  return {...c,songs:selected.filter(Boolean),auto:false};
 }

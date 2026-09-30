@@ -138,7 +138,8 @@ function showScoreGain(points){
  item.addEventListener('animationend',remove,{once:true});
  setTimeout(remove,1000);
 }
-function update(){$('score').textContent=String(score).padStart(7,'0');$('combo').textContent=combo;$('good').textContent=good;$('ok').textContent=ok;$('miss').textContent=miss;$('roll').textContent=rolls;$('gauge').style.width=soul+'%';$('gaugeText').textContent=Math.floor(soul)+'%';updateDanHUD();updateDanPauseRemaining()}
+function accuracyText(){const judged=good+ok+miss;return (judged?Math.min(100,(good+ok*.5)/judged*100):100).toFixed(2)+'%'}
+function update(){$('accuracy').textContent=accuracyText();$('score').textContent=String(score).padStart(7,'0');$('combo').textContent=combo;$('good').textContent=good;$('ok').textContent=ok;$('miss').textContent=miss;$('roll').textContent=rolls;$('gauge').style.width=soul+'%';$('gaugeText').textContent=Math.floor(soul)+'%';updateDanHUD();updateDanPauseRemaining()}
 function judgmentWindows(n){const level=Number(medleySourceChart(n)?.meta?.LEVEL);return Number.isFinite(level)&&level>0&&level<=5?{good:.041708,ok:.108442,miss:.125125}:{good:.025025,ok:.075075,miss:.108442}}
 function judgeCore(n,error){const before=medleyActive()?danStats():null;notifyDanJudgment(error);n.done=true;const noteScore=medleyActive()?danRun.medley.segments[n.medleyIndex].noteScore:chartNoteScore(chart);if(error<=judgmentWindows(n).good){good++;score+=noteScore;showScoreGain(noteScore);soul=Math.min(100,soul+130/soulNoteCount());feedback='良'}else if(error<=judgmentWindows(n).ok){ok++;const gain=Math.floor(noteScore/2/10)*10;score+=gain;showScoreGain(gain);soul=Math.min(100,soul+65/soulNoteCount());feedback='可'}else{miss++;combo=0;soul=Math.max(0,soul-260/soulNoteCount());feedback='不可';feedbackAt=time();medleyRecord(n,before,error);update();return}combo++;maxCombo=Math.max(combo,maxCombo);feedbackAt=time();medleyRecord(n,before,error);update()}
 // Auto rolls use about 30 hits/sec. Balloons may accelerate up to 60 hits/sec
@@ -199,7 +200,11 @@ function loop(){
 }
 function resize(){const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);width=r.width;height=r.height;canvas.width=width*dpr;canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
 function isGogoTime(c,t){const events=c.gogoEvents||[];let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<=t)lo=mid+1;else hi=mid}return lo>0&&events[lo-1].active;}
-function currentSongTitle(){return chart?.meta?.TITLE||'無題'}
+function currentSongTitle(){
+ const meta=chart?.meta||{},course=String(meta.COURSE??'Oni'),key={easy:'Easy',normal:'Normal',hard:'Hard',oni:'Oni',edit:'Edit'}[course.toLowerCase()]||course;
+ const difficulty=key==='Edit'||key==='4'?'裏おに':names[key]||course;
+ return (meta.TITLE||'無題')+' / '+difficulty+' ★'+(meta.LEVEL??'?');
+}
 function updateCurrentSongTitle(){const el=$('currentSongTitle');if(!el)return;const title=currentSongTitle();if(el.textContent!==title){el.textContent=title;el.title=title}}
 function draw(){updateCurrentSongTitle();updateHibiki();updateAutoPads();syncMV();updateProgress();const t=time(),fade=applyChartFade(t),y=height*.5,target=width<600?76:125,speed=Number($('speed').value),r=Math.min(26,height*.19);updateVisualBpm(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.clearRect(0,0,width,height);ctx.fillStyle=chart.videoFile?'#171b2044':'#171b20';ctx.fillRect(0,y-r-20,width,2*r+40);if(isGogoTime(chart,t)){const glow=ctx.createLinearGradient(0,0,width,0);glow.addColorStop(0,'rgba(240,120,40,0.35)');glow.addColorStop(1,'rgba(240,120,40,0)');ctx.fillStyle=glow;ctx.fillRect(0,y-r-20,width,2*r+40)}drawBranchLaneShade(t,y,r,fade.lane);ctx.strokeStyle='#333940';ctx.lineWidth=1;for(let i of [-1,1]){ctx.beginPath();ctx.moveTo(0,y+i*(r+20));ctx.lineTo(width,y+i*(r+20));ctx.stroke()}ctx.fillStyle='#f8c2590c';ctx.fillRect(0,0,target+40,height);const pos=n=>target+(medleyActive()?medleyDistance(n,t):chart.visual?malodyDistance(chart,n.time,n.scroll)-malodyDistance(chart,t,n.scroll):(n.time-t)*(n.bpm/120)*n.scroll)*speed*240;for(const b of chart.bars){const x=pos(b);if(x<0||x>width)continue;ctx.strokeStyle='#ffffff20';ctx.beginPath();ctx.moveTo(x,y-r-18);ctx.lineTo(x,y+r+18);ctx.stroke()}ctx.strokeStyle='#dbd3bd';ctx.lineWidth=3;ctx.beginPath();ctx.arc(target,y,r+8,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#d6c9a05c';ctx.lineWidth=1;ctx.beginPath();ctx.arc(target,y,r+14,0,Math.PI*2);ctx.stroke();const drawBranchNote=(n,noteY,position,endPosition,alpha=1)=>{
  if(n.done||(t<pauseResumeUntil&&n.time<pauseResumeUntil)||(n.dummy&&t>(n.end??n.time)+.15))return;
@@ -877,3 +882,4 @@ function updateVisualBpm(t,opacity){
  if(label.textContent!==value)label.textContent=value;
  label.style.opacity=opacity;
 }
+

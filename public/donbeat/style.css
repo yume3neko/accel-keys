@@ -242,3 +242,6 @@ body.selecting .fields>label:first-child{display:none}
 .dan-header{display:flex;align-items:center;gap:12px;min-width:0}
 .dan-header .dan-heading{flex:0 1 auto;min-width:0}
 #danHud .dan-current-song{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#eee}
+
+
+.scorebar .score-heading{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.scorebar #accuracy{letter-spacing:0;font-variant-numeric:tabular-nums;color:#f8c259;white-space:nowrap}

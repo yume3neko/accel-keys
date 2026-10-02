@@ -5,8 +5,8 @@ import {readFileSync} from 'node:fs';
 const root=new URL('../public/donbeat/',import.meta.url);
 const read=name=>readFileSync(new URL(name,root),'utf8');
 function env(){
- const c=vm.createContext({console,setTimeout,clearTimeout});
- for(const name of ['tja.js','malody.js','dan.js','medley.js'])vm.runInContext(read(name),c);
+ const c=vm.createContext({console,setTimeout,clearTimeout,structuredClone,plain});
+ for(const name of ['tja.js','malody.js','dan.js','medley.js','medley-tools.js'])vm.runInContext(read(name),c);
  vm.runInContext(`let chart,notes=[],score=0,good=0,ok=0,miss=0,rolls=0,maxCombo=0,combo=0,soul=0,balloonRolls=0,balloonPops=0,activeSongRate=1,startAt=100,now=0;function time(){return now}function judgmentOffsetSeconds(){return 0}function soulNoteCount(){return notes.filter(n=>n.type<=4).length||1}function judgmentWindows(n){return {good:.025,ok:.075,miss:.109}}`,c);
  return c;
 }
@@ -270,4 +270,58 @@ test('real judge uses note difficulty across transition and attributes balloon h
  vm.runInContext('const balloon={medleyIndex:1,time:2,end:3,type:7,hits:0,required:5};addRollHits(balloon,5)',c);
  assert.equal(vm.runInContext('danRun.medley.stats[1].rolls',c),5);
  assert.equal(vm.runInContext('danRun.medley.stats[1].balloonPops',c),1);
+});
+
+
+test('adjusted dan export round-trips ranges, quoted titles, hidden songs and all exams',()=>{
+ const c=env();c.source='TITLE:調整テスト\nMODE:MEDLEY\nSONG1:"A, \"mix\"",3\nSONG2:B\nMEASURES1:1,2\nRANGE2:1.25,3.5\nEXAM1:80,100\nEXAM2:1,miss,l,10,1\nEXAM3:2,best\nEXAM3-1:m,1,2\nEXAM3-2:m,2,3\nHIDE:2';
+ // Use an escaped quote in the chart name, as emitted by the serializer.
+ c.source=c.source.replace('A, "mix"','A, ""mix""');
+ assert.equal(vm.runInContext('JSON.stringify(parseDanConfig(serializeDanConfig(parseDanConfig(source))))===JSON.stringify(parseDanConfig(source))',c),true);
+});
+test('selected-song practice slices chart specs without mutating original exams',()=>{
+ const c=env();install(c);c.document={getElementById:id=>({value:id==='danStartMode'?'practice':'1'})};
+ vm.runInContext("pendingDan={config:{songs:specs}};danRun.config.conditions=[{scope:'total',type:'miss',red:[1],gold:[1],ops:['l']}];const selected=danStartConfig(danRun.config)",c);
+ assert.equal(vm.runInContext('selected.songs.length',c),1);
+ assert.equal(vm.runInContext('JSON.stringify(selected.specs)',c),'[{"range":[1,3]}]');
+ assert.equal(vm.runInContext('selected.previousSong===danRun.config.songs[0]',c),true);
+ assert.equal(vm.runInContext('selected.conditions.length',c),0);
+ assert.equal(vm.runInContext('danRun.config.conditions.length',c),1);
+});
+test('previous-song audio occupies exactly three seconds and resume clips the prelude',()=>{
+ const c=env();install(c);c.starts=[];
+ vm.runInContext("const buffer={duration:20};const previous={...entries[0].chart,preloadedAudio:buffer};danRun.config.previousSong={chart:previous};danRun.config.previousSpec={range:[0,10]};danRun.config.mode='MEDLEY';danRun.leadIn=danLeadInPlan(danRun.config,chart);const musicGain={};function audio(){return {createBufferSource(){return {playbackRate:{},connect(){},start(...args){starts.push(args)}}}}}activeSongRate=1;startAt=100;scheduleDanLeadIn(-3);scheduleDanLeadIn(-1);scheduleDanLeadIn(0)",c);
+ assert.deepEqual(c.starts.map(a=>Array.from(a)),[[97,7,3],[99,9,1]]);
+ assert.equal(vm.runInContext('danLeadInActive(-.001)',c),true);
+ assert.equal(vm.runInContext('danLeadInActive(0)',c),false);
+});
+test('practice lead-in scores nothing until selected song starts, including autoplay',async()=>{
+ const c=env();install(c);engine(c);
+ vm.runInContext("danRun.config.auto=true;danRun.config.practice=true;danRun.config.mode='MEDLEY';danRun.config.previousSong={chart:entries[0].chart};danRun.config.previousSpec={range:[0,4]}",c);
+ await vm.runInContext('start({dan:true,seamless:true})',c);
+ assert.equal(vm.runInContext('pausedTime',c),-3);
+ vm.runInContext('audioContext.currentTime=startAt-.1;loop()',c);
+ assert.equal(vm.runInContext('good+ok+miss+score',c),0);
+ vm.runInContext('audioContext.currentTime=startAt+.01;loop()',c);
+ assert.equal(vm.runInContext('good',c),1);
+ assert.equal(vm.runInContext('danCurrentFailed()',c),false);
+});
+
+test('editor validates before updating draft, keeps untouched measures and applies only on request',()=>{
+ const c=env();install(c);
+ const nodes=new Map();c.document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',disabled:false});return nodes.get(id)}};
+ vm.runInContext("function drawMedleyPreview(){}function refreshDanSongs(){}pendingDan={config:{songs:[{measures:[1,2]},{range:[1,4]}]}};medleyEditorState={owner:pendingDan,entries,draft:structuredClone(pendingDan.config),index:0,built:buildMedley(entries,pendingDan.config.songs)}",c);
+ c.document.getElementById('medleyEnd').value='2';c.document.getElementById('medleyFrom').value='1';
+ assert.equal(vm.runInContext('applyMedleyBoundary()',c),true);
+ assert.equal(vm.runInContext('JSON.stringify(medleyEditorState.draft.songs[0])',c),'{"measures":[1,2]}');
+ c.document.getElementById('medleyEnd').value='1.75';c.document.getElementById('medleyFrom').value='1.25';
+ assert.equal(vm.runInContext('applyMedleyBoundary()',c),true);
+ assert.equal(vm.runInContext('JSON.stringify(pendingDan.config.songs[0])',c),'{"measures":[1,2]}');
+ assert.equal(vm.runInContext('JSON.stringify(medleyEditorState.draft.songs[0])',c),'{"range":[0,1.75]}');
+ c.document.getElementById('medleyFrom').value='100';
+ assert.equal(vm.runInContext('applyMedleyBoundary()',c),false);
+ assert.equal(vm.runInContext('medleyEditorState.draft.songs[1].range[0]',c),1.25);
+ c.document.getElementById('medleyFrom').value='1.25';
+ assert.equal(vm.runInContext('commitMedleyEdits()',c),true);
+ assert.equal(vm.runInContext('pendingDan.config.songs[0].range[1]',c),1.75);
 });

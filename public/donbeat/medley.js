@@ -162,7 +162,7 @@ async function beginMedley(){
   if(!e.demo)await preparePlaybackAssets(chart);
  }
  if(danRun!==run)return;
- const built=buildMedley(run.config.songs,pendingDan.config.songs);
+ const built=buildMedley(run.config.songs,run.config.specs||pendingDan.config.songs);
  run.medley={...built,stats:built.segments.map(medleyEmptyStats),displayIndex:-1};
  run.config.songs=run.config.songs.map((e,i)=>({...e,chart:built.segments[i].chart}));
  chart=built.chart;audioBuffer=null;playbackVisualChart=chart;demoMode=false;
@@ -174,7 +174,7 @@ function updateMedleyDisplay(t){
  if(run.medley.displayIndex===s.index)return;
  if(run.medley.displayIndex>=0)run.medley.stats[run.medley.displayIndex].soul=soul;
  run.medley.displayIndex=s.index;chart.meta={...s.original.meta};chart.videoFile=s.original.videoFile;chart.spinnerFile=s.original.spinnerFile;chart._mvEnabled=s.original._mvEnabled;chart._fadeEnabled=s.original._fadeEnabled;
- $('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=run.config.name+' / メドレー '+(s.index+1)+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=s.original.bpm+' BPM';
+ $('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=run.config.name+' / メドレー '+(s.index+1+(run.config.startIndex||0))+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=s.original.bpm+' BPM';
  updateDesktopPlayInfo(s.original);updateDanHUD();
 }
 function medleyFailed(){

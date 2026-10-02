@@ -23,7 +23,7 @@ function danPendingTitle(song,index){if(pendingDan.config.hide?.includes(index+1
 function danErrorTitle(song,index){return pendingDan.config.hide?.includes(index+1)?'？？？':song.chart}
 
 function refreshDanSongs(){
- const box=$('danSummary');box.replaceChildren();if(!pendingDan){box.append(danNode('p','段位設定ファイルを読み込んでください。'));return}
+ refreshDanStartOptions();const box=$('danSummary');box.replaceChildren();if(!pendingDan){box.append(danNode('p','段位設定ファイルを読み込んでください。'));return}
  const c=pendingDan.config;box.append(danNode('h3',c.name));if(pendingDan.localOnly)box.append(danNode('p','この段位はローカルで読み込んだ課題曲のみ検索します（収録曲・以前の読み込みは対象外）。','dan-preview-status'));if(c.mode==='MEDLEY')box.append(danNode('p','メドレーモード · 曲間待機なし','dan-preview-status'));
  let totalCharts;try{totalCharts=resolveDanConfig(true).songs.map(e=>e.chart)}catch{}
  if(totalCharts&&c.mode==='MEDLEY'){
@@ -114,7 +114,7 @@ function danPossibleStats(songOnly){
 }
 function danUnplayedMaximum(c){const normal=c.notes.filter(n=>n.type<=4).length,noteScore=chartNoteScore(c),result={good:normal,ok:0,miss:0,maxCombo:normal,rolls:0,score:normal*noteScore};for(const n of c.notes){if(!((n.type>=5&&n.type<=7)||n.type===9))continue;const hits=danRun.config.auto?autoRollHits(n,n.end):(n.type===7||n.type===9)?n.required:Infinity;result.rolls+=hits;result.score+=hits*100;}result.ok=normal;result.miss=normal+(danRun.config.auto?0:c.notes.filter(n=>n.type===10).length);result.allcombo=normal+result.rolls;return result}
 function danCurrentFailed(){
- if(!danRun)return false;if(medleyActive())return medleyFailed();if(danRun.failed||danExceededMaximum())return true;
+ if(!danRun||danRun.config.practice)return false;if(medleyActive())return medleyFailed();if(danRun.failed||danExceededMaximum())return true;
  const whole=danPossibleStats(false),current=danPossibleStats(true);
  for(const c of danRun.config.conditions){const key=c.scope==='song'?danRun.index:0;if(danOp(c,key)==='m'&&!danPass((c.scope==='song'?current:whole)[c.type],c.red[key],c,key))return true;if(c.scope==='song')for(let i=danRun.index+1;i<danRun.config.songs.length;i++)if(danOp(c,i)==='m'&&!danPass(danUnplayedMaximum(danRun.config.songs[i].chart)[c.type],c.red[i],c,i))return true}
  // Gauge is checked at the end, or earlier only if no possible remaining gain can reach it.
@@ -147,11 +147,11 @@ function danConditionView(c,i,value,pending=false){const red=c.red[i],gold=c.gol
  const mark=danNode('em',undefined,kind==='赤'?'border-red':'border-gold');mark.style.left=down?'0%':'100%';mark.title=kind+' '+target+danLabel(c,i);track.append(mark);
  track.setAttribute('role','meter');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax',String(Math.max(1,capacity)));track.setAttribute('aria-valuenow',String(amount));track.setAttribute('aria-label',danMetrics[c.type].label+' '+kind+(down?'合格までの残り':'合格への進捗'));
  if(danger)track.className+=' danger';box.append(track,danNode('small',(second?'② ':'① ')+kind+' '+target+danLabel(c,i)+' ／ 赤 '+red+'・金 '+gold));return box;}
-function updateDanHUD(){updateSoulDisplay();const hud=$('danHud');if(!danRun){hud.hidden=true;return}hud.hidden=false;hud.replaceChildren();const header=danNode('div',undefined,'dan-header');header.append(danNode('b',danRun.config.name+'　'+(danRun.index+1)+'/'+danRun.config.songs.length+'曲　'+(danRun.failed?'不合格確定・この曲まで':''),'dan-heading'));const song=danNode('span',currentSongTitle(),'dan-current-song');song.title=currentSongTitle();header.append(song);hud.append(header);
+function updateDanHUD(){updateSoulDisplay();const hud=$('danHud');if(!danRun){hud.hidden=true;return}hud.hidden=false;hud.replaceChildren();const header=danNode('div',undefined,'dan-header');header.append(danNode('b',danRun.config.name+'　'+(danRun.index+1+(danRun.config.startIndex||0))+'/'+(danRun.config.originalCount||danRun.config.songs.length)+'曲　'+(danRun.config.practice?'練習 · ':'')+(danRun.failed?'不合格確定・この曲まで':''),'dan-heading'));const song=danNode('span',currentSongTitle(),'dan-current-song');song.title=currentSongTitle();header.append(song);hud.append(header);
  const grid=danNode('div',undefined,'exam-grid');for(const c of danRun.config.conditions){const group=danNode('div',undefined,'exam-group');const indices=c.scope==='song'?[danRun.index]:[0];for(const i of indices){const stats=c.scope==='total'?danStats():danRun.results[i]||danSongStats();group.append(danConditionView(c,i,stats?.[c.type]||0,!stats))}grid.append(group)}hud.append(grid);}
 async function launchDan(automatic=false){
  if(loading||importing||danRun)return;
- let config;try{config=resolveDanConfig();config.auto=automatic===true}catch(e){$('danError').textContent=e.message;return}
+ let config;try{config=danStartConfig(resolveDanConfig());config.auto=automatic===true}catch(e){$('danError').textContent=e.message;return}
  loading=true;if(!$('danDialog').open)$('danDialog').showModal();$('danPlayAuto').disabled=true;$('danPlay').disabled=true;$('danClose').disabled=true;
  try{
   // Keep the user gesture for audio/fullscreen, but do not fetch or decode any song asset yet.
@@ -160,6 +160,7 @@ async function launchDan(automatic=false){
    const e=config.songs[i],c=e.chart;$('danError').textContent=(i+1)+'/'+config.songs.length+'曲目のファイルを確認中…';
    if(!e.demo&&!playbackAssetsAvailable(c))throw Error((i+1)+'曲目の音源 '+(c.meta.WAVE||'')+' が見つかりません。対応する音源を追加してください。');
   }
+  if(config.previousSong)await prepareDanAudio(config.previousSong.chart);
   pendingDan.armed=false;
   danRun={config,index:0,results:[],baseline:{score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0},songCombo:0,songMaxCombo:0,original:{chart,charts,audioBuffer,demoMode},audioResumePromise:resumePromise,finished:false,failed:false};
   $('danDialog').close();if(config.mode==='MEDLEY')await beginMedley();else{loading=false;await beginDanSong();}
@@ -173,7 +174,7 @@ async function beginDanSong(transition=false){
  clearTimeout(danTimer);if(!danRun||danRun.finished)return;
  const run=danRun,e=run.config.songs[run.index];chart=e.chart;demoMode=e.demo;activeSongRate=Number($('musicSpeed')?.value)||1;audioBuffer=null;playbackVisualChart=null;syncMV();syncSpinner();state=transition?'dan-break':'ready';
  run.baseline=run.index?danStats():{score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0};run.songCombo=0;run.songMaxCombo=0;
- $('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=run.config.name+' / '+(run.index+1)+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';
+ $('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=run.config.name+' / '+(run.index+1+(run.config.startIndex||0))+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';
  document.body.classList.remove('selecting');document.body.classList.add('playing');$('pause').disabled=true;
  ['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=true);
  notes=chart.notes.map(n=>({...n,done:false,hits:0}));pausedTime=Math.min(0,(notes[0]?.time||0)-4);resetDummyPlayback(pausedTime);feedback='';update();draw();
@@ -184,7 +185,7 @@ async function beginDanSong(transition=false){
   message.textContent='音源・MV・spinnerを読み込んでいます…';$('status').textContent=(run.index+1)+'曲目の演奏素材を読み込み中…';
   if(!demoMode)await preparePlaybackAssets(chart);else{audioBuffer=null;playbackVisualChart=chart}
   if(danRun!==run||run.finished)return;
-  if(transition){message.textContent=(run.index+1)+'曲目';await fadeDanScene(true);await waitDanVisible();if(danRun!==run||run.finished)return}
+  if(transition){message.textContent=(run.index+1+(run.config.startIndex||0))+'曲目';await fadeDanScene(true);await waitDanVisible();if(danRun!==run||run.finished)return}
   await start({dan:true,carry:run.index>0,seamless:true});
  }catch(err){
   if(danRun!==run)return;
@@ -193,12 +194,13 @@ async function beginDanSong(transition=false){
   const exit=danNode('button','段位を終了','primary');exit.onclick=exitDan;$('overlay').append(exit);$('overlay').style.display='flex';
  }
 }
-function finishDanSong(){if(!danRun||danRun.finished)return;pausedTime=time();stopAudio();cancelAnimationFrame(raf);danRun.results.push(danSongStats());const complete=danRun.index===danRun.config.songs.length-1,result=evaluateDan(danRun.config,danRun.results,danStats(),soul,complete);if(danRun.failed||!result.pass||complete){showDanResult(danRun.failed||!result.pass);return}state='dan-break';$('pause').disabled=true;queueDanNext();}
+function finishDanSong(){if(!danRun||danRun.finished)return;pausedTime=time();stopAudio();cancelAnimationFrame(raf);danRun.results.push(danSongStats());const complete=danRun.index===danRun.config.songs.length-1,result=evaluateDan(danRun.config,danRun.results,danStats(),soul,complete);if((!danRun.config.practice&&(danRun.failed||!result.pass))||complete){showDanResult(danRun.failed||!result.pass);return}state='dan-break';$('pause').disabled=true;queueDanNext();}
 
-function showDanResult(forcedFailure=false){clearDanSceneFade();if(!danRun||danRun.finished)return;const interruptedSong=danRun.results.length<=danRun.index;if(interruptedSong)danRun.results.push(danSongStats());danRun.finished=true;pausedTime=time();state='dan-result';stopAudio();cancelAnimationFrame(raf);clearTimeout(danTimer);document.body.classList.remove('playing');$('pause').disabled=true;const complete=danRun.results.length===danRun.config.songs.length&&!forcedFailure,r=evaluateDan(danRun.config,danRun.results,danStats(),soul,complete),passed=complete&&r.pass,title=danRun.config.auto?'オート演奏終了':passed?r.gold?'金合格':'合格':'不合格';const box=$('danResultContent');box.replaceChildren();box.append(danNode('p',danRun.config.name),danNode('h2',title,'dan-result-title'));if(danRun.config.auto)box.append(danNode('p','オート演奏のため合格扱いにはなりません。条件上は '+(passed?r.gold?'金合格相当':'合格相当':'不合格相当')+'です。'));
+function showDanResult(forcedFailure=false){clearDanSceneFade();if(!danRun||danRun.finished)return;const interruptedSong=danRun.results.length<=danRun.index;if(interruptedSong)danRun.results.push(danSongStats());danRun.finished=true;pausedTime=time();state='dan-result';stopAudio();cancelAnimationFrame(raf);clearTimeout(danTimer);document.body.classList.remove('playing');$('pause').disabled=true;const complete=danRun.results.length===danRun.config.songs.length&&!forcedFailure,r=evaluateDan(danRun.config,danRun.results,danStats(),soul,complete),passed=complete&&r.pass,title=danRun.config.practice?'練習終了':danRun.config.auto?'オート演奏終了':passed?r.gold?'金合格':'合格':'不合格';const box=$('danResultContent');box.replaceChildren();box.append(danNode('p',danRun.config.name),danNode('h2',title,'dan-result-title'));if(danRun.config.practice)box.append(danNode('p',(danRun.config.startIndex+1)+'曲目からの練習です。スコア・精度は今回演奏した分のみで、段位の合否判定は行いません。'));
+ if(danRun.config.auto&&!danRun.config.practice)box.append(danNode('p','オート演奏のため合格扱いにはなりません。条件上は '+(passed?r.gold?'金合格相当':'合格相当':'不合格相当')+'です。'));
  box.append(resultSoul(soul,danRun.config.gauge,danRun.config.goldGauge),resultStats(danStats()));
  const whole=danNode('div',undefined,'result-exams');for(const c of danRun.config.conditions.filter(c=>c.scope==='total'))whole.append(danConditionView(c,0,danStats()[c.type]));box.append(whole);
- for(let i=0;i<danRun.config.songs.length;i++){const entry=danRun.config.songs[i],stats=danRun.results[i],section=danNode('section',undefined,'result-song');section.append(danNode('h3',(i+1)+'. '+entry.chart.meta.TITLE),danNode('p',resultDifficulty(entry.chart)));if(stats){section.append(resultStats(stats),danNode('p','曲終了時の魂ゲージ（通し） '+Math.floor(stats.soul)+'%'));}else section.append(danNode('p','未演奏'));for(const c of danRun.config.conditions.filter(c=>c.scope==='song'))section.append(danConditionView(c,i,stats?.[c.type]||0,!stats));box.append(section);}
+ for(let i=0;i<danRun.config.songs.length;i++){const entry=danRun.config.songs[i],stats=danRun.results[i],section=danNode('section',undefined,'result-song');section.append(danNode('h3',(i+1+(danRun.config.startIndex||0))+'. '+entry.chart.meta.TITLE),danNode('p',resultDifficulty(entry.chart)));if(stats){section.append(resultStats(stats),danNode('p','曲終了時の魂ゲージ（通し） '+Math.floor(stats.soul)+'%'));}else section.append(danNode('p','未演奏'));for(const c of danRun.config.conditions.filter(c=>c.scope==='song'))section.append(danConditionView(c,i,stats?.[c.type]||0,!stats));box.append(section);}
  const replay=async automatic=>{exitDan();await launchDan(automatic)};$('danResultEdit').onclick=()=>replay(false);$('danResultEditAuto').onclick=()=>replay(true);$('danResultExit').onclick=exitDan;
  $('overlay').style.display='flex';$('overlay').replaceChildren();$('overlay').append(danNode('h2',title));const view=danNode('button','コース結果を見る','primary');view.onclick=()=>$('danResult').showModal();$('overlay').append(view);$('status').textContent=title;arrangeResult(true);$('danResult').showModal();}
 function exitDan(){clearDanSceneFade();clearTimeout(danTimer);if(!danRun)return;const old=danRun.original;danRun=null;chart=old.chart;charts=old.charts;audioBuffer=old.audioBuffer;demoMode=old.demoMode;stopAudio();cancelAnimationFrame(raf);$('danResult').close();$('danHud').hidden=true;unlock();$('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=chart.meta.SUBTITLE||'';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';reset()}

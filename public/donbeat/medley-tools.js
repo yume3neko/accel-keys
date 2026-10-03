@@ -73,21 +73,33 @@ function openMedleyEditor(){
  }catch(e){medleyEditorMessage(e.message)}
  if(!dialog.open)dialog.showModal();
 }
+// MEASURES end is exclusive: [9,17] plays measures 9 through 16.
+function medleyMeasureSelection(c,spec,finalSong=false){
+ const list=c.measures||[];if(!list.length)throw Error('小節情報のない譜面は小節単位で調整できません。');
+ if(spec.measures)return spec.measures.slice();
+ const range=medleyRange(c,spec,finalSong),boundaries=[...list.map(m=>m.time),list[list.length-1].end];
+ const nearest=(time,max)=>{let best=0;for(let i=1;i<max;i++)if(Math.abs(boundaries[i]-time)<Math.abs(boundaries[best]-time))best=i;return best+1};
+ const from=nearest(range.from,list.length),to=nearest(range.to,boundaries.length);
+ return [from,Math.max(from+1,to)];
+}
 function loadMedleyJoin(){
  stopMedleyPreview();const ed=medleyEditorState;if(!ed)return;
  ed.index=Number(document.getElementById('medleyJoin').value);ed.built=buildMedley(ed.entries,ed.draft.songs);
- document.getElementById('medleyEnd').value=ed.built.segments[ed.index].to;
- document.getElementById('medleyFrom').value=ed.built.segments[ed.index+1].from;
+ const previous=medleyMeasureSelection(ed.entries[ed.index].chart,ed.draft.songs[ed.index]),next=medleyMeasureSelection(ed.entries[ed.index+1].chart,ed.draft.songs[ed.index+1],ed.index+1===ed.entries.length-1);
+ const endInput=document.getElementById('medleyEnd'),fromInput=document.getElementById('medleyFrom');
+ endInput.value=previous[1];endInput.min=previous[0]+1;endInput.max=ed.entries[ed.index].chart.measures.length+1;
+ fromInput.value=next[0];fromInput.min=1;fromInput.max=Math.min(ed.entries[ed.index+1].chart.measures.length,next[1]-1);
  drawMedleyPreview();
 }
 function applyMedleyBoundary(){
  const ed=medleyEditorState;if(!ed)return false;
  try{
   const endText=document.getElementById('medleyEnd').value,fromText=document.getElementById('medleyFrom').value,end=Number(endText),from=Number(fromText);
-  if(!endText||!fromText||!Number.isFinite(end)||!Number.isFinite(from))throw Error('開始・終了位置を秒数で入力してください。');
-  const candidate=JSON.parse(JSON.stringify(ed.draft)),i=ed.index,previous=medleyRange(ed.entries[i].chart,candidate.songs[i],false),next=medleyRange(ed.entries[i+1].chart,candidate.songs[i+1],i+1===ed.entries.length-1);
-  if(end!==previous.to){candidate.songs[i].range=[previous.from,end];delete candidate.songs[i].measures;}
-  if(from!==next.from){candidate.songs[i+1].range=[from,next.to];delete candidate.songs[i+1].measures;}
+  if(!endText||!fromText||!Number.isSafeInteger(end)||!Number.isSafeInteger(from))throw Error('小節番号を整数で入力してください。');
+  const candidate=JSON.parse(JSON.stringify(ed.draft)),i=ed.index,previous=medleyMeasureSelection(ed.entries[i].chart,candidate.songs[i]),next=medleyMeasureSelection(ed.entries[i+1].chart,candidate.songs[i+1],i+1===ed.entries.length-1);
+  if(end<=previous[0]||end>ed.entries[i].chart.measures.length+1||from<1||from>=next[1]||from>ed.entries[i+1].chart.measures.length)throw Error('開始より後の終了小節と、譜面内の開始小節を指定してください。');
+  if(end!==previous[1]){candidate.songs[i].measures=[previous[0],end];delete candidate.songs[i].range;}
+  if(from!==next[0]){candidate.songs[i+1].measures=[from,next[1]];delete candidate.songs[i+1].range;}
   const built=buildMedley(ed.entries,candidate.songs);ed.draft=candidate;ed.built=built;drawMedleyPreview();medleyEditorMessage('未適用の調整です。「調整を段位に適用」で反映します。');return true;
  }catch(e){medleyEditorMessage(e.message);return false}
 }
@@ -140,10 +152,10 @@ function initMedleyTools(){
  const dialog=document.getElementById('medleyEditor');
  document.getElementById('medleyEditorClose').onclick=()=>dialog.close();dialog.addEventListener('close',stopMedleyPreview);dialog.addEventListener('cancel',stopMedleyPreview);
  document.getElementById('medleyEditorLoad').onclick=()=>{dialog.close();openDan()};
- document.getElementById('medleyJoin').onchange=loadMedleyJoin;
+ document.getElementById('medleyJoin').onchange=()=>{try{loadMedleyJoin()}catch(e){medleyEditorMessage(e.message)}};
  const change=()=>{const playing=medleyPreviewPlaying;stopMedleyPreview();if(applyMedleyBoundary()&&playing)playMedleyPreview()};
  for(const id of ['medleyEnd','medleyFrom'])document.getElementById(id).onchange=change;
- document.querySelectorAll('[data-seam-nudge]').forEach(button=>button.onclick=()=>{const [side,amount]=button.dataset.seamNudge.split(':'),input=document.getElementById(side==='end'?'medleyEnd':'medleyFrom');input.value=String(Math.round((Number(input.value)+Number(amount))*1e6)/1e6);change()});
+ document.querySelectorAll('[data-seam-nudge]').forEach(button=>button.onclick=()=>{const [side,amount]=button.dataset.seamNudge.split(':'),input=document.getElementById(side==='end'?'medleyEnd':'medleyFrom');input.value=String(Number(input.value)+Number(amount));change()});
  document.getElementById('medleyPreviewPlay').onclick=playMedleyPreview;
  document.getElementById('medleyPreviewStop').onclick=()=>{stopMedleyPreview();drawMedleyPreview();medleyEditorMessage('停止しました。')};
  document.getElementById('medleyApply').onclick=commitMedleyEdits;

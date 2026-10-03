@@ -314,14 +314,27 @@ test('editor validates before updating draft, keeps untouched measures and appli
  c.document.getElementById('medleyEnd').value='2';c.document.getElementById('medleyFrom').value='1';
  assert.equal(vm.runInContext('applyMedleyBoundary()',c),true);
  assert.equal(vm.runInContext('JSON.stringify(medleyEditorState.draft.songs[0])',c),'{"measures":[1,2]}');
- c.document.getElementById('medleyEnd').value='1.75';c.document.getElementById('medleyFrom').value='1.25';
+ c.document.getElementById('medleyEnd').value='3';c.document.getElementById('medleyFrom').value='2';
  assert.equal(vm.runInContext('applyMedleyBoundary()',c),true);
  assert.equal(vm.runInContext('JSON.stringify(pendingDan.config.songs[0])',c),'{"measures":[1,2]}');
- assert.equal(vm.runInContext('JSON.stringify(medleyEditorState.draft.songs[0])',c),'{"range":[0,1.75]}');
+ assert.equal(vm.runInContext('JSON.stringify(medleyEditorState.draft.songs[0])',c),'{"measures":[1,3]}');
  c.document.getElementById('medleyFrom').value='100';
  assert.equal(vm.runInContext('applyMedleyBoundary()',c),false);
- assert.equal(vm.runInContext('medleyEditorState.draft.songs[1].range[0]',c),1.25);
- c.document.getElementById('medleyFrom').value='1.25';
+ assert.equal(vm.runInContext('medleyEditorState.draft.songs[1].measures[0]',c),2);
+ c.document.getElementById('medleyFrom').value='2';
  assert.equal(vm.runInContext('commitMedleyEdits()',c),true);
- assert.equal(vm.runInContext('pendingDan.config.songs[0].range[1]',c),1.75);
+ assert.equal(vm.runInContext('pendingDan.config.songs[0].measures[1]',c),3);
+});
+
+
+test('measure-based editor preserves exclusive endpoints and rejects fractional measures',()=>{
+ const c=env();install(c);const nodes=new Map();c.document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:''});return nodes.get(id)}};
+ vm.runInContext("function drawMedleyPreview(){}medleyEditorState={entries,draft:{songs:[{measures:[1,2]},{measures:[1,3]}]},index:0}",c);
+ c.document.getElementById('medleyEnd').value='2.5';c.document.getElementById('medleyFrom').value='2';
+ assert.equal(vm.runInContext('applyMedleyBoundary()',c),false);
+ c.document.getElementById('medleyEnd').value='3';
+ assert.equal(vm.runInContext('applyMedleyBoundary()',c),true);
+ assert.equal(vm.runInContext('medleyEditorState.built.segments[0].to',c),4);
+ assert.equal(vm.runInContext('medleyEditorState.built.segments[1].from',c),2);
+ assert.equal(vm.runInContext('JSON.stringify(medleyEditorState.draft.songs)',c),'[{"measures":[1,3]},{"measures":[2,3]}]');
 });

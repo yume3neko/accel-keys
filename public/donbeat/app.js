@@ -6,7 +6,6 @@ const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext
 const demo=`TITLE:練習譜面\nSUBTITLE:伴奏なし・打音のみ\nBPM:120\nOFFSET:0\nCOURSE:Easy\nLEVEL:3\nBALLOON:8\n#START\n0000,\n1000100010001000,\n1000200010002000,\n1010100010102000,\n1020102010201020,\n3000400030004000,\n5000000000000008,\n#GOGOSTART\n1010202010102020,\n1110200011102000,\n1020102010201020,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000200010201000,\n1000000000000000,\n0000,\n#END\nCOURSE:Normal\nLEVEL:4\nBALLOON:8,10,12\n#START\n0000,\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1000100010001000,\n1000200010002000,\n1010000010100000,\n1000101020002000,\n1010200010102000,\n3000000040000000,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Hard\nLEVEL:6\nBALLOON:12,14,16\n#START\n0000,\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1010101010101010,\n1010202010102020,\n1110000022200000,\n1011101020222020,\n1120102011201020,\n3010401030104010,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Oni\nLEVEL:8\nBALLOON:16,20,24\n#START\n0000,\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1110111022202220,\n1120112011202220,\n1212121012121220,\n1111222011112220,\n1122112211202220,\n1110101110102220,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END\nCOURSE:Edit\nLEVEL:10\nBALLOON:24,30,36\n#START\n0000,\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n#GOGOSTART\n1112112211121122,\n1211221212112212,\n1111222211221122,\n111222111222111222111222,\n1121211211221211,\n11112111211121112111211121112222,\n5000000000000008,\n7000000000000008,\n#GOGOEND\n3000400030004000,\n1000000000000000,\n0000,\n#END`;
 const names={Easy:'かんたん',Normal:'ふつう',Hard:'むずかしい',Oni:'おに',Edit:'裏',0:'かんたん',1:'ふつう',2:'むずかしい',3:'おに',4:'裏'};
 var expandedSong=null,openSongFolder='official',songFolderTouched=false,openOfficialGenre=null;
-const officialSongNames=new Set(['BATTLE NO.1','六本の薔薇','六本の薔薇と采の歌','Nivalis','Nivalis*Anima','魔宵月','エンジェルドリーム','銀の黎明','銀の黎明か、黒の晶華か。','銀の黎明か、黒の晶華か','リスドンヴァルナ','リスドンヴァルナの黄昏','らんぶる','らんぶる乱舞'].map(normalizeSongTitle));
 let musicGain,effectGain;
 function audio(){if(!audioContext)audioContext=new (window.AudioContext||window.webkitAudioContext)();if(!musicGain){musicGain=audioContext.createGain();effectGain=audioContext.createGain();musicGain.connect(audioContext.destination);effectGain.connect(audioContext.destination);applyVolumes()}return audioContext}
 function tone(type,when){const ac=audio(),osc=ac.createOscillator(),gain=ac.createGain();osc.type=type===1?'sine':'triangle';const t=when??ac.currentTime;osc.frequency.setValueAtTime(type===1?180:900,t);osc.frequency.exponentialRampToValueAtTime(type===1?55:250,t+.085);gain.gain.setValueAtTime(.23,t);gain.gain.exponentialRampToValueAtTime(.001,t+.12);osc.connect(gain).connect(effectGain);osc.start(t);osc.stop(t+.13)}
@@ -199,7 +198,7 @@ function loop(){
  $('status').textContent=danLeadInActive(t)?'前曲の最後3秒 · 切り替わりから演奏':resumeLead?'2小節巻き戻し中 · 判定なし':danRun?.failed?'不合格確定 · この曲の終了まで演奏できます':!auto&&t-adjust<judgeFrom?'助走中 · 判定なし → '+judgeFrom.toFixed(2)+'秒から':auto?'オートプレイ中':practiceTarget===null?'演奏中':'途中から演奏中';
  draw();if(t>songDuration()){finish();return}raf=requestAnimationFrame(loop)
 }
-function resize(){const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);width=r.width;height=r.height;canvas.width=width*dpr;canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
+function resize(){const r=medleyPerformanceActive()?{width:canvas.clientWidth,height:canvas.clientHeight}:canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);width=r.width;height=r.height;canvas.width=width*dpr;canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
 function isGogoTime(c,t){const events=c.gogoEvents||[];let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<=t)lo=mid+1;else hi=mid}return lo>0&&events[lo-1].active;}
 function currentSongTitle(){
  const meta=chart?.meta||{},course=String(meta.COURSE??'Oni'),key={easy:'Easy',normal:'Normal',hard:'Hard',oni:'Oni',edit:'Edit'}[course.toLowerCase()]||course;
@@ -272,7 +271,7 @@ async function loadFiles(files){
   for(const f of chartFiles){
    let parsed;try{const bytes=await f.arrayBuffer();let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{text=new TextDecoder('shift-jis').decode(bytes)}parsed=/\.mc$/i.test(f.name)?parseMalody(text):parseTJA(text)}catch(e){skipped.push(f.name+'：'+e.message);continue}
    for(const c of parsed.charts){
-    c.sourcePath=filePath(f);c.importName=f.importName||f.name;c.warnings=[...(parsed.warnings||[])];const wave=(c.meta.WAVE||'').replace(/\\/g,'/').normalize('NFC'),dir=filePath(f).split('/').slice(0,-1).join('/');
+    c.uploadedLocal=true;c.sourcePath=filePath(f);c.importName=f.importName||f.name;c.warnings=[...(parsed.warnings||[])];const wave=(c.meta.WAVE||'').replace(/\\/g,'/').normalize('NFC'),dir=filePath(f).split('/').slice(0,-1).join('/');
     const exact=sounds.filter(a=>normalizedPath(filePath(a))===normalizedPath(dir+'/'+wave));
     const matches=exact.length?exact:sounds.filter(a=>a.name.normalize('NFC').toLowerCase()===wave.split('/').pop().toLowerCase());
     if(matches.length===1)c.audioFile=matches[0];else if(matches.length===0)c.audioFile=audioFiles.get(wave.split('/').pop().toLowerCase());if(matches.length>1)c.warnings.push('同名の音源が複数あります。音源を個別に選択してください');
@@ -603,11 +602,10 @@ document.querySelectorAll('.pads').forEach(region=>{
  region.addEventListener('contextmenu',e=>e.preventDefault());
 });
 
-function normalizeSongTitle(title){return String(title||'').normalize('NFKC').toLowerCase().replace(/[\s　・_-]/g,'')}
 function songCategory(c){
+ if(c?.uploadedLocal===true||(!c?.serverEntry&&c?.sourcePath&&!c?.builtinDemo&&!c?.generated))return 'uploaded';
  const explicit=c?.category||c?.serverEntry?.category;
  if((c?.categoryManual===true||c?.serverEntry?.categoryManual===true)&&(explicit==='official'||explicit==='creative'))return explicit;
- if(officialSongNames.has(normalizeSongTitle(c?.meta?.TITLE))||officialSongNames.has(normalizeSongTitle(c?.serverEntry?.title)))return 'official';
  return explicit==='official'||explicit==='creative'?explicit:'creative';
 }
 
@@ -630,7 +628,7 @@ function songOfficialGenre(c){
  return normalizeOfficialGenre(c?.genre||c?.serverEntry?.genre||c?.meta?.GENREJA||c?.meta?.GENRE);
 }
 function songGroups(){
- const grouped={official:new Map(),creative:new Map()};
+ const grouped={official:new Map(),creative:new Map(),uploaded:new Map()};
  charts.forEach((c,index)=>{
   const category=songCategory(c),title=c.meta.TITLE||'無題';
   if(category==='official'){
@@ -640,8 +638,8 @@ function songGroups(){
    if(!songs.has(title))songs.set(title,[]);
    songs.get(title).push({c,index});
   }else{
-   if(!grouped.creative.has(title))grouped.creative.set(title,[]);
-   grouped.creative.get(title).push({c,index});
+   if(!grouped[category].has(title))grouped[category].set(title,[]);
+   grouped[category].get(title).push({c,index});
   }
  });
  return grouped;
@@ -654,14 +652,14 @@ function officialSongCount(groups){
 function renderSongSelection(){
  const host=$('songSelectionList');if(!host)return;host.replaceChildren();
  const grouped=songGroups();
- if(!songFolderTouched)openSongFolder=officialSongCount(grouped.official)?'official':'creative';
- for(const [category,label] of [['official','本家譜面'],['creative','創作譜面']]){
+ if(!songFolderTouched)openSongFolder=chart&&songCategory(chart)==='uploaded'?'uploaded':officialSongCount(grouped.official)?'official':'creative';
+ for(const [category,label] of [['official','本家譜面'],['creative','創作譜面'],['uploaded','アップロードした譜面']]){
   const folder=document.createElement('section');folder.className='song-folder';
   const toggle=document.createElement('button');toggle.className='song-folder-title';toggle.type='button';
   const openedFolder=openSongFolder===category;
   toggle.setAttribute('aria-expanded',String(openedFolder));
   const folderName=document.createElement('span');folderName.className='song-folder-name';folderName.textContent=label;
-  const count=document.createElement('span');count.className='song-folder-count';count.textContent=(category==='official'?officialSongCount(grouped.official):grouped.creative.size)+'曲';
+  const count=document.createElement('span');count.className='song-folder-count';count.textContent=(category==='official'?officialSongCount(grouped.official):grouped[category].size)+'曲';
   const chevron=document.createElement('span');chevron.className='song-folder-chevron';chevron.textContent=openedFolder?'−':'＋';
   toggle.append(folderName,count,chevron);toggle.onclick=()=>{
    songFolderTouched=true;openSongFolder=openSongFolder===category?null:category;expandedSong=null;renderSongSelection();
@@ -725,7 +723,7 @@ function renderSongSelection(){
     section.append(genreToggle,genreList);list.append(section);
    }
   }else{
-   if(grouped.creative.size)renderRows(grouped.creative,list,null);
+   if(grouped[category].size)renderRows(grouped[category],list,null);
    else{const empty=document.createElement('p');empty.className='song-folder-empty';empty.textContent='このフォルダにはまだ曲がありません。';list.append(empty)}
   }
  }

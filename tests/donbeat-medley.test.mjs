@@ -348,7 +348,7 @@ test('preview gain starts at the configured absolute volume on every repeat',()=
 test('drum faces adjust whole measures and rims switch the editable song endpoint',()=>{
  const c=env();install(c);const nodes=new Map();c.document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{value:'',open:true});return nodes.get(id)}};
  vm.runInContext("function stopMedleyPreview(){}function drawMedleyPreview(){}function updateMedleyPadLabels(){}function playMedleyPreview(){}medleyPerformanceMount=[];medleyEditorState={entries,draft:{songs:[{measures:[1,2]},{measures:[1,3]}]},index:0,built:buildMedley(entries,[{measures:[1,2]},{measures:[1,3]}])}",c);
- c.document.getElementById('medleyJoin').value='0';c.document.getElementById('medleyAdjustSide').value='end';
+ c.document.getElementById('medleyPause').open=false;c.document.getElementById('medleyJoin').value='0';c.document.getElementById('medleyAdjustSide').value='end';
  vm.runInContext('loadMedleyJoin();handleMedleyPad(2)',c);
  assert.equal(vm.runInContext('medleyEditorState.draft.songs[0].measures[1]',c),3);
  vm.runInContext('handleMedleyPad(1)',c);
@@ -382,3 +382,16 @@ test('stopping a preview disposes every source and its gain before the next repe
  assert.deepEqual(c.calls,['stop','source','stop','source','gain']);
  assert.equal(vm.runInContext('medleyPreviewGain===null&&!medleyPreviewPlaying&&medleyPreviewNodes.length===0',c),true);
 });
+
+ test('uploaded charts have their own category and song names do not imply official charts',()=>{
+ const c=vm.createContext({});vm.runInContext(engineFunction('songCategory'),c);
+ assert.equal(vm.runInContext("songCategory({meta:{TITLE:'千本桜'}})",c),'creative');
+ assert.equal(vm.runInContext("songCategory({uploadedLocal:true,category:'official',categoryManual:true})",c),'uploaded');
+ assert.equal(vm.runInContext("songCategory({sourcePath:'pack/song.tja'})",c),'uploaded');
+ assert.equal(vm.runInContext("songCategory({serverEntry:{category:'official'}})",c),'official');
+ });
+ test('fixed auto preview schedules only normal notes inside the preview interval',()=>{
+ const c=env();const starts=[];c.effectGain={};c.ac={createOscillator:()=>({frequency:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},start:t=>starts.push(t),stop(){}}),createGain:()=>({gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){}})};
+ vm.runInContext('medleyPreviewEpoch=10;scheduleMedleyAutoNotes(ac,[{time:0,type:1},{time:1,type:2},{time:2,type:3},{time:1.5,type:5}],1,2)',c);
+ assert.deepEqual(starts,[10]);assert.equal(vm.runInContext('medleyPreviewNodes.length',c),2);
+ });

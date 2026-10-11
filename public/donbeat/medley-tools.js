@@ -73,7 +73,7 @@ function openMedleyEditor(){
   document.getElementById('medleyEditorBody').hidden=false;loadMedleyJoin();medleyEditorMessage('試聴するつなぎ目を選んでください。');
  }catch(e){medleyEditorMessage(e.message)}
  if(!dialog.open)dialog.showModal();
- if(medleyEditorState?.built){mountMedleyPerformance();resize();}
+ if(medleyEditorState?.built){mountMedleyPerformance();document.body.classList.add('medley-editing');resize();beginMedleyEditorPlayback();}
 }
 // MEASURES end is exclusive: [9,17] plays measures 9 through 16.
 function medleyMeasureSelection(c,spec,finalSong=false){
@@ -119,7 +119,7 @@ function mountMedleyPerformance(){
 function unmountMedleyPerformance(){
  stopMedleyPreview();if(!medleyPerformanceMount)return;
  for(const {node,marker} of medleyPerformanceMount){marker.replaceWith(node);node.querySelectorAll('[data-medley-label]').forEach(label=>label.remove());}
- medleyPerformanceMount=null;medleyPreviewCursor=null;resize();
+ medleyPerformanceMount=null;medleyPreviewCursor=null;document.body.classList.remove('medley-editing');document.getElementById('medleyPause').close();leavePlayFullscreen();resize();
 }
 function updateMedleyPadLabels(){
  if(!medleyPerformanceMount)return;
@@ -159,7 +159,7 @@ function switchMedleyAdjustment(amount){
  try{loadMedleyJoin();if(playing)playMedleyPreview()}catch(e){medleyEditorMessage(e.message)}
 }
 function handleMedleyPad(index){
- if(!medleyPerformanceActive())return false;
+ if(!medleyPerformanceActive()||document.getElementById('medleyPause').open)return false;
  if(index===0)switchMedleyAdjustment(-1);else if(index===3)switchMedleyAdjustment(1);else nudgeMedleyMeasure(index===1?-1:1);return true;
 }
 function createMedleyPreviewGain(ac){
@@ -180,8 +180,9 @@ async function playMedleyPreview(){
    if(!s.buffer)continue;const begin=Math.max(start,s.start,s.shift),finish=Math.min(end,s.end,s.shift+s.buffer.duration);if(finish<=begin)continue;
    const node=audio().createBufferSource();node.buffer=s.buffer;node.connect(medleyPreviewGain);node.start(medleyPreviewEpoch+begin-start,begin-s.shift,finish-begin);medleyPreviewNodes.push(node);
   }
-  medleyEditorMessage('試聴中 · 数値を変更すると新しい位置で再生し直します。');
-  const frame=()=>{if(!medleyPreviewPlaying)return;const t=start+audio().currentTime-medleyPreviewEpoch;medleyPreviewCursor=Math.max(start,t);drawMedleyPreview(medleyPreviewCursor);if(t>=end){const repeat=document.getElementById('medleyPreviewLoop').checked;stopMedleyPreview();if(repeat)playMedleyPreview();else medleyEditorMessage('試聴終了');return}medleyPreviewFrame=requestAnimationFrame(frame)};frame();
+  scheduleMedleyAutoNotes(audio(),ed.built.chart.notes,start,end);
+  medleyEditorMessage('オート固定 · 面で小節調整 / ふちで曲を切り替え');
+  const frame=()=>{if(!medleyPreviewPlaying)return;const t=start+audio().currentTime-medleyPreviewEpoch;medleyPreviewCursor=Math.max(start,t);drawMedleyPreview(medleyPreviewCursor);if(t>=end){const repeat=true;stopMedleyPreview();if(repeat)playMedleyPreview();else medleyEditorMessage('試聴終了');return}medleyPreviewFrame=requestAnimationFrame(frame)};frame();
  }catch(e){if(token===medleyPreviewToken){stopMedleyPreview();medleyEditorMessage('試聴できません：'+e.message)}}
 }
 function commitMedleyEdits(){
@@ -189,11 +190,33 @@ function commitMedleyEdits(){
  if(pendingDan!==ed.owner){medleyEditorMessage('段位が変更されました。調整画面を開き直してください。');return false}
  pendingDan.config=JSON.parse(JSON.stringify(ed.draft));refreshDanSongs();medleyEditorMessage('現在の段位に適用しました。次回用には.danを保存してください。');return true;
 }
+function scheduleMedleyAutoNotes(ac,notes,start,end){
+ for(const n of notes){
+  if(n.type<1||n.type>4||n.time<start||n.time>=end)continue;
+  const when=medleyPreviewEpoch+n.time-start,type=n.type===1||n.type===3?1:2,osc=ac.createOscillator(),gain=ac.createGain();
+  osc.type=type===1?'sine':'triangle';osc.frequency.setValueAtTime(type===1?180:900,when);osc.frequency.exponentialRampToValueAtTime(type===1?55:250,when+.085);
+  gain.gain.setValueAtTime(.23,when);gain.gain.exponentialRampToValueAtTime(.001,when+.12);osc.connect(gain);gain.connect(effectGain);osc.start(when);osc.stop(when+.13);medleyPreviewNodes.push(osc,gain);
+ }
+}
+async function beginMedleyEditorPlayback(){
+ const ed=medleyEditorState;if(!medleyPerformanceActive())return;
+ const resume=audio().resume();
+ try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();if(screen.orientation?.lock)await screen.orientation.lock('landscape')}catch{}
+ await resume;
+ if(ed===medleyEditorState&&medleyPerformanceActive()&&!document.getElementById('medleyPause').open){resize();playMedleyPreview();}
+}
+function openMedleyPause(){stopMedleyPreview();const dialog=document.getElementById('medleyPause');if(!dialog.open)dialog.showModal();}
+function closeMedleyEditor(){unmountMedleyPerformance();document.getElementById('medleyEditor').close();}
+function downloadMedleyEdits(){
+ if(!commitMedleyEdits())return false;
+ const text=serializeDanConfig(medleyEditorState.draft),url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');
+ a.href=url;a.download=(pendingDan.path.split('/').pop().replace(/\.[^.]+$/,'')||'medley')+'_調整済み.dan';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;
+}
 function initMedleyTools(){
  document.getElementById('danStartMode').onchange=refreshDanStartOptions;
  document.getElementById('medleyEditorOpen').onclick=openMedleyEditor;
  const dialog=document.getElementById('medleyEditor');
- document.getElementById('medleyEditorClose').onclick=()=>{unmountMedleyPerformance();dialog.close()};dialog.addEventListener('close',unmountMedleyPerformance);dialog.addEventListener('cancel',stopMedleyPreview);
+ document.getElementById('medleyEditorClose').onclick=()=>{if(medleyPerformanceActive())openMedleyPause();else dialog.close()};dialog.addEventListener('close',unmountMedleyPerformance);dialog.addEventListener('cancel',event=>{if(medleyPerformanceActive()){event.preventDefault();openMedleyPause()}});
  document.getElementById('medleyEditorLoad').onclick=()=>{unmountMedleyPerformance();dialog.close();openDan()};
  document.getElementById('medleyJoin').onchange=()=>{try{loadMedleyJoin()}catch(e){medleyEditorMessage(e.message)}};
  const change=()=>{const playing=medleyPreviewPlaying;stopMedleyPreview();if(applyMedleyBoundary()&&playing)playMedleyPreview()};
@@ -201,12 +224,15 @@ function initMedleyTools(){
  document.querySelectorAll('[data-seam-nudge]').forEach(button=>button.onclick=()=>{const [side,amount]=button.dataset.seamNudge.split(':'),input=document.getElementById(side==='end'?'medleyEnd':'medleyFrom');input.value=String(Number(input.value)+Number(amount));change()});
  document.getElementById('medleyAdjustSide').onchange=()=>drawMedleyPreview(medleyPreviewCursor);
  document.getElementById('medleyPerformance').addEventListener('pointerdown',event=>{const button=event.target.closest('[data-hit]');if(!button||!medleyPerformanceActive())return;event.preventDefault();event.stopImmediatePropagation();handleMedleyPad([...document.querySelectorAll('.pads [data-hit]')].indexOf(button));},true);
- window.addEventListener('keydown',event=>{if(!medleyPerformanceActive()||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;const index=['d','f','j','k'].indexOf(event.key.toLowerCase());if(index<0)return;event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)handleMedleyPad(index);});
+ window.addEventListener('keydown',event=>{if(!medleyPerformanceActive()||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;if(event.key==='Escape'||event.key===' '){event.preventDefault();event.stopImmediatePropagation();if(!document.getElementById('medleyPause').open)openMedleyPause();return;}const index=['d','f','j','k'].indexOf(event.key.toLowerCase());if(index<0)return;event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)handleMedleyPad(index);});
  document.getElementById('medleyPreviewPlay').onclick=playMedleyPreview;
  document.getElementById('medleyPreviewStop').onclick=()=>{stopMedleyPreview();drawMedleyPreview();medleyEditorMessage('停止しました。')};
  document.getElementById('medleyApply').onclick=commitMedleyEdits;
- document.getElementById('medleyDiscard').onclick=openMedleyEditor;
- document.getElementById('medleyExport').onclick=()=>{if(!commitMedleyEdits())return;const text=serializeDanConfig(medleyEditorState.draft),url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=(pendingDan.path.split('/').pop().replace(/\.[^.]+$/,'')||'medley')+'_調整済み.dan';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
- document.addEventListener('visibilitychange',()=>{if(document.hidden)stopMedleyPreview()});
+ document.getElementById('medleyDiscard').onclick=closeMedleyEditor;
+ document.getElementById('medleyExport').onclick=downloadMedleyEdits;
+ document.getElementById('medleySaveExit').onclick=()=>{if(downloadMedleyEdits())closeMedleyEditor()};
+ document.getElementById('medleyResume').onclick=()=>{document.getElementById('medleyPause').close();beginMedleyEditorPlayback()};
+ document.getElementById('medleyPause').addEventListener('cancel',event=>{event.preventDefault();document.getElementById('medleyPause').close();beginMedleyEditorPlayback()});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden&&medleyPerformanceActive())openMedleyPause();else if(document.hidden)stopMedleyPreview()});
 }
 if(typeof document!=='undefined')initMedleyTools();

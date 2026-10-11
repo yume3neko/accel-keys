@@ -338,3 +338,47 @@ test('measure-based editor preserves exclusive endpoints and rejects fractional 
  assert.equal(vm.runInContext('medleyEditorState.built.segments[1].from',c),2);
  assert.equal(vm.runInContext('JSON.stringify(medleyEditorState.draft.songs)',c),'[{"measures":[1,3]},{"measures":[2,3]}]');
 });
+
+test('preview gain starts at the configured absolute volume on every repeat',()=>{
+ const c=env();c.volumes=[];c.document={getElementById:()=>({value:'70'})};
+ c.ac={currentTime:12,destination:{},createGain(){return {gain:{cancelScheduledValues(){},setValueAtTime(value){c.volumes.push(value)}},connect(){}}}};
+ vm.runInContext('for(let i=0;i<20;i++)createMedleyPreviewGain(ac)',c);
+ assert.equal(c.volumes.length,20);assert.ok(c.volumes.every(v=>v===.7));
+});
+test('drum faces adjust whole measures and rims switch the editable song endpoint',()=>{
+ const c=env();install(c);const nodes=new Map();c.document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{value:'',open:true});return nodes.get(id)}};
+ vm.runInContext("function stopMedleyPreview(){}function drawMedleyPreview(){}function updateMedleyPadLabels(){}function playMedleyPreview(){}medleyPerformanceMount=[];medleyEditorState={entries,draft:{songs:[{measures:[1,2]},{measures:[1,3]}]},index:0,built:buildMedley(entries,[{measures:[1,2]},{measures:[1,3]}])}",c);
+ c.document.getElementById('medleyJoin').value='0';c.document.getElementById('medleyAdjustSide').value='end';
+ vm.runInContext('loadMedleyJoin();handleMedleyPad(2)',c);
+ assert.equal(vm.runInContext('medleyEditorState.draft.songs[0].measures[1]',c),3);
+ vm.runInContext('handleMedleyPad(1)',c);
+ assert.equal(vm.runInContext('medleyEditorState.draft.songs[0].measures[1]',c),2);
+ vm.runInContext('handleMedleyPad(3);handleMedleyPad(2)',c);
+ assert.equal(c.document.getElementById('medleyAdjustSide').value,'from');
+ assert.equal(vm.runInContext('medleyEditorState.draft.songs[1].measures[0]',c),2);
+ vm.runInContext('handleMedleyPad(0)',c);assert.equal(c.document.getElementById('medleyAdjustSide').value,'end');
+});
+test('performance preview restores the gameplay chart, state and score even if drawing fails',()=>{
+ const c=env();install(c);engine(c);const nodes=new Map();c.document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{value:'1',open:true});return nodes.get(id)}};
+ c.adapter=c.document.getElementById;vm.runInContext('document.getElementById=adapter',c);
+ vm.runInContext("medleyPerformanceMount=[];medleyEditorState={entries,draft:{songs:specs},index:0,built:buildMedley(entries,specs)};const originalChart=chart,originalNotes=notes,originalRun=danRun;function drawGame(){throw Error('drawing unavailable')}const width=800,height=220",c);
+ assert.throws(()=>vm.runInContext('drawMedleyPreview(1)',c),/drawing unavailable/);
+ assert.equal(vm.runInContext('chart===originalChart&&notes===originalNotes&&danRun===originalRun&&state===\'ready\'&&score===0',c),true);
+});
+
+test('actual performance renderer draws preview frames without invoking judgment or changing original notes',()=>{
+ const c=env();install(c);engine(c);c.adapter=()=>({value:'1',open:true,style:{}});
+ vm.runInContext(`document.getElementById=adapter;medleyPerformanceMount=[];medleyEditorState={entries,draft:{songs:specs},index:0,built:buildMedley(entries,specs)};
+ const originalChart=chart,originalNotes=notes,originalRun=danRun;const width=800,height=220;
+ const ctx=new Proxy({}, {get(target,key){return target[key]||(()=>({addColorStop(){}}))},set(target,key,value){target[key]=value;return true}});
+ function applyChartFade(){return {lane:1,note:1,button:1,info:1}}function updateVisualBpm(){}function isGogoTime(){return false}function drawBranchLaneShade(){}function branchNoteY(t,n,y){return y}function activeBranchTransition(){return null}function drawBranchDetails(){}function renderNotes(){throw Error('gameplay note cache should not be used')}`,c);
+ const source=read('app.js');vm.runInContext(source.slice(source.indexOf('function drawGame('),source.indexOf('async function choose(')),c);
+ vm.runInContext('for(let i=0;i<20;i++)drawMedleyPreview(i*.1)',c);
+ assert.equal(vm.runInContext("chart===originalChart&&notes===originalNotes&&danRun===originalRun&&state==='ready'&&score===0&&notes.every(n=>!n.done)",c),true);
+});
+test('stopping a preview disposes every source and its gain before the next repeat',()=>{
+ const c=env();c.calls=[];c.document={getElementById:()=>({disabled:true})};c.cancelAnimationFrame=()=>{};
+ vm.runInContext("medleyPreviewNodes=[{stop(){calls.push('stop')},disconnect(){calls.push('source')}},{stop(){calls.push('stop')},disconnect(){calls.push('source')}}];medleyPreviewGain={disconnect(){calls.push('gain')}};medleyPreviewPlaying=true;stopMedleyPreview();stopMedleyPreview()",c);
+ assert.deepEqual(c.calls,['stop','source','stop','source','gain']);
+ assert.equal(vm.runInContext('medleyPreviewGain===null&&!medleyPreviewPlaying&&medleyPreviewNodes.length===0',c),true);
+});

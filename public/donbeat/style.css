@@ -262,3 +262,5 @@ body.multi-course .scorebar{position:absolute!important;right:8px!important;bott
 body.multi-course .scorebar>div:not(.pause-control){display:none!important}body.multi-course .pause-control{display:block!important}body.multi-course #volumeOpen,body.multi-course #pause{height:34px!important;min-height:0!important;padding:4px 12px!important}
 body.multi-course .game-footer{position:absolute!important;bottom:10px;left:10px;right:155px;display:flex!important;gap:12px;font-size:12px;pointer-events:none}
 body.multi-course #overlay{z-index:30;background:#15191bea;overflow:auto;padding:12px}body.multi-course #overlay p{margin:3px;font-size:13px}body.multi-course #judgmentOverlay{display:none}
+
+body.multi-course .game.has-mv .lane{background:transparent!important}body.multi-course #visualBpm{display:none!important}

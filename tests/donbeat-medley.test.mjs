@@ -372,7 +372,7 @@ test('actual performance renderer draws preview frames without invoking judgment
  const originalChart=chart,originalNotes=notes,originalRun=danRun;const width=800,height=220;
  const ctx=new Proxy({}, {get(target,key){return target[key]||(()=>({addColorStop(){}}))},set(target,key,value){target[key]=value;return true}});
  function applyChartFade(){return {lane:1,note:1,button:1,info:1}}function updateVisualBpm(){}function isGogoTime(){return false}function drawBranchLaneShade(){}function branchNoteY(t,n,y){return y}function activeBranchTransition(){return null}function drawBranchDetails(){}function renderNotes(){throw Error('gameplay note cache should not be used')}`,c);
- const source=read('app.js');vm.runInContext(source.slice(source.indexOf('function drawGame('),source.indexOf('async function choose(')),c);
+ const source=read('app.js');vm.runInContext(source.slice(source.indexOf('function drawRhythmNote('),source.indexOf('async function choose(')),c);
  vm.runInContext('for(let i=0;i<20;i++)drawMedleyPreview(i*.1)',c);
  assert.equal(vm.runInContext("chart===originalChart&&notes===originalNotes&&danRun===originalRun&&state==='ready'&&score===0&&notes.every(n=>!n.done)",c),true);
 });

@@ -6,7 +6,7 @@ const root=new URL('../public/donbeat/',import.meta.url);
 const read=name=>readFileSync(new URL(name,root),'utf8');
 function env(){
  const c=vm.createContext({console,setTimeout,clearTimeout,structuredClone,plain});
- for(const name of ['tja.js','malody.js','dan.js','medley.js','medley-tools.js'])vm.runInContext(read(name),c);
+ for(const name of ['tja.js','malody.js','dan.js','medley.js','medley-tools.js','multi-course.js'])vm.runInContext(read(name),c);
  vm.runInContext(`let chart,notes=[],score=0,good=0,ok=0,miss=0,rolls=0,maxCombo=0,combo=0,soul=0,balloonRolls=0,balloonPops=0,activeSongRate=1,startAt=100,now=0;function time(){return now}function judgmentOffsetSeconds(){return 0}function soulNoteCount(){return notes.filter(n=>n.type<=4).length||1}function judgmentWindows(n){return {good:.025,ok:.075,miss:.109}}`,c);
  return c;
 }

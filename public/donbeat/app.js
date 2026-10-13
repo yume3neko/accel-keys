@@ -877,11 +877,14 @@ function timeSignatureAt(c,t){
  const clean=v=>Number.isInteger(v)?String(v):Number(v.toFixed(3)).toString();
  return clean(num)+'/'+clean(den);
 }
+function visualBpmLabel(c,t){
+ const n=visualBpmState(c,t),meter=timeSignatureAt(c,t),playerSpeed=Number($('speed').value)||1,musicRate=(state==='playing'||state==='paused')?activeSongRate:(Number($('musicSpeed').value)||1),format=v=>Number(v.toFixed(3)).toLocaleString('ja-JP',{maximumFractionDigits:3});
+ return meter+' 拍子   見た目 '+format(n.bpm)+' BPM × '+format(n.hs)+' HS'+(n.scroll!==1?' × '+format(n.scroll):'')+(playerSpeed!==1?' × '+format(playerSpeed)+' 設定':'')+(musicRate!==1?' × '+format(musicRate)+' 曲速':'')+' = '+format(n.value*playerSpeed*musicRate)+' BPM';
+}
 function updateVisualBpm(t,opacity){
  let label=$('visualBpm');
  if(!label){label=document.createElement('div');label.id='visualBpm';label.style.cssText='position:absolute;right:10px;top:5px;z-index:35;pointer-events:none;font:600 clamp(10px,1.5vw,13px) sans-serif;color:#eee;text-shadow:0 1px 3px #000;background:#10131799;padding:3px 6px;border-radius:4px;max-width:calc(100% - 20px);text-align:right;overflow-wrap:anywhere';canvas.parentElement.append(label)}
- const n=visualBpmState(chart,t),meter=timeSignatureAt(chart,t),playerSpeed=Number($('speed').value)||1,musicRate=(state==='playing'||state==='paused')?activeSongRate:(Number($('musicSpeed').value)||1),format=v=>Number(v.toFixed(3)).toLocaleString('ja-JP',{maximumFractionDigits:3});
- const value=meter+' 拍子   見た目 '+format(n.bpm)+' BPM × '+format(n.hs)+' HS'+(n.scroll!==1?' × '+format(n.scroll):'')+(playerSpeed!==1?' × '+format(playerSpeed)+' 設定':'')+(musicRate!==1?' × '+format(musicRate)+' 曲速':'')+' = '+format(n.value*playerSpeed*musicRate)+' BPM';
+ const value=visualBpmLabel(chart,t);
  if(label.textContent!==value)label.textContent=value;
  label.style.opacity=opacity;
 }

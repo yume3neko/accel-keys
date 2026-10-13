@@ -28,11 +28,7 @@ function loopMultiCourse(){
  if(t>Math.max(audioBuffer?.duration||0,...multiRun.lanes.map(l=>l.chart.duration))+1){finishMultiCourse();return}
  raf=requestAnimationFrame(loop);
 }
-function multiVisualLabel(c,t){
- const motion=visualBpmState(c,t),speed=Number($('speed').value)||1,rate=activeSongRate||1;
- const format=n=>Number(n.toFixed(3)).toLocaleString('ja-JP',{maximumFractionDigits:3});
- return timeSignatureAt(c,t)+' 拍子 · 見た目 '+format(motion.value*speed*rate)+' BPM';
-}
+function multiVisualLabel(c,t){return visualBpmLabel(c,t)}
 function drawMultiCourse(){
  const t=time(),rows=multiRun.lanes.length,rowHeight=height/rows,info=Math.min(180,width*.22),target=info+Math.min(70,(width-info)*.12),speed=(Number($('speed').value)||1)*240;
  ctx.clearRect(0,0,width,height);
@@ -41,7 +37,7 @@ function drawMultiCourse(){
   ctx.save();ctx.beginPath();ctx.rect(0,top,width,rowHeight);ctx.clip();
   const mvActive=chart._mvEnabled!==false&&!!chart.videoFile;
   ctx.fillStyle=isGogoTime(c,t)?(mvActive?'#59332766':'#593327'):(mvActive?'#191d2244':(i%2?'#20242a':'#191d22'));ctx.fillRect(0,top,width,rowHeight);
-  ctx.fillStyle=colors[i%colors.length];ctx.fillRect(0,top,info,rowHeight);ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 '+Math.max(11,Math.min(18,rowHeight*.15))+'px sans-serif';
+  ctx.fillStyle=colors[i%colors.length];ctx.globalAlpha=mvActive?.35:1;ctx.fillRect(0,top,info,rowHeight);ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 '+Math.max(11,Math.min(18,rowHeight*.15))+'px sans-serif';
   ctx.fillText(multiCourseLabel(c),10,top+rowHeight*.2,info-20);ctx.font='700 '+Math.max(13,Math.min(24,rowHeight*.2))+'px sans-serif';ctx.fillText(String(lane.score).padStart(7,'0'),10,top+rowHeight*.48,info-20);
   ctx.font=Math.max(10,Math.min(15,rowHeight*.13))+'px sans-serif';ctx.fillText('AUTO · '+lane.combo+' COMBO',10,top+rowHeight*.75,info-20);
   ctx.beginPath();ctx.rect(info,top,width-info,rowHeight);ctx.clip();ctx.strokeStyle='#c8bba9';ctx.lineWidth=2;ctx.beginPath();ctx.arc(target,y,r+5,0,Math.PI*2);ctx.stroke();

@@ -1,0 +1,18 @@
+// 小節番号・精度95%は説明用です。実際の曲に合わせて変更してください。
+TITLE:隠し分岐の例
+MODE:MEDLEY
+
+// 共通部分：通常版の1〜32小節
+SONG1:short.tja,3
+MEASURES1:1,33
+
+// 条件未達：通常版の33小節から末尾
+SONG2:short.tja,3
+MEASURES2:33,34
+
+// 条件達成：フル版の29小節から末尾
+SONG3:full.tja,3
+MEASURES3:29,30
+
+// 共通部分の精度95%以上ならSONG3、それ以外はSONG2へ。
+BRANCH1:accuracy,m,95,3,2

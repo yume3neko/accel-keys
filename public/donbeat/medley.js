@@ -109,9 +109,9 @@ function medleySeamActive(t){
  const s=medleySegmentAt(t);
  return medleyInSeam(s,t-s.shift);
 }
-function medleySourceChart(n){return medleyActive()&&n?.medleyIndex!==undefined?danRun.medley.segments[n.medleyIndex].original:chart}
+function medleySourceChart(n){return medleyActive()&&n?.medleyIndex!==undefined?(danRun.medley.branch?medleyBranchPreviewSegment(n):danRun.medley.segments[n.medleyIndex]).original:chart}
 function medleyDistance(n,t){
- const s=danRun.medley.segments[n.medleyIndex],c=s.original,local=t-s.shift,nt=n.time-s.shift;
+ const s=danRun.medley.branch?medleyBranchPreviewSegment(n):danRun.medley.segments[n.medleyIndex],c=s.original,local=t-s.shift,nt=n.time-s.shift;
  // Never suppress TJA #SCROLL or MC hs: both are stored per note.
  const hs=n.scroll??1,rate=(n.bpm||c.bpm||120)/120*hs;
  if(!s.visualChart)return (n.time-t)*rate;
@@ -137,48 +137,65 @@ function medleyRecord(n,before,error){
  for(const key of ['score','good','ok','miss','rolls','balloonRolls','balloonPops','allcombo'])s[key]+=after[key]-before[key];
  if(error!==undefined){s.combo=error<=judgmentWindows(n).ok?s.combo+1:0;s.maxCombo=Math.max(s.maxCombo,s.combo)}
  s.soul=soul;
+ if(danRun.medley.branch)refreshMedleyBranchAudio();
 }
-let medleySources=[];
-function stopMedleyAudio(){for(const s of medleySources){try{s.stop()}catch{}s.disconnect()}medleySources=[]}
+let medleySources=[],medleyGains=[];
+function stopMedleyAudio(){for(const s of medleySources){try{s.stop()}catch{}s.disconnect()}medleySources=[];for(const g of medleyGains)g.disconnect();medleyGains=[];if(danRun?.medley?.branch)danRun.medley.branch.gates=[]}
 function scheduleMedleyAudio(t){
  const ac=audio();
- for(const s of danRun.medley.segments){
-  if(!s.buffer||s.end<=t)continue;
+ const m=danRun.medley,b=m.branch;
+ const schedule=(s,gate=null)=>{
+  if(!s.buffer||s.end<=t)return;
   const begin=Math.max(t,s.start,s.shift),offset=begin-s.shift,duration=Math.min(s.end-begin,s.buffer.duration-offset);
-  if(duration<=0)continue;
-  const node=ac.createBufferSource();node.buffer=s.buffer;node.playbackRate.value=activeSongRate;node.connect(musicGain);
+  if(duration<=0)return;
+  const node=ac.createBufferSource();node.buffer=s.buffer;node.playbackRate.value=activeSongRate;node.connect(gate||musicGain);
   node.start(startAt+begin/activeSongRate,offset,duration);medleySources.push(node);
+ };
+ if(b&&!b.decided){
+  b.audioBoundary=startAt+b.boundary/activeSongRate;
+  refreshMedleyBranchAudio();
+  for(const s of m.segments.slice(0,b.rule.index+1))schedule(s);
+  for(const [pass,plan] of [[false,b.no],[true,b.yes]]){
+   const gate=ac.createGain();gate.gain.value=0;gate.gain.setValueAtTime(pass===b.pendingPass?1:0,b.audioBoundary);gate.connect(musicGain);
+   medleyGains.push(gate);b.gates.push({pass,node:gate});schedule(plan.segments.at(-1),gate);
+  }
+ }else{
+  for(const s of m.segments)schedule(s);
  }
 }
 async function beginMedley(){
  const run=danRun;
  state='ready';document.body.classList.remove('selecting');document.body.classList.add('playing');
- $('overlay').replaceChildren(danNode('h2','メドレーを準備中'),danNode('p','全曲の音源・譜面を読み込んでいます…'));$('overlay').style.display='flex';
+ $('overlay').replaceChildren(danNode('h2',run.config.branch?'演奏準備中':'メドレーを準備中'),danNode('p','演奏素材を読み込んでいます…'));$('overlay').style.display='flex';
  await enterPlayFullscreen();await waitForLandscape();await run.audioResumePromise;
  for(let i=0;i<run.config.songs.length;i++){
   if(danRun!==run)return;
   const e=run.config.songs[i];chart=e.chart;demoMode=e.demo;
-  $('status').textContent=(i+1)+'/'+run.config.songs.length+'曲目を読み込み中…';
+  $('status').textContent=run.config.branch?'演奏素材を読み込み中…':(i+1)+'/'+run.config.songs.length+'曲目を読み込み中…';
   if(!e.demo)await preparePlaybackAssets(chart);
  }
  if(danRun!==run)return;
- const built=buildMedley(run.config.songs,run.config.specs||pendingDan.config.songs);
+ const specs=run.config.specs||pendingDan.config.songs;
+ const built=run.config.branch?buildBranchedMedley(run.config.songs,specs,run.config.branch):buildMedley(run.config.songs,specs);
  run.medley={...built,stats:built.segments.map(medleyEmptyStats),displayIndex:-1};
- run.config.songs=run.config.songs.map((e,i)=>({...e,chart:built.segments[i].chart}));
+ if(built.branch)setBranchedMedleyConfig(run,built.branch.no);
+ else run.config.songs=run.config.songs.map((e,i)=>({...e,chart:built.segments[i].chart}));
  chart=built.chart;audioBuffer=null;playbackVisualChart=chart;demoMode=false;
  loading=false;await start({dan:true,seamless:true});
 }
 function updateMedleyDisplay(t){
  if(!medleyActive())return;
+ if(danRun.medley.branch)updateMedleyBranch(t);
  const s=medleySegmentAt(t),run=danRun;run.index=s.index;
  if(run.medley.displayIndex===s.index)return;
  if(run.medley.displayIndex>=0)run.medley.stats[run.medley.displayIndex].soul=soul;
  run.medley.displayIndex=s.index;chart.meta={...s.original.meta};chart.videoFile=s.original.videoFile;chart.spinnerFile=s.original.spinnerFile;chart._mvEnabled=s.original._mvEnabled;chart._fadeEnabled=s.original._fadeEnabled;
- $('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=run.config.name+' / メドレー '+(s.index+1+(run.config.startIndex||0))+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=s.original.bpm+' BPM';
+ $('title').textContent=chart.meta.TITLE||'無題';$('subtitle').textContent=run.medley.branch?(chart.meta.SUBTITLE||'').replace(/^(--|\+\+)/,''):run.config.name+' / メドレー '+(s.index+1+(run.config.startIndex||0))+'曲目';$('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=s.original.bpm+' BPM';
  updateDesktopPlayInfo(s.original);updateDanHUD();
 }
 function medleyFailed(){
  const run=danRun,t=time()-judgmentOffsetSeconds(),m=run.medley;
+ if(m.branch)return false;
  // Autoplay is a full-course preview; its fixed roll rate must not
  // terminate the course early when a manual roll exam is unreachable.
  // Avoid a failure result during the leading pre-roll for manual play, too.
@@ -199,6 +216,7 @@ function medleyFailed(){
  return Math.min(100,soul+remaining*130/soulNoteCount())+1e-9<run.config.gauge;
 }
 function finishMedley(forced=false){
+ if(danRun.medley.branch){showHiddenMedleyResult();return}
  const run=danRun;run.results=run.medley.stats.slice(0,forced?run.index+1:undefined).map(s=>({...s}));
  showDanResult(forced);
 }

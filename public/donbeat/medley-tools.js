@@ -4,6 +4,9 @@
 let danStartOwner=null;
 function refreshDanStartOptions(){
  const select=document.getElementById('danStartSong');if(!select)return;
+ const hidden=!!pendingDan?.config.branch,mode=document.getElementById('danStartMode');
+ if(mode?.parentElement)mode.parentElement.hidden=hidden;
+ if(hidden){mode.value='full';select.replaceChildren();select.disabled=true;document.getElementById('danStartSongLabel').hidden=true;document.getElementById('danStartHint').hidden=true;return}
  const changed=danStartOwner!==pendingDan,old=changed?'0':select.value;danStartOwner=pendingDan;
  select.replaceChildren();
  if(pendingDan)pendingDan.config.songs.forEach((song,i)=>{const option=danNode('option',(i+1)+'. '+danPendingTitle(song,i));option.value=String(i);select.append(option)});
@@ -13,7 +16,7 @@ function refreshDanStartOptions(){
  document.getElementById('danStartSongLabel').hidden=!practice;document.getElementById('danStartHint').hidden=!practice;
 }
 function danStartConfig(config){
- const practice=document.getElementById('danStartMode')?.value==='practice';
+ const practice=!config.branch&&document.getElementById('danStartMode')?.value==='practice';
  const startIndex=practice?Number(document.getElementById('danStartSong')?.value||0):0;
  if(!Number.isInteger(startIndex)||startIndex<0||startIndex>=config.songs.length)throw Error('開始する曲を選択してください。');
  const specs=pendingDan.config.songs.map(s=>({...s,range:s.range?.slice(),measures:s.measures?.slice()}));
@@ -44,6 +47,7 @@ function scheduleDanLeadIn(t){
 function serializeDanConfig(config){
  const lines=['TITLE:'+config.name,'MODE:'+config.mode];
  config.songs.forEach((song,i)=>{const n=i+1;lines.push('SONG'+n+':"'+song.chart.replace(/"/g,'""')+'"'+(song.course===undefined?'':','+song.course));if(song.range)lines.push('RANGE'+n+':'+song.range.join(','));if(song.measures)lines.push('MEASURES'+n+':'+song.measures.join(','))});
+ if(config.branch){const b=config.branch;lines.push('BRANCH'+(b.index+1)+':'+[b.metric,b.op,b.threshold,b.pass+1,b.reject+1].join(','))}
  lines.push('EXAM1:'+config.gauge+','+config.goldGauge);
  const types={good:'best',ok:'good',miss:'miss',score:'score',rolls:'roll',maxCombo:'combo',allcombo:'allcombo'};
  config.conditions.forEach((c,i)=>{const key='EXAM'+(i+2),value=j=>(c.ops?.[j]||'m')+','+c.red[j]+','+c.gold[j];if(c.scope==='total')lines.push(key+':1,'+types[c.type]+','+value(0));else{lines.push(key+':2,'+types[c.type]);config.songs.forEach((_,j)=>lines.push(key+'-'+(j+1)+':'+value(j)))}});
@@ -64,6 +68,7 @@ function openMedleyEditor(){
  document.getElementById('medleyEditorBody').hidden=true;medleyEditorState=null;
  try{
   if(!pendingDan||pendingDan.config.mode!=='MEDLEY')throw Error('まず「段位・課題曲を読み込む」からメドレー設定と課題曲を読み込んでください。');
+  if(pendingDan.config.branch)throw Error('隠し分岐の区間は設定ファイルのMEASURESまたはRANGEで調整してください。');
   if(pendingDan.config.songs.length<2)throw Error('つなぎ目の調整には2曲以上のメドレーが必要です。');
   const entries=resolveDanConfig(true).songs,draft=JSON.parse(JSON.stringify(pendingDan.config));
   buildMedley(entries,draft.songs);

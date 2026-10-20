@@ -33,6 +33,7 @@ function branchPreviewChoices(decided,currentRoute='N'){
  return [...decided,...Array(Math.max(0,count-decided.length)).fill(route)];
 }
 async function start(options={}){
+ if(!options.dan&&typeof pendingDan!=='undefined'&&pendingDan?.config.branch&&pendingHiddenMedley())return launchDan(options.auto===true);
  if(loading||importing||state==='playing'||(danRun&&!options.dan)||(!demoMode&&!danRun&&!playbackAssetsAvailable(chart)))return;
  activeSongRate=Number($('musicSpeed')?.value)||1;
  document.body.classList.toggle('desktop-play',desktopPlayMode());updateDesktopPlayInfo(chart);
@@ -83,7 +84,7 @@ function pauseRewindTime(t){
 }
 function resumeFromPause(){
  if(state!=='paused')return;
- if(danRun&&(danRun.pauseCount||0)>2)return;
+ if(danRun&&!danRun.config.branch&&(danRun.pauseCount||0)>2)return;
  const resumePoint=pausedTime,rewind=pauseRewindTime(resumePoint);
  pauseResumeUntil=resumePoint;
  pausedTime=rewind;
@@ -102,9 +103,9 @@ function resumeFromPause(){
 function togglePause(){
  if(state==='playing'){
   pausedTime=time();state='paused';stopAudio();draw();cancelAnimationFrame(raf);setPauseIcon(true);
-  if(danRun)danRun.pauseCount=(danRun.pauseCount||0)+1;
+  if(danRun&&!danRun.config.branch)danRun.pauseCount=(danRun.pauseCount||0)+1;
   updateDanPauseRemaining();
-  const canResume=!danRun||(danRun.pauseCount||0)<=2;
+  const canResume=!danRun||danRun.config.branch||(danRun.pauseCount||0)<=2;
   $('overlay').style.display='flex';$('overlay').replaceChildren();
   const h=document.createElement('h2');h.textContent='一時停止';
   const actions=document.createElement('div');actions.className='pause-actions';
@@ -112,7 +113,7 @@ function togglePause(){
   const restart=document.createElement('button');restart.textContent='↻ 最初から';restart.onclick=()=>{const automatic=danRun?danRun.config.auto:auto;if(danRun){exitDan();launchDan(automatic)}else{state='ready';start({auto:automatic})}};
   const q=document.createElement('button');q.textContent='選曲に戻る';q.onclick=()=>{if(danRun)exitDan();else{unlock();reset()}};
   actions.append(b,restart,q);$('overlay').append(h,actions);
-  if(danRun){const p=document.createElement('p');p.className='pause-resume-limit';p.textContent=canResume?'段位の再開：'+(danRun.pauseCount||0)+'/2回使用':'段位では再開を2回まで使用できます。';$('overlay').append(p)}
+  if(danRun&&!danRun.config.branch){const p=document.createElement('p');p.className='pause-resume-limit';p.textContent=canResume?'段位の再開：'+(danRun.pauseCount||0)+'/2回使用':'段位では再開を2回まで使用できます。';$('overlay').append(p)}
  }else if(state==='paused')resumeFromPause();
 }
 function unlock(){['course','files','folder','demo','danOpen','danFiles','danFolder'].forEach(id=>$(id).disabled=false);}
@@ -162,9 +163,10 @@ function addRollHitsCore(r,count=1){
   if((r.type===7||r.type===9)&&r.hits>=r.required){r.done=true;balloonPops++;feedback=''}
   feedbackAt=time();medleyRecord(r,before);update();
 }
-function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(playTime<pauseResumeUntil||danLeadInActive(playTime))return;const t=playTime-judgmentOffsetSeconds();if(t<judgeFrom)return;const damage=notes.find(n=>n.type===10&&!n.done&&!n.ghost&&Math.abs(n.time-t)<=judgmentWindows(n).miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&Math.abs(n.time-t)<=judgmentWindows(n).miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&((n.type>=5&&n.type<=7)||n.type===9)&&t>=n.time&&t<=n.end);if(r&&(![7,9].includes(r.type)||type===1))addRollHits(r)}
+function hit(type,automatic=false){if(!automatic&&autoInputLocked())return;if(state!=='playing'){if(state==='ready'){audio().resume();tone(type)}return}if(auto&&!automatic)return;tone(type);const playTime=time();if(danRun?.medley?.branch)updateMedleyBranch(playTime);if(playTime<pauseResumeUntil||danLeadInActive(playTime))return;const t=playTime-judgmentOffsetSeconds();if(t<judgeFrom)return;const damage=notes.find(n=>n.type===10&&!n.done&&!n.ghost&&(!danRun?.medley?.branch||medleyBranchJudgmentAllowed(n))&&Math.abs(n.time-t)<=judgmentWindows(n).miss);if(damage){judgeCore(damage,1);return}const n=notes.find(n=>!n.done&&!n.ghost&&n.type<=4&&(!danRun?.medley?.branch||medleyBranchJudgmentAllowed(n))&&Math.abs(n.time-t)<=judgmentWindows(n).miss);if(n&&(n.type===1||n.type===3?1:2)===type){judge(n,Math.abs(n.time-t));return}const r=notes.find(n=>!n.done&&!n.ghost&&(!danRun?.medley?.branch||medleyBranchJudgmentAllowed(n))&&((n.type>=5&&n.type<=7)||n.type===9)&&t>=n.time&&t<=n.end);if(r&&(![7,9].includes(r.type)||type===1))addRollHits(r)}
 function songDuration(){if(medleyActive())return chart.duration+Math.max(0,judgmentOffsetSeconds())+.126;return Math.max(.001,chart.duration+(danRun?0:1),danRun?Math.max(0,...chart.notes.map(n=>(n.end??n.time)+judgmentWindows().miss+.001)):0,audioBuffer?.duration||0)}
 function updateProgress(t=time()){
+  if(danRun?.medley?.branch){const fraction=state==='dan-result'?1:Math.max(0,Math.min(1,t/Math.max(.001,chart.duration)));$('songProgressFill').style.transform=`scaleX(${fraction})`;$('songProgress').setAttribute('aria-valuenow',String(Math.floor(fraction*100)));$('courseProgress').hidden=true;return}
   if(medleyActive()){const seg=medleySegmentAt(t),fraction=Math.max(0,Math.min(1,(t-seg.start)/(seg.end-seg.start))),percent=(seg.index+fraction)/danRun.medley.segments.length*100;$('songProgressFill').style.transform=`scaleX(${fraction})`;$('courseProgress').hidden=false;$('courseProgressFill').style.transform=`scaleX(${percent/100})`;$('courseProgress').setAttribute('aria-valuenow',String(Math.floor(percent)));$('songProgress').setAttribute('aria-valuenow',String(Math.floor(fraction*100)));return}
   const songFraction=state==='result'?1:state==='ready'?0:Math.max(0,Math.min(1,t/songDuration()));
   const percent=danRun?Math.min(100,(danRun.index+((state==='dan-break'||danRun.results.length>danRun.index)?1:songFraction))/Math.max(1,danRun.config.songs.length)*100):songFraction*100;
@@ -241,7 +243,7 @@ if(swap?.active.outgoingNotes?.length){
   const n=swap.active.outgoingNotes[i],noteY=branchNoteY(t,n,y,2*r+40,true);
   drawBranchNote(n,noteY,oldPos,oldPos,1);
  }
-}if(danRun){ctx.globalAlpha=fade.lane;ctx.fillStyle='#fff';ctx.font='700 14px sans-serif';ctx.textAlign='left';ctx.textBaseline='bottom';const remaining=notes.filter(n=>n.type<=4&&!n.done).length+(medleyActive()?0:danRun.config.songs.slice(danRun.index+1).reduce((sum,e)=>sum+e.chart.notes.filter(n=>n.type<=4).length,0));ctx.fillText('残り '+remaining+' ノーツ',12,height-6)}drawBranchDetails(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.textAlign='center';const judgment=$('judgmentOverlay');judgment.textContent=feedback&&t-feedbackAt<.45?feedback:'';judgment.style.left=target+'px';judgment.style.top=Math.max(20,y-r-36)+'px';judgment.style.color=feedback==='不可'?'#aaa':feedback==='可'?'#fff':'#ffd565';judgment.style.opacity=fade.lane;$('status').style.opacity=1;if(state==='playing'&&t<(notes[0]?.time??0)-.2){ctx.font='700 15px sans-serif';ctx.fillStyle='#bfc2c3';ctx.fillText('まもなくスタート',width/2,height-18)}}
+}if(danRun&&!danRun.config.branch){ctx.globalAlpha=fade.lane;ctx.fillStyle='#fff';ctx.font='700 14px sans-serif';ctx.textAlign='left';ctx.textBaseline='bottom';const remaining=notes.filter(n=>n.type<=4&&!n.done).length+(medleyActive()?0:danRun.config.songs.slice(danRun.index+1).reduce((sum,e)=>sum+e.chart.notes.filter(n=>n.type<=4).length,0));ctx.fillText('残り '+remaining+' ノーツ',12,height-6)}drawBranchDetails(t,fade.lane);ctx.globalAlpha=fade.lane;ctx.textAlign='center';const judgment=$('judgmentOverlay');judgment.textContent=feedback&&t-feedbackAt<.45?feedback:'';judgment.style.left=target+'px';judgment.style.top=Math.max(20,y-r-36)+'px';judgment.style.color=feedback==='不可'?'#aaa':feedback==='可'?'#fff':'#ffd565';judgment.style.opacity=fade.lane;$('status').style.opacity=1;if(state==='playing'&&t<(notes[0]?.time??0)-.2){ctx.font='700 15px sans-serif';ctx.fillStyle='#bfc2c3';ctx.fillText('まもなくスタート',width/2,height-18)}}
 async function choose(){
  if(importing||danRun)return;seekTarget=0;let chosen=charts[Number($('course').value)||0];loading=true;
  try{if(chosen.serverEntry)chosen=await prepareServerChart(chosen)}
@@ -255,7 +257,7 @@ async function choose(){
  $('fileinfo').textContent=demoMode?'伴奏なし・打音のみで練習できます':playbackAssetsAvailable(chart)?'譜面を読み込みました。音源・MV・spinnerは演奏開始時に読み込みます。':wave?'音源未選択：'+chart.meta.WAVE+' を追加してください':'音源を追加すると演奏できます';
  loading=false;rememberDanCharts();reset();if(chart.warnings?.length)$('fileinfo').textContent+=' ／ 注意：'+chart.warnings.join('、');
 }
-function fillCourses(){const s=$('course');s.replaceChildren();charts.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(c.meta.TITLE||'無題')+' / '+(names[c.meta.COURSE]||c.meta.COURSE||'おに')+' ★'+(c.meta.LEVEL||'?');s.append(o)})}
+function fillCourses(){const s=$('course');s.replaceChildren();charts.forEach((c,i)=>{if(c._hiddenMedleyCandidate)return;const o=document.createElement('option');o.value=i;o.textContent=(c.meta.TITLE||'無題')+' / '+(names[c.meta.COURSE]||c.meta.COURSE||'おに')+' ★'+(c.meta.LEVEL||'?');s.append(o)})}
 
 function filePath(f){return (f.chartPath||f.webkitRelativePath||f.name).replace(/\\/g,'/').normalize('NFC')}
 function normalizedPath(s){const parts=[];for(const p of s.split('/')){if(p==='..')parts.pop();else if(p&&p!=='.')parts.push(p)}return parts.join('/').toLowerCase()}
@@ -305,6 +307,7 @@ async function loadFiles(files){
   for(const f of sounds)if(sounds.filter(a=>a.name.toLowerCase()===f.name.toLowerCase()).length===1)audioFiles.set(f.name.toLowerCase(),f);
   if(!loaded.length&&sounds.length){const match=audioFiles.get((chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase());if(match)chart.audioFile=match}
   if(incoming)pendingDan=incoming;
+  if(pendingDan?.config.branch){rememberDanCharts();hideMedleyBranchCandidates();fillCourses();}
   importing=false;await choose();if(skipped.length)$('fileinfo').textContent+=' ／ 読み飛ばし：'+skipped.join('、');
  }catch(e){$('fileinfo').textContent='読み込みエラー：'+e.message;$('danError').textContent=$('fileinfo').textContent;return}finally{importing=false;loading=false;unlock();$('files').value='';$('folder').value=''}
  await tryStartPendingDan();
@@ -386,7 +389,7 @@ function updateAutoPads(){const now=audioContext?.currentTime||0;document.queryS
 
 function updateDanPauseRemaining(){
  const label=$('danPauseRemaining');if(!label)return;
- if(!danRun){label.hidden=true;return}
+ if(!danRun||danRun.config.branch){label.hidden=true;return}
  const remaining=Math.max(0,2-(danRun.pauseCount||0));
  label.hidden=false;label.textContent='再開あと'+remaining+'回';
 }
@@ -594,7 +597,7 @@ function updateDummyPlayback(t){
   }else n.done=true;
  }
 }
-function renderNotes(){const dummy=dummyNotesForPlay();if(!renderNoteCache||renderNoteCache.notes!==notes||renderNoteCache.dummy!==dummy){renderNoteCache={notes,dummy,list:[...notes,...dummy].sort((a,b)=>a.time-b.time)}}return renderNoteCache.list;}
+function renderNotes(){if(danRun?.medley?.branch)return medleyBranchRenderNotes();const dummy=dummyNotesForPlay();if(!renderNoteCache||renderNoteCache.notes!==notes||renderNoteCache.dummy!==dummy){renderNoteCache={notes,dummy,list:[...notes,...dummy].sort((a,b)=>a.time-b.time)}}return renderNoteCache.list;}
 
 // Touch cancellation supplements touch-action for Safari double-tap gestures.
 // Judgment remains pointerdown-only, preserving simultaneous and rapid hits.
@@ -632,6 +635,7 @@ function songOfficialGenre(c){
 function songGroups(){
  const grouped={official:new Map(),creative:new Map(),uploaded:new Map()};
  charts.forEach((c,index)=>{
+  if(c._hiddenMedleyCandidate)return;
   const category=songCategory(c),title=c.meta.TITLE||'無題';
   if(category==='official'){
    const genre=songOfficialGenre(c);

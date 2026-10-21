@@ -8,10 +8,8 @@ function parseMedleyBranch(fields,songs,mode,fail){
  const key=keys[0],index=Number(key.slice(6))-1;
  const parts=fields.get(key).split(',').map(s=>s.trim());
  const [metric,op,value,yes,no]=parts,threshold=Number(value),pass=Number(yes)-1,reject=Number(no)-1;
- const metrics=['accuracy','best','good','miss','score','roll','combo','allcombo','soul'];
  if(index<0||!Number.isSafeInteger(index)||songs.length!==index+3)fail(key+' の後に通常用・達成時用の2区間を指定してください。');
- if(parts.length!==5||!metrics.includes(metric)||!['m','l'].includes(op)||!value||!Number.isFinite(threshold)||threshold<0||
-   (['accuracy','soul'].includes(metric)?threshold>100:!Number.isSafeInteger(threshold)))fail(key+' は 条件種類,m/l,条件値,達成時の曲番号,未達時の曲番号 です。');
+ if(parts.length!==5||!validSongBranchCondition(metric,op,value))fail(key+' は 条件種類,m/l,条件値,達成時の曲番号,未達時の曲番号 です。');
  if(!/^\d+$/.test(yes)||!/^\d+$/.test(no)||pass===reject||![pass,reject].every(i=>i===index+1||i===index+2))fail(key+' の分岐先には後続の2区間をそれぞれ指定してください。');
  return {index,metric,op,threshold,pass,reject};
 }
@@ -56,16 +54,21 @@ function medleyBranchStats(){
  const result=medleyEmptyStats();
  for(const s of m.stats.slice(0,b.rule.index+1)){
   for(const key of ['good','ok','miss','score','rolls','allcombo'])result[key]+=s[key];
+  for(let type=1;type<result.noteHits.length;type++)result.noteHits[type]+=s.noteHits[type];
   result.maxCombo=Math.max(result.maxCombo,s.maxCombo);
  }
  const pending=notes.filter(n=>n.medleyIndex<=b.rule.index&&n.type<=4&&!n.done&&!n.ghost);
  if(run.config.auto){
   // Autoplay is known before the first audio quantum, including coarse frames.
   result.good=common.reduce((n,s)=>n+s.chart.notes.filter(x=>x.type<=4).length,0);result.ok=result.miss=0;
+  result.noteHits.fill(0);
   result.rolls=0;result.score=0;
   for(const s of common){
    result.score+=s.chart.notes.filter(n=>n.type<=4).length*s.noteScore;
-   for(const n of s.chart.notes)if(n.type>=5&&n.type<=9&&n.type!==8){const hits=autoRollHits(n,n.end);result.rolls+=hits;result.score+=hits*100}
+   for(const n of s.chart.notes){
+    if(n.type<=4)result.noteHits[n.type]++;
+    else if(n.type>=5&&n.type<=9&&n.type!==8){const hits=autoRollHits(n,n.end);result.rolls+=hits;result.score+=hits*100;result.noteHits[n.type]+=hits}
+   }
   }
   result.allcombo=result.good+result.rolls;result.maxCombo=result.good;
   result.soul=Math.min(100,result.good*130/soulNoteCount());
@@ -85,7 +88,8 @@ function refreshMedleyBranchAudio(){
  const b=danRun.medley.branch;
  if(b.decided||(Number.isFinite(b.audioBoundary)&&audio().currentTime>=b.audioBoundary))return;
  const stats=medleyBranchStats(),types={best:'good',good:'ok',roll:'rolls',combo:'maxCombo'};
- const value=stats[types[b.rule.metric]||b.rule.metric];
+ const noteTypes=songBranchNoteTypes(b.rule.metric);
+ const value=noteTypes?noteTypes.reduce((sum,type)=>sum+stats.noteHits[type],0):stats[types[b.rule.metric]||b.rule.metric];
  b.pendingPass=b.rule.op==='m'?value>=b.rule.threshold:value<b.rule.threshold;
  for(const gate of b.gates){
   gate.node.gain.cancelScheduledValues(b.audioBoundary);
@@ -122,6 +126,10 @@ function medleyBranchJudgmentAllowed(n){
 function hideMedleyBranchCandidates(){
  if(!pendingDan?.config.branch)return;
  const key=c=>normalizedPath(c.sourcePath||c.meta.TITLE||'');
+ if(pendingDan.embedded){
+  const source=key(pendingDan.rootChart),missing=danCandidateCharts().map(e=>e.chart).filter(c=>c.songBranch&&key(c)===source&&!charts.includes(c));
+  charts.unshift(...missing);
+ }
  const common=new Set(),endings=new Set(),b=pendingDan.config.branch;
  pendingDan.config.songs.forEach((_,i)=>{
   try{const c=resolveDanConfig(true,i).songs[0]?.chart;if(c)(i<=b.index?common:endings).add(key(c))}catch{}
@@ -133,6 +141,22 @@ function hideMedleyBranchCandidates(){
 function pendingHiddenMedley(c=chart){
  if(!pendingDan?.config.branch)return false;
  try{return resolveDanConfig(true,0).songs[0]?.chart===c}catch{return false}
+}
+
+function activateTjaSongBranch(c,force=false){
+ if(!c?.songBranch||danRun||(!force&&pendingDan&&!pendingDan.embedded))return false;
+ const b=c.songBranch,course=String(c.meta.COURSE||'Oni').toLowerCase(),courses={easy:0,normal:1,hard:2,oni:3,edit:4};
+ const difficulty=Object.hasOwn(courses,course)?courses[course]:/^[0-4]$/.test(course)?Number(course):-1;
+ if(difficulty<0)return false;
+ const source=c.sourcePath||c.meta.TITLE,from=Math.min(0,c.measures?.[0]?.time??0)||0;
+ const config={name:c.meta.TITLE||'無題',mode:'MEDLEY',gauge:80,goldGauge:100,conditions:[],hide:[],songs:[
+  {chart:source,course:difficulty,range:[from,b.time]},
+  {chart:source,course:difficulty,range:[b.time,b.time+.001]},
+  {chart:b.target,course:difficulty,measures:[b.measure,b.measure+1]}],
+  branch:{index:0,metric:b.metric,op:b.op,threshold:b.threshold,pass:2,reject:1}};
+ pendingDan={config,path:c.sourcePath||'song.tja',armed:false,embedded:true,rootChart:c,
+  localOnly:!!c.uploadedLocal,localCharts:c._songBranchLocalCharts||new Set(charts.filter(x=>x.uploadedLocal))};
+ return true;
 }
 
 function showHiddenMedleyResult(){

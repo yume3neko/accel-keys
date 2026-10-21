@@ -130,12 +130,16 @@ function medleyFadeAt(t){
  if(medleyInSeam(s,t-s.shift))return {info:1,lane:1,note:1,button:1};
  return chartFadeAt(s.safeFades,t-s.shift);
 }
-function medleyEmptyStats(){return {score:0,good:0,ok:0,miss:0,rolls:0,maxCombo:0,balloonRolls:0,balloonPops:0,allcombo:0,soul:0,combo:0}}
+function medleyEmptyStats(){return {score:0,good:0,ok:0,miss:0,rolls:0,noteHits:Array(11).fill(0),maxCombo:0,balloonRolls:0,balloonPops:0,allcombo:0,soul:0,combo:0}}
 function medleyRecord(n,before,error){
  if(!medleyActive()||n.medleyIndex===undefined)return;
  const s=danRun.medley.stats[n.medleyIndex],after=danStats();
  for(const key of ['score','good','ok','miss','rolls','balloonRolls','balloonPops','allcombo'])s[key]+=after[key]-before[key];
- if(error!==undefined){s.combo=error<=judgmentWindows(n).ok?s.combo+1:0;s.maxCombo=Math.max(s.maxCombo,s.combo)}
+ if(error!==undefined){s.combo=error<=judgmentWindows(n).ok?s.combo+1:0;s.maxCombo=Math.max(s.maxCombo,s.combo);
+  // A strike within the hit window counts even if it receives a bad timing
+  // judgment. Letting a note pass uses error=1 and does not count as a strike.
+  if(n.type===10||(n.type>=1&&n.type<=4&&error<=judgmentWindows(n).miss))s.noteHits[n.type]++;
+ }else if([5,6,7,9].includes(n.type))s.noteHits[n.type]+=after.rolls-before.rolls;
  s.soul=soul;
  if(danRun.medley.branch)refreshMedleyBranchAudio();
 }

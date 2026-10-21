@@ -14,8 +14,8 @@ SONG3:full.tja,3
 MEASURES3:2,3
 BRANCH1:accuracy,m,75,3,2`;
 function engineFunction(name){const code=read('app.js'),at=code.search(new RegExp('^(?:async )?function '+name+'\\(','m')),end=code.indexOf('\n',at);if(at<0)throw Error(name);return code.slice(at,end).endsWith('}')?code.slice(at,end):code.slice(at,code.indexOf('\n}',end)+2)}
-function env(automatic=false){
- const c=vm.createContext({console,structuredClone,setTimeout,clearTimeout,config,automatic});
+function env(automatic=false,source=config){
+ const c=vm.createContext({console,structuredClone,setTimeout,clearTimeout,config:source,automatic});
  for(const name of ['tja.js','malody.js','dan.js','medley.js','medley-branch.js','medley-tools.js'])vm.runInContext(read(name),c);
  vm.runInContext(String.raw`
  const starts=[],gains=[],nodes=new Map();
@@ -155,4 +155,94 @@ test('adding a missing ending later keeps the common song selectable and resolve
  await run(c,'loadFiles(second)');assert.equal(run(c,'chart.meta.TITLE'),'Song');
  assert.equal(run(c,'resolveDanConfig().songs.length'),3);
  assert.equal(run(c,'charts.find(c=>c.meta.TITLE==="Full")._hiddenMedleyCandidate'),true);
+});
+
+const noBlueConfig=config.replace('accuracy,m,75','note2+4,l,1');
+test('note types are counted individually, including bad timing strikes but excluding notes left untouched',()=>{
+ for(const type of [1,2,3,4])for(const error of [0,.05,.09]){
+  const c=env(false,noBlueConfig);c.type=type;c.error=error;
+  run(c,'notes[0].type=type;audioContext.currentTime=100+error;hit(type===1||type===3?1:2)');
+  assert.equal(run(c,'danRun.medley.stats[0].noteHits[type]'),1);
+  assert.equal(run(c,'danRun.medley.stats[0].noteHits.reduce((a,b)=>a+b,0)'),1);
+  assert.equal(run(c,'danRun.medley.branch.pendingPass'),type===1||type===3);
+ }
+ const c=env(false,noBlueConfig);
+ run(c,'audioContext.currentTime=102.2;judge(notes[1],1)');
+ assert.equal(run(c,'miss'),1);assert.equal(run(c,'medleyBranchStats().noteHits[2]'),0);
+ assert.equal(run(c,'danRun.medley.branch.pendingPass'),true);
+});
+test('roll and balloon strikes retain their individual note types; empty rim taps do not count',()=>{
+ for(const type of [5,6,7,9]){
+  const c=env(false,noBlueConfig);c.type=type;
+  run(c,'audioContext.currentTime=101;hit(2);notes.push({type,time:1,end:1.9,medleyIndex:0,done:false,hits:0,required:3});audioContext.currentTime=101.2;hit(1);hit(1)');
+  assert.equal(run(c,'medleyBranchStats().noteHits[type]'),2);
+  assert.equal(run(c,'medleyBranchStats().noteHits[2]'),0);
+  assert.equal(run(c,'danRun.medley.branch.pendingPass'),true);
+ }
+ const c=env();run(c,'notes.unshift({type:10,time:0,medleyIndex:0,done:false});hit(1)');
+ assert.equal(run(c,'medleyBranchStats().noteHits[10]'),1);
+});
+test('generic type sums work at the audio boundary and autoplay predicts every common note type',()=>{
+ const c=env(false,noBlueConfig);
+ assert.equal(run(c,'danRun.medley.branch.pendingPass'),true);
+ run(c,'hit(1);audioContext.currentTime=102;hit(2)');
+ assert.equal(run(c,'danRun.medley.branch.pendingPass'),false);
+ run(c,'audioContext.currentTime=104;updateMedleyBranch(time())');
+ assert.equal(run(c,'danRun.medley.branch.passed'),false);
+ const automatic=env(true,noBlueConfig);
+ assert.deepEqual(json(automatic,'medleyBranchStats().noteHits.slice(1,5)'),[1,1,0,0]);
+ assert.equal(run(automatic,'danRun.medley.branch.pendingPass'),false);
+ const noHits=env(false,noBlueConfig);
+ run(noHits,'audioContext.currentTime=104;updateMedleyBranch(time())');
+ assert.equal(run(noHits,'danRun.medley.branch.passed'),true);
+});
+test('TJA song branch parses its exact command time, quoted target and original offset/meter/BPM',()=>{
+ const c=env();c.text='TITLE:Source\nBPM:120\nOFFSET:-1.25\nCOURSE:Oni\n#START\n#MEASURE 3/4\n1000,\n#BPMCHANGE 60\n2000,\n#SONGBRANCH note2+4, l, 1, "full, mix.tja", 3\n#GOGOSTART\n3000,\n#END';
+ assert.equal(run(c,'parseTJA(text).charts[0].songBranch.time'),5.75);
+ assert.deepEqual(json(c,'parseTJA(text).charts[0].songBranch'),{time:5.75,metric:'note2+4',op:'l',threshold:1,target:'full, mix.tja',measure:3});
+ assert.deepEqual(json(c,'parseTJA(text).warnings'),[]);
+ assert.equal(run(c,'parseTJA(text).charts[0].notes.at(-1).time'),5.75);
+ for(const bad of ['note2+2,l,1,full.tja,2','note8,l,1,full.tja,2','note2,l,.5,full.tja,2','note2,l,1,full.ogg,2','note2,l,1,../full.tja,2','note2,l,1,/full.tja,2','note2,l,1,full.tja,0','note2,x,1,full.tja,2']){
+  c.bad=textReplace(c.text,bad);assert.throws(()=>run(c,'parseTJA(bad)'),/SONGBRANCH/);
+ }
+ c.bad=c.text.replace('#GOGOSTART','#SONGBRANCH note1,m,1,other.tja,1');assert.throws(()=>run(c,'parseTJA(bad)'),/1か所/);
+ function textReplace(text,definition){return text.replace(/#SONGBRANCH[^\n]+/,'#SONGBRANCH '+definition)}
+});
+test('TJA alone arms hidden playback in every difficulty, keeps local scope and hides all target courses',()=>{
+ const c=env();run(c,`
+  const courseNames=['Easy','Normal','Hard','Oni','Edit'];
+  const allShort=courseNames.map(course=>{const c=parseTJA('TITLE:Song\\nBPM:120\\nCOURSE:'+course+'\\n#START\\n1000,\\n2000,\\n#SONGBRANCH note2+4,l,1,full.tja,2\\n3000,\\n4000,\\n#END').charts[0];return {...c,sourcePath:'short.tja',uploadedLocal:true}});
+  const allFull=courseNames.map(course=>({...full,meta:{...full.meta,COURSE:course},uploadedLocal:true}));
+  const scope=new Set([...allShort,...allFull]);allShort.forEach(c=>c._songBranchLocalCharts=scope);
+  let charts=[...allShort,...allFull];pendingDan=null;danRun=null;danPool.length=0;danPool.push(...charts.map(chart=>({chart})));
+ `);
+ for(let i=0;i<5;i++){
+  c.courseIndex=i;run(c,'chart=allShort[courseIndex];activateTjaSongBranch(chart);hideMedleyBranchCandidates()');
+  assert.equal(run(c,'pendingDan.embedded&&pendingDan.localOnly'),true);
+  assert.equal(run(c,'pendingHiddenMedley()'),true);
+  assert.equal(run(c,'resolveDanConfig().songs[2].chart===allFull[courseIndex]'),true);
+  assert.equal(run(c,'allShort.every(c=>!c._hiddenMedleyCandidate)&&allFull.every(c=>c._hiddenMedleyCandidate)'),true);
+  assert.equal(run(c,'pendingDan.config.songs[0].range[0]'),0);
+ }
+ run(c,'charts=allFull.slice();hideMedleyBranchCandidates()');
+ assert.equal(run(c,'allShort.every(c=>charts.includes(c))'),true);
+});
+test('loading only TJA and audio activates the embedded fork, and later target imports preserve all source difficulties',async()=>{
+ const c=env();Object.assign(c,{File,TextDecoder});
+ for(const name of ['filePath','normalizedPath','decodeDanText','loadFiles'])vm.runInContext(engineFunction(name),c);
+ run(c,String.raw`
+  let charts=[],audioFiles=new Map(),loading=false,importing=false,demoMode=false;danRun=null;pendingDan=null;state='ready';
+  function fillCourses(){$('course').value=String(Math.max(0,charts.findIndex(c=>!c._hiddenMedleyCandidate)))}
+  function attachVideos(){}function attachSpinners(){}function unlock(){}function refreshDanSongs(){}
+  async function choose(){chart=charts[Number($('course').value)];rememberDanCharts()}
+ `);
+ const courses=['Easy','Normal','Hard','Oni','Edit'];
+ const shortText='TITLE:Song\nBPM:120\nWAVE:short.ogg\n'+courses.map(course=>'COURSE:'+course+'\n#START\n1000,\n2000,\n#SONGBRANCH note2+4,l,1,full.tja,2\n3000,\n4000,\n#END').join('\n');
+ const fullText=shortText.replace('TITLE:Song','TITLE:Full').replace('short.ogg','full.ogg').replaceAll('#SONGBRANCH note2+4,l,1,full.tja,2\n','');
+ c.first=[new File([shortText],'short.tja'),new File(['audio'],'short.ogg')];
+ await run(c,'loadFiles(first)');assert.equal(run(c,'pendingDan.embedded'),true);
+ c.second=[new File([fullText],'full.tja'),new File(['audio'],'full.ogg')];
+ await run(c,'loadFiles(second)');
+ assert.equal(run(c,'charts.filter(c=>c.songBranch&&!c._hiddenMedleyCandidate).length'),5);
+ assert.equal(run(c,'resolveDanConfig().songs.length'),3);
 });

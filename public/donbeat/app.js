@@ -13,7 +13,7 @@ function judgmentOffsetSeconds(){return Number($('offset').value||0)/1000*active
 function time(){return state==='playing'?(audioContext.currentTime-startAt)*activeSongRate:pausedTime}
 function stopAudio(){stopMedleyAudio();clearAutoPads();stopMV();if(source){try{source.stop()}catch{}source=null}}
 function scheduleAudio(t){stopAudio();scheduleDanLeadIn(t);if(medleyActive()){scheduleMedleyAudio(t);return}if(!audioBuffer)return;source=audio().createBufferSource();source.buffer=audioBuffer;source.playbackRate.value=activeSongRate;source.connect(musicGain);if(t<0)source.start(audioContext.currentTime-t/activeSongRate);else if(t<audioBuffer.duration)source.start(audioContext.currentTime,t)}
-function reset(){clearMultiCourse();document.body.classList.add('selecting');document.body.classList.remove('desktop-play');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;clearScoreGains();if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true}seek.disabled=!chart?.measures?.length;renderSongSelection();draw()}
+function reset(){clearMultiCourse();document.body.classList.add('selecting');document.body.classList.remove('desktop-play');playbackVisualChart=null;audioBuffer=null;dummyPlayback=null;balloonRolls=balloonPops=0;clearScoreGains();if(danRun){exitDan();return}practiceTarget=null;judgeFrom=-Infinity;pauseResumeUntil=-Infinity;cancelAnimationFrame(raf);stopAudio();state='ready';leavePlayFullscreen();document.body.classList.remove('playing');$('pause').disabled=true;setPauseIcon(false);notes=chart.notes.map(n=>({...n,done:false,hits:0}));score=combo=maxCombo=good=ok=miss=rolls=soul=0;pausedTime=Math.min(-2,(chart.notes[0]?.time||0)-2);feedback='';beatIndex=0;update();$('overlay').style.display='flex';$('overlay').replaceChildren();const e=document.createElement('span');e.className='eyebrow';e.textContent='READY TO DRUM?';const h=document.createElement('h2');h.hidden=true;const p=document.createElement('p');p.hidden=true;const b=document.createElement('button');b.className='primary';b.textContent='▶ 演奏スタート';b.onclick=()=>start();const seek=document.createElement('button');seek.className='seek-start';seek.textContent='途中からはじめる';seek.onclick=openSeek;const buttons=document.createElement('div');buttons.className='seek-buttons';const ab=document.createElement('button');ab.textContent='オートプレイでスタート';ab.onclick=()=>start({auto:true});buttons.append(b,ab,seek);$('overlay').append(e,h,p,buttons);const playable=demoMode||playbackAssetsAvailable(chart);$('status').textContent=playable?'譜面準備完了':'音源の追加が必要です';if(!playable){h.hidden=false;p.hidden=false;h.textContent='音源を追加してください';p.textContent='譜面に対応する音源を選ぶと演奏できます。';b.disabled=true;ab.disabled=true}seek.disabled=!chart?.measures?.length||!!chart.songBranch;renderSongSelection();draw()}
 function syncRebuiltChart(next){
  let index=charts.indexOf(chart);
  if(index<0){
@@ -33,6 +33,7 @@ function branchPreviewChoices(decided,currentRoute='N'){
  return [...decided,...Array(Math.max(0,count-decided.length)).fill(route)];
 }
 async function start(options={}){
+ if(!options.dan&&chart?.songBranch)activateTjaSongBranch(chart);
  if(!options.dan&&typeof pendingDan!=='undefined'&&pendingDan?.config.branch&&pendingHiddenMedley())return launchDan(options.auto===true);
  if(loading||importing||state==='playing'||(danRun&&!options.dan)||(!demoMode&&!danRun&&!playbackAssetsAvailable(chart)))return;
  activeSongRate=Number($('musicSpeed')?.value)||1;
@@ -255,7 +256,7 @@ async function choose(){
  $('level').textContent='★ '+(chart.meta.LEVEL||'?');$('bpm').textContent=chart.bpm+' BPM';
  updateDesktopPlayInfo(chart);
  $('fileinfo').textContent=demoMode?'伴奏なし・打音のみで練習できます':playbackAssetsAvailable(chart)?'譜面を読み込みました。音源・MV・spinnerは演奏開始時に読み込みます。':wave?'音源未選択：'+chart.meta.WAVE+' を追加してください':'音源を追加すると演奏できます';
- loading=false;rememberDanCharts();reset();if(chart.warnings?.length)$('fileinfo').textContent+=' ／ 注意：'+chart.warnings.join('、');
+ loading=false;rememberDanCharts();if(activateTjaSongBranch(chart)){const selected=charts.indexOf(chart);hideMedleyBranchCandidates();fillCourses();$('course').value=String(selected)}reset();if(chart.warnings?.length)$('fileinfo').textContent+=' ／ 注意：'+chart.warnings.join('、');
 }
 function fillCourses(){const s=$('course');s.replaceChildren();charts.forEach((c,i)=>{if(c._hiddenMedleyCandidate)return;const o=document.createElement('option');o.value=i;o.textContent=(c.meta.TITLE||'無題')+' / '+(names[c.meta.COURSE]||c.meta.COURSE||'おに')+' ★'+(c.meta.LEVEL||'?');s.append(o)})}
 
@@ -300,13 +301,14 @@ async function loadFiles(files){
   attachVideos([...danPool.map(e=>e.chart),...loaded],expanded);
   attachSpinners([...danPool.map(e=>e.chart),...loaded],expanded);
   // Commit only after parsing succeeds; importing a broken package keeps the current song.
-  if(loaded.length){audioFiles=new Map();charts=[...loaded,...charts.filter(c=>c.serverEntry)];demoMode=false;fillCourses()}
+  if(loaded.length){const scope=new Set(loaded);for(const c of loaded)if(c.songBranch)c._songBranchLocalCharts=scope;audioFiles=new Map();charts=[...loaded,...charts.filter(c=>c.serverEntry)];demoMode=false;fillCourses()}
    // Keep the mixed local course locked to charts from this import.  Further
    // local chart uploads can complete the package, but older/R2 charts cannot.
    rememberDanImportedCharts(loaded,incoming);
   for(const f of sounds)if(sounds.filter(a=>a.name.toLowerCase()===f.name.toLowerCase()).length===1)audioFiles.set(f.name.toLowerCase(),f);
   if(!loaded.length&&sounds.length){const match=audioFiles.get((chart.meta.WAVE||'').replace(/\\/g,'/').split('/').pop().toLowerCase());if(match)chart.audioFile=match}
   if(incoming)pendingDan=incoming;
+  else if(loaded.some(c=>c.songBranch)){rememberDanCharts();const root=loaded.find(c=>c.songBranch);activateTjaSongBranch(root,true);$('course').value=String(charts.indexOf(root))}
   if(pendingDan?.config.branch){rememberDanCharts();hideMedleyBranchCandidates();fillCourses();}
   importing=false;await choose();if(skipped.length)$('fileinfo').textContent+=' ／ 読み飛ばし：'+skipped.join('、');
  }catch(e){$('fileinfo').textContent='読み込みエラー：'+e.message;$('danError').textContent=$('fileinfo').textContent;return}finally{importing=false;loading=false;unlock();$('files').value='';$('folder').value=''}
@@ -702,9 +704,9 @@ function renderSongSelection(){
    const status=document.createElement('p');status.className='muted';const playable=demoMode||playbackAssetsAvailable(c);status.textContent=loading?'読み込み中…':demoMode?'練習曲':playable?(audioBuffer&&c===chart?'演奏できます':'譜面準備完了・素材は演奏開始時に読み込み'):'音源を追加してください';panel.append(status);
    const actions=document.createElement('div');actions.className='song-choice-actions';
    for(const [text,action,primary] of [['▶ 演奏スタート',()=>start(),true],['オートプレイでスタート',()=>start({auto:true}),false],['途中からはじめる',()=>openSeek(),false]]){
-    const button=document.createElement('button');button.textContent=text;if(primary)button.className='primary';button.disabled=loading||importing||!playable||c!==chart;button.onclick=action;actions.append(button);
+    const button=document.createElement('button');button.textContent=text;if(primary)button.className='primary';button.disabled=loading||importing||!playable||c!==chart||(!!c.songBranch&&text==='途中からはじめる');button.onclick=action;actions.append(button);
    }
-   if(entries.length>1){const multi=document.createElement('button');multi.textContent='複数難易度を同時再生';multi.disabled=loading||importing;multi.onclick=()=>openMultiCourse(entries);actions.append(multi)}
+   if(entries.length>1){const multi=document.createElement('button');multi.textContent='複数難易度を同時再生';multi.disabled=loading||importing||entries.some(e=>e.c.songBranch);multi.onclick=()=>openMultiCourse(entries);actions.append(multi)}
    panel.append(actions);
   }
   const badges=featureBadges(entries.map(e=>e.c));heading.append(badges);item.append(heading,panel);target.append(item);
